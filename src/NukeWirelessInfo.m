@@ -159,10 +159,13 @@ static void presentInfo(UIViewController *controller) {
     }
 
     CGFloat width = scroll.bounds.size.width;
-    overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 392, width, 1800)];
+    overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 392, width, 370)];
     overlay.tag = kInfoOverlayTag;
     overlay.backgroundColor = UIColor.blackColor;
     [scroll addSubview:overlay];
+    CGSize contentSize = scroll.contentSize;
+    contentSize.height = MAX(contentSize.height, CGRectGetMaxY(overlay.frame));
+    scroll.contentSize = contentSize;
     if (!linkTarget) linkTarget = [NWInfoLinkTarget new];
 
     NSString *avatarPath = [[NSBundle mainBundle] pathForResource:@"CreditsAvatar" ofType:@"jpg"];

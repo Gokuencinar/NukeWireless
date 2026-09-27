@@ -42,6 +42,8 @@ def read_zstd_tar(archive: bytes) -> list[tuple[tarfile.TarInfo, bytes | None]]:
     with tarfile.open(fileobj=io.BytesIO(expanded), mode="r:") as tf:
         for member in tf:
             payload = tf.extractfile(member).read() if member.isfile() else None
+            if member.isfile() and len(payload) != member.size:
+                raise ValueError(f"truncated tar member: {member.name}")
             entries.append((copy.copy(member), payload))
     return entries
 
@@ -57,7 +59,8 @@ def main() -> None:
     if hashlib.sha256(original).hexdigest() != EXPECTED_SOURCE_SHA256:
         raise ValueError("source deb differs from the known-working Nuke Wireless 1.0.25 package")
     info_binary = (ROOT / "prebuilt" / "NukeWirelessInfo_ios.dylib").read_bytes()
-    if b"https://buymeacoffee.com/gokuen" not in info_binary or b"BSSID:" not in info_binary:
+    if (b"https://buymeacoffee.com/gokuen" not in info_binary or
+        b"NWInfoLinkTarget" not in info_binary or b"BSSID" not in info_binary):
         raise ValueError("Info extension binary does not match this source")
 
     parts = read_ar(original)
@@ -77,25 +80,28 @@ def main() -> None:
     if not required.issubset(data_names) or {INFO_LIBRARY, INFO_FILTER, INFO_PATCH} & data_names:
         raise ValueError("unexpected source package contents")
 
-    for member, payload in control_entries:
+    for index, (member, payload) in enumerate(control_entries):
         name = member.name.lstrip("./")
         if name == "control":
             payload = replace_once(payload, b"Version: 1.0.25+rh25\n",
                                    b"Version: 1.0.25+rh25.1\n")
             member.size = len(payload)
+            control_entries[index] = (member, payload)
         elif name == "postinst":
             payload = replace_once(payload,
                 b"ldid -S /usr/lib/TweakInject/NukeWirelessPaths.dylib\n",
                 b"ldid -S /usr/lib/TweakInject/NukeWirelessPaths.dylib\n"
                 b"ldid -S /usr/lib/TweakInject/NukeWirelessInfo.dylib\n")
             member.size = len(payload)
+            control_entries[index] = (member, payload)
 
-    for member, payload in data_entries:
+    for index, (member, payload) in enumerate(data_entries):
         if member.name.lstrip("./") == ENTITLEMENTS:
             payload = replace_once(payload, b"</dict></plist>",
                 b"<key>com.apple.developer.networking.wifi-info</key><true/>\n"
                 b"</dict></plist>")
             member.size = len(payload)
+            data_entries[index] = (member, payload)
 
     filter_data = next(payload for member, payload in data_entries
         if member.name.lstrip("./") == "usr/lib/TweakInject/NukeWirelessPaths.plist")
@@ -104,6 +110,10 @@ def main() -> None:
         regular(INFO_FILTER, filter_data),
         symlink(INFO_PATCH, "/usr/lib/DynamicPatches/AutoPatches.dylib"),
     ])
+
+    for member, payload in control_entries + data_entries:
+        if member.isfile() and len(payload) != member.size:
+            raise ValueError(f"tar member size mismatch: {member.name}: {member.size} != {len(payload)}")
 
     output = pack_ar([
         ("debian-binary", parts["debian-binary"]),
