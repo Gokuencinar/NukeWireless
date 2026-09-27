@@ -1,12 +1,12 @@
-name: Build Harpy Reloaded RootHide library
+name: Build Nuke Wireless Info extension
 
 on:
   push:
     branches:
       - main
     paths:
-      - src/HarpyRootHidePaths.c
-      - .github/workflows/build-tweak.yml
+      - src/NukeWirelessInfo.m
+      - .github/workflows/build-info.yml
 
 permissions:
   contents: write
@@ -16,26 +16,28 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile iOS arm64 library
+      - name: Compile Info extension for iOS arm64
         shell: bash
         run: |
           set -euo pipefail
           sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
           xcrun --sdk iphoneos clang \
             -arch arm64 -miphoneos-version-min=16.3 \
-            -isysroot "$sdk" -fPIC -fblocks -O2 \
+            -isysroot "$sdk" -fobjc-arc -fblocks -fPIC -O2 \
             -dynamiclib -Wl,-undefined,dynamic_lookup \
-            -o prebuilt/HarpyRootHidePaths_ios.dylib \
-            src/HarpyRootHidePaths.c
-          file prebuilt/HarpyRootHidePaths_ios.dylib
-      - name: Save compiled library
+            -framework UIKit -framework Foundation \
+            -framework QuartzCore -framework SystemConfiguration \
+            -o prebuilt/NukeWirelessInfo_ios.dylib \
+            src/NukeWirelessInfo.m
+          file prebuilt/NukeWirelessInfo_ios.dylib
+      - name: Save compiled Info library
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add prebuilt/HarpyRootHidePaths_ios.dylib
+          git add prebuilt/NukeWirelessInfo_ios.dylib
           if ! git diff --cached --quiet; then
-            git commit -m "Build Harpy Reloaded RootHide 1.0.26 library"
+            git commit -m "Build Nuke Wireless Info-only library"
             git push origin HEAD:main
           fi

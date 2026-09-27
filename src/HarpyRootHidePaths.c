@@ -5,39 +5,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
-#include <stdint.h>
-#if __has_include(<net/route.h>)
 #include <net/route.h>
-#else
-/* iPhoneOS SDKs omit the BSD routing-table declarations. */
-#define NET_RT_FLAGS 2
-#define RTF_LLINFO 0x400
-#define RTAX_DST 0
-#define RTAX_GATEWAY 1
-#define RTAX_MAX 8
-struct rt_metrics {
-    unsigned long rmx_locks, rmx_mtu, rmx_hopcount, rmx_expire;
-    unsigned long rmx_recvpipe, rmx_sendpipe, rmx_ssthresh, rmx_rtt;
-    unsigned long rmx_rttvar, rmx_weight;
-    uint32_t rmx_filler[3];
-};
-struct rt_msghdr {
-    unsigned short rtm_msglen;
-    unsigned char rtm_version, rtm_type;
-    unsigned short rtm_index;
-    int rtm_flags, rtm_addrs;
-    pid_t rtm_pid;
-    int rtm_seq, rtm_errno, rtm_use;
-    uint32_t rtm_inits;
-    struct rt_metrics rtm_rmx;
-};
-#endif
 #include <net/if_dl.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <time.h>
 
 typedef void *id;
@@ -83,7 +58,7 @@ static void (*original_did_appear)(id, SEL, BOOL);
 static void (*original_found_device)(id, SEL, id);
 static id oui_brands;
 static int ui_dump_count;
-static id info_button_target;
+static int info_overlay_added;
 struct cg_point { double x, y; };
 struct cg_size { double width, height; };
 struct cg_rect { struct cg_point origin; struct cg_size size; };
@@ -270,22 +245,6 @@ static int get_interface_ip(const char *name, char *ip, unsigned long ip_size) {
             item->ifa_addr->sa_family != AF_INET) continue;
         struct sockaddr_in *address = (struct sockaddr_in *)item->ifa_addr;
         if (inet_ntop(AF_INET, &address->sin_addr, ip, (socklen_t)ip_size))
-            found = 1;
-        break;
-    }
-    freeifaddrs(first);
-    return found;
-}
-
-static int get_interface_netmask(const char *name, char *mask, unsigned long mask_size) {
-    struct ifaddrs *first = 0;
-    if (getifaddrs(&first) != 0) return 0;
-    int found = 0;
-    for (struct ifaddrs *item = first; item; item = item->ifa_next) {
-        if (!item->ifa_addr || !item->ifa_netmask || !equals(item->ifa_name, name) ||
-            item->ifa_addr->sa_family != AF_INET) continue;
-        struct sockaddr_in *address = (struct sockaddr_in *)item->ifa_netmask;
-        if (inet_ntop(AF_INET, &address->sin_addr, mask, (socklen_t)mask_size))
             found = 1;
         break;
     }
@@ -642,10 +601,8 @@ static void patched_found_device(id self, SEL cmd, id device) {
     debug_line("scan-device-brand", brand);
     char local_ip[32] = {0};
     if (ip && get_interface_ip("en0", local_ip, sizeof(local_ip)) &&
-        equals(ip, local_ip) && name && name[0] && !equals(name, "Unknown Host")) {
+        equals(ip, local_ip) && name && name[0] && !equals(name, "Unknown Host"))
         scanned_count = 0; /* The local entry starts a fresh Wi-Fi scan. */
-        bulk_confirm_count = 0;
-    }
     if (ip && get_interface_ip("en0", local_ip, sizeof(local_ip)) &&
         equals(ip, local_ip) && (!name || !name[0] ||
             equals(name, "Unknown Host"))) {
@@ -688,29 +645,14 @@ static void set_bulk_title(const char *title) {
             sel_registerName("setTitle:forState:"), string_from_utf8(title), 0);
 }
 
-static int valid_mac(const char *mac) {
-    if (!mac || strlen(mac) != 17) return 0;
-    for (int i = 0; i < 17; ++i) {
-        char c = mac[i];
-        if (i % 3 == 2) { if (c != ':') return 0; }
-        else if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-                   (c >= 'A' && c <= 'F'))) return 0;
-    }
-    return 1;
-}
-
 static int bulk_eligible(struct scanned_device *out, int capacity) {
     char local_ip[32] = {0}, router_ip[32] = {0}, router_mac[32] = {0};
-    if (!get_interface_ip("en0", local_ip, sizeof(local_ip))) return 0;
-    if (!get_gateway_from_system_configuration(router_ip, sizeof(router_ip)) &&
-        !get_gateway(router_ip, sizeof(router_ip), router_mac, sizeof(router_mac)))
-        return 0;
+    get_interface_ip("en0", local_ip, sizeof(local_ip));
+    get_gateway(router_ip, sizeof(router_ip), router_mac, sizeof(router_mac));
     int count = 0;
     for (int i = 0; i < scanned_count && count < capacity; ++i) {
         struct scanned_device *d = &scanned_devices[i];
-        struct in_addr parsed;
-        if (inet_pton(AF_INET, d->ip, &parsed) != 1 || !valid_mac(d->mac) ||
-            equals(d->ip, local_ip) ||
+        if (!d->ip[0] || !d->mac[0] || equals(d->ip, local_ip) ||
             equals(d->ip, router_ip)) continue;
         out[count++] = *d;
     }
@@ -886,195 +828,26 @@ static id find_info_scroll(id view, int depth) {
     return 0;
 }
 
-static void open_info_url(const char *url_text) {
-    id url = ((id (*)(id, SEL, id))objc_msgSend)(objc_getClass("NSURL"),
-        sel_registerName("URLWithString:"), string_from_utf8(url_text));
-    id app = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIApplication"),
-        sel_registerName("sharedApplication"));
-    id options = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("NSDictionary"),
-        sel_registerName("dictionary"));
-    if (url && app) ((void (*)(id, SEL, id, id, id))objc_msgSend)(app,
-        sel_registerName("openURL:options:completionHandler:"), url, options, 0);
-}
-
-static void info_github_tapped(id self, SEL cmd, id sender) {
-    (void)self; (void)cmd; (void)sender;
-    open_info_url("https://github.com/Gokuencinar");
-}
-
-static void info_coffee_tapped(id self, SEL cmd, id sender) {
-    (void)self; (void)cmd; (void)sender;
-    open_info_url("https://buymeacoffee.com/gokuen");
-}
-
-static id add_info_label(id parent, const char *value, struct cg_rect frame,
-                         double size, BOOL centered, long tag) {
-    id label = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UILabel"),
-        sel_registerName("alloc"));
-    label = ((id (*)(id, SEL, struct cg_rect))objc_msgSend)(label,
-        sel_registerName("initWithFrame:"), frame);
-    ((void (*)(id, SEL, id))objc_msgSend)(label,
-        sel_registerName("setText:"), string_from_utf8(value));
-    id white = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIColor"),
-        sel_registerName("whiteColor"));
-    ((void (*)(id, SEL, id))objc_msgSend)(label,
-        sel_registerName("setTextColor:"), white);
-    id font = ((id (*)(id, SEL, double))objc_msgSend)(objc_getClass("UIFont"),
-        sel_registerName("systemFontOfSize:"), size);
-    ((void (*)(id, SEL, id))objc_msgSend)(label,
-        sel_registerName("setFont:"), font);
-    ((void (*)(id, SEL, long))objc_msgSend)(label,
-        sel_registerName("setNumberOfLines:"), 0L);
-    ((void (*)(id, SEL, long))objc_msgSend)(label,
-        sel_registerName("setTextAlignment:"), centered ? 1L : 0L);
-    if (tag) ((void (*)(id, SEL, long))objc_msgSend)(label,
-        sel_registerName("setTag:"), tag);
-    ((void (*)(id, SEL, id))objc_msgSend)(parent,
-        sel_registerName("addSubview:"), label);
-    return label;
-}
-
-static void add_info_button(id parent, const char *title, struct cg_rect frame,
-                            SEL action, BOOL filled) {
-    id button = ((id (*)(id, SEL, long))objc_msgSend)(objc_getClass("UIButton"),
-        sel_registerName("buttonWithType:"), 1L);
-    ((void (*)(id, SEL, struct cg_rect))objc_msgSend)(button,
-        sel_registerName("setFrame:"), frame);
-    ((void (*)(id, SEL, id, NSUInteger))objc_msgSend)(button,
-        sel_registerName("setTitle:forState:"), string_from_utf8(title), 0);
-    id color = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIColor"),
-        sel_registerName(filled ? "systemBlueColor" : "clearColor"));
-    ((void (*)(id, SEL, id))objc_msgSend)(button,
-        sel_registerName("setBackgroundColor:"), color);
-    if (filled) {
-        id layer = ((id (*)(id, SEL))objc_msgSend)(button,
-            sel_registerName("layer"));
-        ((void (*)(id, SEL, double))objc_msgSend)(layer,
-            sel_registerName("setCornerRadius:"), 8.0);
-        id white = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIColor"),
-            sel_registerName("whiteColor"));
-        ((void (*)(id, SEL, id, NSUInteger))objc_msgSend)(button,
-            sel_registerName("setTitleColor:forState:"), white, 0);
-    }
-    ((void (*)(id, SEL, id, SEL, NSUInteger))objc_msgSend)(button,
-        sel_registerName("addTarget:action:forControlEvents:"),
-        info_button_target, action, 1UL << 6);
-    ((void (*)(id, SEL, id))objc_msgSend)(parent,
-        sel_registerName("addSubview:"), button);
-}
-
-static void current_wifi_name(char *name, unsigned long size) {
-    name[0] = 0;
-    void *library = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", 1);
-    if (!library) return;
-    id (*copy_info)(id) = (void *)dlsym(library, "CNCopyCurrentNetworkInfo");
-    if (!copy_info) return;
-    id info = copy_info(string_from_utf8("en0"));
-    if (!info) return;
-    id ssid = ((id (*)(id, SEL, id))objc_msgSend)(info,
-        sel_registerName("objectForKey:"), string_from_utf8("SSID"));
-    const char *value = utf8(ssid);
-    if (value && value[0]) snprintf(name, size, "%s", value);
-    CFRelease(info);
-}
-
-static void refresh_info_network(id overlay) {
-    id label = ((id (*)(id, SEL, long))objc_msgSend)(overlay,
-        sel_registerName("viewWithTag:"), 90125L);
-    if (!label) return;
-    char ip[32] = {0}, mask[32] = {0}, router[32] = {0}, ssid[128] = {0};
-    get_interface_ip("en0", ip, sizeof(ip));
-    if (ip[0]) {
-        get_interface_netmask("en0", mask, sizeof(mask));
-        get_gateway_from_system_configuration(router, sizeof(router));
-        current_wifi_name(ssid, sizeof(ssid));
-    }
-    char details[512];
-    if (!ip[0]) snprintf(details, sizeof(details), "Wi-Fi: sin conexión");
-    else snprintf(details, sizeof(details),
-        "Wi-Fi: %s\nIP: %s\nMáscara: %s\nRouter: %s",
-        ssid[0] ? ssid : "nombre no disponible", ip,
-        mask[0] ? mask : "no disponible",
-        router[0] ? router : "no disponible");
-    ((void (*)(id, SEL, id))objc_msgSend)(label,
-        sel_registerName("setText:"), string_from_utf8(details));
-}
-
-static void show_info_credits(id root) {
+static void hide_info_credits(id root) {
+    if (info_overlay_added) return;
     id scroll = find_info_scroll(root, 0);
     if (!scroll) return;
-    id previous = ((id (*)(id, SEL, long))objc_msgSend)(scroll,
-        sel_registerName("viewWithTag:"), 90123L);
-    if (previous) { refresh_info_network(previous); return; }
-    if (!info_button_target) {
-        Class target_class = objc_getClass("HarpyInfoButtonTarget");
-        if (!target_class) {
-            target_class = objc_allocateClassPair(objc_getClass("NSObject"),
-                "HarpyInfoButtonTarget", 0);
-            if (!target_class) return;
-            class_addMethod(target_class, sel_registerName("openGitHub:"),
-                (IMP)info_github_tapped, "v@:@");
-            class_addMethod(target_class, sel_registerName("openCoffee:"),
-                (IMP)info_coffee_tapped, "v@:@");
-            objc_registerClassPair(target_class);
-        }
-        info_button_target = ((id (*)(id, SEL))objc_msgSend)(target_class,
-            sel_registerName("new"));
-    }
     struct cg_rect frame = ((struct cg_rect (*)(id, SEL))objc_msgSend)(
         scroll, sel_registerName("frame"));
     struct cg_rect cover = {{0, 392}, {frame.size.width, 1800}};
-    id overlay = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIView"),
+    Class view_class = objc_getClass("UIView");
+    id overlay = ((id (*)(id, SEL))objc_msgSend)(view_class,
         sel_registerName("alloc"));
-    overlay = ((id (*)(id, SEL, struct cg_rect))objc_msgSend)(overlay,
-        sel_registerName("initWithFrame:"), cover);
-    ((void (*)(id, SEL, long))objc_msgSend)(overlay,
-        sel_registerName("setTag:"), 90123L);
-    id black = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIColor"),
+    overlay = ((id (*)(id, SEL, struct cg_rect))objc_msgSend)(
+        overlay, sel_registerName("initWithFrame:"), cover);
+    Class color_class = objc_getClass("UIColor");
+    id black = ((id (*)(id, SEL))objc_msgSend)(color_class,
         sel_registerName("blackColor"));
     ((void (*)(id, SEL, id))objc_msgSend)(overlay,
         sel_registerName("setBackgroundColor:"), black);
     ((void (*)(id, SEL, id))objc_msgSend)(scroll,
         sel_registerName("addSubview:"), overlay);
-
-    id bundle = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("NSBundle"),
-        sel_registerName("mainBundle"));
-    id avatar_path = ((id (*)(id, SEL, id, id))objc_msgSend)(bundle,
-        sel_registerName("pathForResource:ofType:"),
-        string_from_utf8("CreditsAvatar"), string_from_utf8("jpg"));
-    id avatar_image = ((id (*)(id, SEL, id))objc_msgSend)(objc_getClass("UIImage"),
-        sel_registerName("imageWithContentsOfFile:"), avatar_path);
-    struct cg_rect avatar_frame = {{(frame.size.width - 66) / 2, 10}, {66, 66}};
-    id avatar = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("UIImageView"),
-        sel_registerName("alloc"));
-    avatar = ((id (*)(id, SEL, struct cg_rect))objc_msgSend)(avatar,
-        sel_registerName("initWithFrame:"), avatar_frame);
-    ((void (*)(id, SEL, id))objc_msgSend)(avatar,
-        sel_registerName("setImage:"), avatar_image);
-    ((void (*)(id, SEL, long))objc_msgSend)(avatar,
-        sel_registerName("setContentMode:"), 2L);
-    ((void (*)(id, SEL, BOOL))objc_msgSend)(avatar,
-        sel_registerName("setClipsToBounds:"), 1);
-    id layer = ((id (*)(id, SEL))objc_msgSend)(avatar,
-        sel_registerName("layer"));
-    ((void (*)(id, SEL, double))objc_msgSend)(layer,
-        sel_registerName("setCornerRadius:"), 33.0);
-    ((void (*)(id, SEL, id))objc_msgSend)(overlay,
-        sel_registerName("addSubview:"), avatar);
-
-    add_info_label(overlay, "Adaptación RootHide por\nGokuencinar · GokuEn",
-        (struct cg_rect){{16, 78}, {frame.size.width - 32, 48}}, 16, 1, 0);
-    add_info_button(overlay, "GitHub: @Gokuencinar",
-        (struct cg_rect){{40, 129}, {frame.size.width - 80, 34}},
-        sel_registerName("openGitHub:"), 0);
-    add_info_button(overlay, "Buy Me a Coffee",
-        (struct cg_rect){{40, 169}, {frame.size.width - 80, 38}},
-        sel_registerName("openCoffee:"), 1);
-    add_info_label(overlay, "RED ACTUAL",
-        (struct cg_rect){{20, 215}, {frame.size.width - 40, 28}}, 16, 0, 0);
-    add_info_label(overlay, "",
-        (struct cg_rect){{20, 245}, {frame.size.width - 40, 112}}, 14, 0, 90125L);
-    refresh_info_network(overlay);
+    info_overlay_added = 1;
     debug_line("credits-overlay", "added");
 }
 
@@ -1098,7 +871,7 @@ static void patched_did_appear(id self, SEL cmd, BOOL animated) {
         sel_registerName("setHidden:"), 1);
     if (selected != 2) return;
     id view = ((id (*)(id, SEL))objc_msgSend)(self, sel_registerName("view"));
-    show_info_credits(view);
+    hide_info_credits(view);
 }
 
 static void patched_arguments(id self, SEL cmd, id arguments) {
@@ -1174,7 +947,6 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
 }
 
 __attribute__((constructor)) static void install_paths(void) {
-    debug_line("release", "HarpyRootHide 1.0.26");
     Method exists = class_getInstanceMethod(objc_getClass("NSFileManager"),
         sel_registerName("fileExistsAtPath:"));
     Class task_class = objc_getClass("NSConcreteTask");
