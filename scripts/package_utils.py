@@ -1,4 +1,4 @@
-"""Build a RootHide test package from the user-supplied Harpy Reloaded deb.
+"""Build the Nuke Wireless RootHide package from its user-supplied base app.
 
 The original maintainer scripts are treated as data and are never executed.
 """
@@ -13,7 +13,10 @@ from pathlib import Path
 import tarfile
 
 
-SOURCE = Path(os.environ["HARPY_SOURCE_DEB"])
+SOURCE_PATH = os.environ.get("NUKE_WIRELESS_SOURCE_DEB")
+if not SOURCE_PATH:
+    raise KeyError("Set NUKE_WIRELESS_SOURCE_DEB to the original package path")
+SOURCE = Path(SOURCE_PATH)
 
 
 
@@ -81,6 +84,7 @@ def get_tar_member(parts: dict[str, bytes], prefix: str) -> bytes:
     if len(found) != 1:
         raise ValueError(f"expected exactly one {prefix} member")
     return found[0][1]
+
 
 
 

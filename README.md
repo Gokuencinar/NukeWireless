@@ -1,43 +1,49 @@
-# Harpy Reloaded para Dopamine 2 RootHide
+# Nuke Wireless
 
-Adaptación de Harpy Reloaded para iPhone XS con iOS 16.3.1 y Dopamine 2 RootHide. La versión visible probada es **1.0.24** (`1.0.24+rh24` en el gestor de paquetes).
+Adaptación RootHide para iOS 16 que amplía las herramientas Wi-Fi: muestra los dispositivos de la red local, permite guardar nombres para ellos y ofrece controles para bloquearlos mediante ARP.
 
-## Estado comprobado
+La app presenta la marca **Nuke Wireless**, un icono propio y créditos para **Gokuencinar · GokuEn** en la pestaña Info.
 
-- La app abre y muestra los menús.
-- En una red Wi-Fi de prueba, «Block device» corta Internet al equipo seleccionado y «Desbloquear» lo devuelve sin cerrar Harpy.
-- Info conserva «Advanced Settings» y la versión; los apartados «Credits», «Acknowledgements» y «Special Thanks» quedan ocultos en esa pantalla.
-- El escaneo conserva una sola entrada del iPhone y evita su duplicado sin nombre.
-- Si un equipo no publica su nombre, aparece como «Equipo .N». La marca se obtiene del prefijo MAC mediante una copia local de la [lista pública MA-L de IEEE](https://standards.ieee.org/products-programs/regauth/). Una dirección MAC privada puede mostrar «Private MAC».
-- En Wi-Fi, «Bloquear todos» requiere una segunda pulsación de confirmación en 10 segundos. En la prueba con 15 equipos, todos perdieron la conexión y «Desbloquear todos» la restauró sin cerrar la app. El router y el propio iPhone quedan excluidos. El botón de desbloqueo detiene los bloqueos que inició el botón conjunto.
+## Funciones
 
-El bloqueo usa ARP. Esta adaptación no ofrece desautenticación Wi-Fi. Úsala únicamente con dispositivos y redes que administras.
+- Lista de dispositivos conectados a la red Wi-Fi y sus direcciones IP/MAC.
+- Bloqueo y desbloqueo de un dispositivo, con confirmación para la acción conjunta.
+- Alias guardados por dirección MAC y resolución local de nombres cuando está disponible.
+- Actualización de la lista al deslizar hacia abajo.
+- Aviso cuando la interfaz Wi-Fi tiene IPv6; el bloqueo ARP solo cubre IPv4.
+- No ofrece desautenticación Wi-Fi. Utilízalo únicamente en redes y dispositivos que administras.
 
-## Qué contiene este repositorio
+## Créditos
 
-- `src/HarpyRootHidePaths.c`: adaptación de rutas y del proceso de bloqueo/desbloqueo.
-- `patches/aegis_parent_check.s` y `scripts/patch_aegis.py`: adaptación del auxiliar Aegis a la ruta variable de RootHide.
-- `prebuilt/HarpyRootHidePaths_ios.dylib`: compilación de la biblioteca anterior para arm64.
-- `scripts/build_deb.py`: reconstrucción del paquete a partir de una copia original obtenida por el usuario.
-- `scripts/update_oui.py`: crea la tabla local de fabricantes desde `oui.csv` de IEEE.
+**Gokuencinar · GokuEn**. La pestaña Info muestra el mismo avatar de perfil que se usa en BandLock.
 
-El `.deb` original y los binarios de terceros no se incluyen aquí. Conservan los derechos de sus respectivos autores. Para generar el paquete necesitas tu propia copia de `xyz.cypwn.harpy-reloaded_1.0.1k_iphoneos-arm64.deb`.
+## Contenido del repositorio
 
-## Reconstrucción en Windows
+- `src/NukeWirelessPaths.c`: adaptación RootHide, controles de red y créditos.
+- `patches/aegis_parent_check.s` y `scripts/patch_aegis.py`: parche del auxiliar para la ruta variable de RootHide.
+- `prebuilt/NukeWirelessPaths_ios.dylib`: biblioteca iOS arm64 generada por el workflow de macOS para la rama de Nuke Wireless.
+- `assets/NukeWirelessIcon.png`: icono de la app.
+- `assets/CreditsAvatar.jpg`: avatar de perfil usado también en BandLock.
+- `scripts/build_deb.py`: reconstrucción del paquete a partir del paquete original proporcionado por el usuario.
+- `scripts/update_oui.py`: genera la tabla local de fabricantes a partir del CSV MA-L de IEEE.
 
-Necesitas Python 3, `keystone-engine`, el `.deb` original, el [CSV MA-L de IEEE](https://standards-oui.ieee.org/oui/oui.csv) y acceso a `ldid` en el iPhone para instalar el paquete generado.
+## Reconstrucción
+
+Necesitas Python 3, `keystone-engine`, el paquete original de la app, el CSV MA-L de IEEE y acceso a `ldid` en el iPhone para instalar el paquete generado.
 
 ```powershell
 python -m pip install keystone-engine
-$env:HARPY_SOURCE_DEB = 'C:\ruta\a\xyz.cypwn.harpy-reloaded_1.0.1k_iphoneos-arm64.deb'
+$env:NUKE_WIRELESS_SOURCE_DEB = 'C:\ruta\al\paquete-original.deb'
 python scripts/update_oui.py C:\ruta\a\oui.csv
 python scripts/patch_aegis.py
 python scripts/build_deb.py
 ```
 
-El paquete aparece en `dist/`. La instalación requiere Dopamine 2 RootHide y las dependencias que indica el propio paquete (`rootless-compat`, `ellekit`, `arpoison`, `network-cmds` y `ldid`).
+El paquete aparece en `dist/` como `com.gokuencinar.nukewireless_1.0.25+rh25_iphoneos-arm64e.deb`. Declara el conflicto y reemplazo del paquete anterior para evitar que ambas variantes instalen la misma app a la vez.
 
-## Alcance
+## Compatibilidad técnica
 
-La biblioteca enlaza con puntos concretos de Harpy Reloaded 1.0.1k; no se ha validado con otra compilación de la app, otro modelo de iPhone ni otra versión de iOS. La marca indica el titular registrado del prefijo MAC y puede diferir de la marca comercial del dispositivo.
+Esta adaptación inyecta código en una app de terceros y enlaza con sus clases privadas, su identificador de bundle y las rutas de sus ejecutables. Esos identificadores heredados se conservan donde son necesarios para que la integración funcione; el nombre visible de la app, el paquete y los recursos propios usan **Nuke Wireless**. La integración de la versión 1.0.25 necesita validación en el dispositivo.
+
+La compilación de la biblioteca requiere macOS y el SDK de iOS configurado en el workflow de GitHub Actions. El `.deb` de origen tampoco está incluido; debes aportar una copia que tengas derecho a modificar.
 

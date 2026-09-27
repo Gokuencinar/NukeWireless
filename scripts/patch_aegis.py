@@ -1,4 +1,4 @@
-"""Patch Aegis's obsolete parent-path check for Harpy on randomized RootHide.
+"""Patch the helper's parent-path check for randomized RootHide.
 
 The new check compares the parent executable's entire physical path against
 the expected app path under the helper's own randomized jailbreak root.
@@ -108,4 +108,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
