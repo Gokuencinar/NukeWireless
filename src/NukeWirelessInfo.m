@@ -1,9 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <SystemConfiguration/SystemConfiguration.h>
-#import <SystemConfiguration/CaptiveNetwork.h>
-#import <NetworkExtension/NetworkExtension.h>
-#import <CoreLocation/CoreLocation.h>
+#import "NWScanBridge.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <arpa/inet.h>
@@ -14,19 +12,28 @@
 #include <dlfcn.h>
 
 /* Info-only extension for the user's Nuke Wireless 1.0.25 package. */
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.3";
 static const NSInteger kInfoOverlayTag = 90721;
 static const NSInteger kRefreshButtonTag = 90730;
 static const NSInteger kNetworkRowTag = 90800;
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
+static void (*originalDidLayout)(UIViewController *, SEL);
+static void (*originalContentSize)(UIScrollView *, SEL, CGSize);
+static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
+static void (*originalScrollEnabled)(UIScrollView *, SEL, BOOL);
+static BOOL (*originalCancelTouches)(UIScrollView *, SEL, UIView *);
+static void (*originalLabelText)(UILabel *, SEL, NSString *);
+static char infoScrollKey, wifiInsetKey, statusLabelKey;
+static __weak UITabBarController *activeTab;
+static void layoutAdditions(UITabBarController *tab);
 static NSArray<NSString *> *networkKeys(void) {
     return @[@"SSID", @"BSSID", @"IPv4", @"Puerta de enlace", @"Máscara", @"DNS"];
 }
 static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString *> *values);
 static void refreshNetworkRows(UIView *overlay);
 
-@interface NWInfoLinkTarget : NSObject <CLLocationManagerDelegate>
+@interface NWInfoLinkTarget : NSObject
 @property (nonatomic, weak) UIView *overlay;
-@property (nonatomic, strong) CLLocationManager *locationManager;
 - (void)openGitHub:(id)sender;
 - (void)openCoffee:(id)sender;
 - (void)copyNetworkValue:(UIButton *)sender;
@@ -46,20 +53,13 @@ static void refreshNetworkRows(UIView *overlay);
 }
 - (void)copyNetworkValue:(UIButton *)sender {
     NSString *value = sender.accessibilityValue;
-    if (value.length && ![value isEqualToString:@"No disponible"] &&
-        ![value isEqualToString:@"Ubicación no autorizada"])
+    if (value.length && ![value isEqualToString:@"No disponible"])
         UIPasteboard.generalPasteboard.string = value;
 }
 - (void)refreshWiFi:(id)sender {
-    Class targetClass = NSClassFromString(@"NukeWirelessBulkButtonTarget");
-    id target = targetClass ? [targetClass new] : nil;
-    SEL refresh = NSSelectorFromString(@"refreshTriggered:");
-    if ([target respondsToSelector:refresh])
-        ((void (*)(id, SEL, id))objc_msgSend)(target, refresh, sender);
-}
-- (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager {
-    (void)manager;
-    if (self.overlay) refreshNetworkRows(self.overlay);
+    (void)sender;
+    NWRefreshScan();
+    layoutAdditions(activeTab);
 }
 @end
 
@@ -67,6 +67,53 @@ static NWInfoLinkTarget *linkTarget;
 
 static NSString *available(NSString *value) {
     return value.length ? value : @"No disponible";
+}
+
+// MobileWiFi reads only the current association on the jailbroken device.
+// Every symbol and CoreFoundation type is checked before use.
+static NSDictionary *currentAssociation(void) {
+    static void *framework;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        framework = dlopen("/System/Library/PrivateFrameworks/MobileWiFi.framework/MobileWiFi", RTLD_LAZY);
+    });
+    if (!framework) return @{};
+    CFTypeRef (*create)(CFAllocatorRef, int) = dlsym(framework, "WiFiManagerClientCreate");
+    CFArrayRef (*copyDevices)(CFTypeRef) = dlsym(framework, "WiFiManagerClientCopyDevices");
+    CFTypeRef (*copyNetwork)(CFTypeRef) = dlsym(framework, "WiFiDeviceClientCopyCurrentNetwork");
+    CFStringRef (*getSSID)(CFTypeRef) = dlsym(framework, "WiFiNetworkGetSSID");
+    CFTypeRef (*getProperty)(CFTypeRef, CFStringRef) = dlsym(framework, "WiFiNetworkGetProperty");
+    CFStringRef (*getInterface)(CFTypeRef) = dlsym(framework, "WiFiDeviceClientGetInterfaceName");
+    if (!create || !copyDevices || !copyNetwork || !getSSID || !getProperty) return @{};
+    CFTypeRef manager = create(kCFAllocatorDefault, 0);
+    if (!manager) return @{};
+    CFArrayRef interfaces = copyDevices(manager);
+    NSMutableDictionary *result = [NSMutableDictionary new];
+    if (interfaces && CFGetTypeID(interfaces) == CFArrayGetTypeID()) {
+        for (CFIndex index = 0; index < CFArrayGetCount(interfaces); ++index) {
+            CFTypeRef device = CFArrayGetValueAtIndex(interfaces, index);
+            CFStringRef name = getInterface ? getInterface(device) : NULL;
+            if (name && !CFEqual(name, CFSTR("en0"))) continue;
+            CFTypeRef network = copyNetwork(device);
+            if (!network) continue;
+            CFStringRef ssid = getSSID(network);
+            if (ssid && CFGetTypeID(ssid) == CFStringGetTypeID())
+                result[@"SSID"] = [(__bridge NSString *)ssid copy];
+            CFTypeRef bssid = getProperty(network, CFSTR("BSSID"));
+            if (bssid && CFGetTypeID(bssid) == CFStringGetTypeID())
+                result[@"BSSID"] = [(__bridge NSString *)bssid copy];
+            else if (bssid && CFGetTypeID(bssid) == CFDataGetTypeID() && CFDataGetLength(bssid) == 6) {
+                const UInt8 *b = CFDataGetBytePtr(bssid);
+                result[@"BSSID"] = [NSString stringWithFormat:@"%02x:%02x:%02x:%02x:%02x:%02x",
+                    b[0], b[1], b[2], b[3], b[4], b[5]];
+            }
+            CFRelease(network);
+            if (result.count) break;
+        }
+    }
+    if (interfaces) CFRelease(interfaces);
+    CFRelease(manager);
+    return result;
 }
 
 static void interfaceIPv4(NSString **address, NSString **mask) {
@@ -93,7 +140,7 @@ static void interfaceIPv4(NSString **address, NSString **mask) {
 static NSDictionary<NSString *, NSString *> *networkDetails(void) {
     NSString *address = nil, *mask = nil;
     interfaceIPv4(&address, &mask);
-    NSDictionary *wifi = CFBridgingRelease(CNCopyCurrentNetworkInfo(CFSTR("en0")));
+    NSDictionary *wifi = currentAssociation();
     NSString *ssid = wifi[@"SSID"];
     NSString *bssid = wifi[@"BSSID"];
     NSString *router = nil, *dnsServer = nil;
@@ -118,13 +165,9 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
             dnsServer = servers.firstObject;
         CFRelease(store);
     }
-    CLAuthorizationStatus location = [CLLocationManager authorizationStatus];
-    NSString *missingWiFi = (location == kCLAuthorizationStatusDenied ||
-        location == kCLAuthorizationStatusRestricted) ?
-        @"Ubicación no autorizada" : @"No disponible";
     return @{
-        @"SSID": ssid.length ? ssid : missingWiFi,
-        @"BSSID": bssid.length ? bssid : missingWiFi,
+        @"SSID": available(ssid),
+        @"BSSID": available(bssid),
         @"IPv4": available(address),
         @"Puerta de enlace": available(router),
         @"Máscara": available(mask),
@@ -190,16 +233,13 @@ static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString
 
 static void refreshNetworkRows(UIView *overlay) {
     if (!overlay) return;
-    updateNetworkRows(overlay, networkDetails());
     __weak UIView *weakOverlay = overlay;
-    [NEHotspotNetwork fetchCurrentWithCompletionHandler:^(NEHotspotNetwork *network) {
-        UIView *current = weakOverlay;
-        if (!current || !network) return;
-        NSMutableDictionary *values = [networkDetails() mutableCopy];
-        if (network.SSID.length) values[@"SSID"] = network.SSID;
-        if (network.BSSID.length) values[@"BSSID"] = network.BSSID;
-        updateNetworkRows(current, values);
-    }];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSDictionary *values = networkDetails();
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (weakOverlay) updateNetworkRows(weakOverlay, values);
+        });
+    });
 }
 
 static void presentWiFi(UIViewController *controller, UITabBarController *tab) {
@@ -226,6 +266,7 @@ static void presentInfo(UIViewController *controller) {
     if (!tab && [controller isKindOfClass:[UITabBarController class]])
         tab = (UITabBarController *)controller;
     if (!tab) return;
+    activeTab = tab;
     if (tab.selectedIndex == 0) { presentWiFi(controller, tab); return; }
     if (tab.selectedIndex != 2) return;
     CGFloat largestArea = 0;
@@ -233,6 +274,11 @@ static void presentInfo(UIViewController *controller) {
         findInfoScroll(tab.selectedViewController.view, &largestArea) : nil;
     if (!scroll) scroll = findInfoScroll(controller.view, &largestArea);
     if (!scroll) return;
+    objc_setAssociatedObject(scroll, &infoScrollKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    scroll.scrollEnabled = YES;
+    scroll.alwaysBounceVertical = YES;
+    scroll.canCancelContentTouches = YES;
+    scroll.delaysContentTouches = YES;
     UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
     if (overlay) {
         refreshNetworkRows(overlay);
@@ -240,7 +286,7 @@ static void presentInfo(UIViewController *controller) {
     }
 
     CGFloat width = scroll.bounds.size.width;
-    overlay = [[UIControl alloc] initWithFrame:CGRectMake(0, 392, width, 548)];
+    overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 392, width, 548)];
     overlay.tag = kInfoOverlayTag;
     overlay.backgroundColor = UIColor.blackColor;
     [scroll addSubview:overlay];
@@ -295,11 +341,6 @@ static void presentInfo(UIViewController *controller) {
         [card addSubview:row];
     }
     refreshNetworkRows(overlay);
-    if ([CLLocationManager authorizationStatus] == kCLAuthorizationStatusNotDetermined) {
-        linkTarget.locationManager = [CLLocationManager new];
-        linkTarget.locationManager.delegate = linkTarget;
-        [linkTarget.locationManager requestWhenInUseAuthorization];
-    }
 }
 
 static void patchedViewDidAppear(UIViewController *controller, SEL selector, BOOL animated) {
@@ -307,12 +348,142 @@ static void patchedViewDidAppear(UIViewController *controller, SEL selector, BOO
     __weak UIViewController *weakController = controller;
     dispatch_async(dispatch_get_main_queue(), ^{
         UIViewController *strongController = weakController;
-        if (strongController) presentInfo(strongController);
+        if (strongController) {
+            presentInfo(strongController);
+            layoutAdditions(activeTab);
+        }
     });
+}
+
+static UIScrollView *findWiFiScroll(UIView *view, CGFloat *area) {
+    UIScrollView *best = nil;
+    if ([view isKindOfClass:UIScrollView.class]) {
+        CGFloat size = view.bounds.size.width * view.bounds.size.height;
+        if (size > *area) { *area = size; best = (UIScrollView *)view; }
+    }
+    for (UIView *child in view.subviews) {
+        UIScrollView *found = findWiFiScroll(child, area);
+        if (found) best = found;
+    }
+    return best;
+}
+
+static void layoutAdditions(UITabBarController *tab) {
+    if (!tab || !tab.isViewLoaded) return;
+    UIView *root = tab.selectedViewController.view;
+    if (tab.selectedIndex == 2) {
+        CGFloat area = 0;
+        UIScrollView *scroll = findInfoScroll(root, &area);
+        UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
+        if (!overlay) return;
+        scroll.scrollEnabled = YES;
+        scroll.panGestureRecognizer.enabled = YES;
+        scroll.canCancelContentTouches = YES;
+        CGSize size = scroll.contentSize;
+        size.height = MAX(size.height, CGRectGetMaxY(overlay.frame) + 24);
+        if (!CGSizeEqualToSize(scroll.contentSize, size)) scroll.contentSize = size;
+        [scroll bringSubviewToFront:overlay];
+        return;
+    }
+    if (tab.selectedIndex != 0) return;
+    UIButton *button = (UIButton *)[root viewWithTag:kRefreshButtonTag];
+    BOOL busy = NWScanBusy();
+    button.enabled = !busy;
+    NSString *title = busy ? @"Escaneando…" : @"↻ Actualizar";
+    if (![button.currentTitle isEqualToString:title])
+        [button setTitle:title forState:UIControlStateNormal];
+    if (button) [root bringSubviewToFront:button];
+    CGFloat area = 0;
+    UIScrollView *scroll = findWiFiScroll(root, &area);
+    UIView *panel = [tab.view viewWithTag:90122];
+    if (scroll && panel && !panel.hidden) {
+        CGRect banner = [panel convertRect:panel.bounds toView:scroll];
+        CGFloat bottom = MAX(0, CGRectGetMaxY(scroll.bounds) - CGRectGetMinY(banner) + 16);
+        objc_setAssociatedObject(scroll, &wifiInsetKey, @(bottom), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UIEdgeInsets inset = scroll.contentInset;
+        if (inset.bottom < bottom) { inset.bottom = bottom; scroll.contentInset = inset; }
+        UIEdgeInsets indicator = scroll.verticalScrollIndicatorInsets;
+        indicator.bottom = bottom;
+        if (!UIEdgeInsetsEqualToEdgeInsets(scroll.verticalScrollIndicatorInsets, indicator))
+            scroll.verticalScrollIndicatorInsets = indicator;
+        UIRefreshControl *refresh = scroll.refreshControl;
+        if (refresh) {
+            [refresh removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
+            [refresh addTarget:linkTarget action:@selector(refreshWiFi:)
+                forControlEvents:UIControlEventValueChanged];
+            if (!busy) [refresh endRefreshing];
+        }
+    }
+    for (UIView *child in panel.subviews) {
+        if ([child isKindOfClass:UILabel.class]) {
+            objc_setAssociatedObject(child, &statusLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            ((UILabel *)child).text = NWScanSummary();
+            break;
+        }
+    }
+}
+
+static void patchedDidLayout(UIViewController *controller, SEL selector) {
+    originalDidLayout(controller, selector);
+    if (activeTab && (controller == activeTab || controller == activeTab.selectedViewController))
+        layoutAdditions(activeTab);
+}
+
+static void patchedContentSize(UIScrollView *scroll, SEL sel, CGSize size) {
+    if (objc_getAssociatedObject(scroll, &infoScrollKey)) {
+        UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
+        if (overlay) size.height = MAX(size.height, CGRectGetMaxY(overlay.frame) + 24);
+    }
+    originalContentSize(scroll, sel, size);
+}
+
+static void patchedContentInset(UIScrollView *scroll, SEL sel, UIEdgeInsets inset) {
+    NSNumber *minimum = objc_getAssociatedObject(scroll, &wifiInsetKey);
+    if (minimum) inset.bottom = MAX(inset.bottom, minimum.doubleValue);
+    originalContentInset(scroll, sel, inset);
+}
+
+static void patchedScrollEnabled(UIScrollView *scroll, SEL sel, BOOL enabled) {
+    originalScrollEnabled(scroll, sel,
+        objc_getAssociatedObject(scroll, &infoScrollKey) ? YES : enabled);
+}
+
+static BOOL patchedCancelTouches(UIScrollView *scroll, SEL sel, UIView *view) {
+    if (objc_getAssociatedObject(scroll, &infoScrollKey)) return YES;
+    return originalCancelTouches(scroll, sel, view);
+}
+
+static void patchedLabelText(UILabel *label, SEL sel, NSString *text) {
+    if (!objc_getAssociatedObject(label, &statusLabelKey)) {
+        originalLabelText(label, sel, text);
+        return;
+    }
+    NSString *value = NWScanSummary();
+    if (![label.text isEqualToString:value]) originalLabelText(label, sel, value);
 }
 
 __attribute__((constructor)) static void installInfoExtension(void) {
     Method method = class_getInstanceMethod([UIViewController class], @selector(viewDidAppear:));
     if (method) originalViewDidAppear = (void *)method_setImplementation(
         method, (IMP)patchedViewDidAppear);
+    method = class_getInstanceMethod(UIViewController.class, @selector(viewDidLayoutSubviews));
+    originalDidLayout = (void *)method_setImplementation(method, (IMP)patchedDidLayout);
+    method = class_getInstanceMethod(UIScrollView.class, @selector(setContentSize:));
+    originalContentSize = (void *)method_setImplementation(method, (IMP)patchedContentSize);
+    method = class_getInstanceMethod(UIScrollView.class, @selector(setContentInset:));
+    originalContentInset = (void *)method_setImplementation(method, (IMP)patchedContentInset);
+    method = class_getInstanceMethod(UIScrollView.class, @selector(setScrollEnabled:));
+    originalScrollEnabled = (void *)method_setImplementation(method, (IMP)patchedScrollEnabled);
+    method = class_getInstanceMethod(UIScrollView.class, @selector(touchesShouldCancelInContentView:));
+    originalCancelTouches = (void *)method_setImplementation(method, (IMP)patchedCancelTouches);
+    method = class_getInstanceMethod(UILabel.class, @selector(setText:));
+    originalLabelText = (void *)method_setImplementation(method, (IMP)patchedLabelText);
+    NWInstallScanHooks();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer *timer) {
+            (void)timer;
+            if (UIApplication.sharedApplication.applicationState == UIApplicationStateActive)
+                layoutAdditions(activeTab);
+        }];
+    });
 }

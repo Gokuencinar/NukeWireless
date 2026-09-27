@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - src/NukeWirelessInfo.m
+      - src/NWScanBridge.m
+      - src/NWScanBridge.h
       - .github/workflows/build-info.yml
 
 permissions:
@@ -27,9 +29,8 @@ jobs:
             -dynamiclib -Wl,-undefined,dynamic_lookup \
             -framework UIKit -framework Foundation \
             -framework QuartzCore -framework SystemConfiguration \
-            -framework NetworkExtension -framework CoreLocation \
             -o prebuilt/NukeWirelessInfo_ios.dylib \
-            src/NukeWirelessInfo.m
+            src/NukeWirelessInfo.m src/NWScanBridge.m
           file prebuilt/NukeWirelessInfo_ios.dylib
       - name: Save compiled Info library
         shell: bash
