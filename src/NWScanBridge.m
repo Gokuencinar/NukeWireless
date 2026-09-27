@@ -1,4 +1,5 @@
 #import "NWScanBridge.h"
+#import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <mach-o/dyld.h>
@@ -15,7 +16,6 @@ static void (*oldStart)(id, SEL);
 static void (*oldFound)(id, SEL, id);
 static void (*oldFinished)(id, SEL, int);
 static void (*oldFailed)(id, SEL);
-extern void NWInvokeRefresh(void *adapter, const void *entry);
 
 static id readObject(id object, NSString *selector) {
     SEL sel = NSSelectorFromString(selector);
@@ -112,23 +112,23 @@ NSString *NWScanSummary(void) {
         (unsigned long)devices.count, suffix];
 }
 
-BOOL NWRefreshScan(void) {
-    // This ABI belongs ONLY to the SHA-256-pinned 1.0.25 executable.
-    // Its native refresh clears Published.devices, sets isScanning, then schedules
-    // MMLANScanner.start. Calling start alone would leave stale rows in the UI.
-    id adapter = wifiAdapter;
-    if (!NSThread.isMainThread || !adapter || NWScanBusy()) return NO;
-    const uint8_t *base = (const uint8_t *)_dyld_get_image_header(0);
-    static const uint8_t prologue[] = {
-        0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,
-        0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9
-    };
-    if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
-    pendingStart = YES;
-    NWInvokeRefresh((__bridge void *)adapter, base + 0xc5a8);
-    // Unlock only if the native refresh never reached the scanner.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC),
-        dispatch_get_main_queue(), ^{ if (pendingStart) pendingStart = NO; });
+static UIScrollView *findRefreshScroll(UIView *view) {
+    if ([view isKindOfClass:UIScrollView.class] && ((UIScrollView *)view).refreshControl)
+        return (UIScrollView *)view;
+    for (UIView *child in view.subviews) {
+        UIScrollView *found = findRefreshScroll(child);
+        if (found) return found;
+    }
+    return nil;
+}
+
+BOOL NWRefreshScan(UIView *wifiRootView) {
+    if (!NSThread.isMainThread || !wifiRootView) return NO;
+    UIScrollView *scroll = findRefreshScroll(wifiRootView);
+    UIRefreshControl *refresh = scroll.refreshControl;
+    if (!refresh || refresh.isRefreshing) return NO;
+    [refresh beginRefreshing];
+    [refresh sendActionsForControlEvents:UIControlEventValueChanged];
     return YES;
 }
 

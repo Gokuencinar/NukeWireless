@@ -12,7 +12,7 @@
 #include <dlfcn.h>
 
 /* Info-only extension for the user's Nuke Wireless 1.0.25 package. */
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.3";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.4";
 static const NSInteger kInfoOverlayTag = 90721;
 static const NSInteger kRefreshButtonTag = 90730;
 static const NSInteger kNetworkRowTag = 90800;
@@ -58,7 +58,8 @@ static void refreshNetworkRows(UIView *overlay);
 }
 - (void)refreshWiFi:(id)sender {
     (void)sender;
-    NWRefreshScan();
+    UIViewController *selected = activeTab.selectedViewController;
+    if (selected) NWRefreshScan(selected.view);
     layoutAdditions(activeTab);
 }
 @end
@@ -193,6 +194,17 @@ static UIScrollView *findInfoScroll(UIView *view, CGFloat *largestArea) {
     return best;
 }
 
+static void removeBaseInfoBanner(UIView *view) {
+    for (UIView *child in [view.subviews copy]) {
+        if ([child isKindOfClass:UILabel.class] &&
+            [((UILabel *)child).text isEqualToString:@"NUKE WIRELESS"]) {
+            [child.superview removeFromSuperview];
+            return;
+        }
+        removeBaseInfoBanner(child);
+    }
+}
+
 static UILabel *infoLabel(UIView *parent, CGRect frame, NSString *text,
                           CGFloat fontSize, NSTextAlignment alignment, NSInteger tag) {
     UILabel *label = [[UILabel alloc] initWithFrame:frame];
@@ -274,6 +286,7 @@ static void presentInfo(UIViewController *controller) {
         findInfoScroll(tab.selectedViewController.view, &largestArea) : nil;
     if (!scroll) scroll = findInfoScroll(controller.view, &largestArea);
     if (!scroll) return;
+    removeBaseInfoBanner(scroll);
     objc_setAssociatedObject(scroll, &infoScrollKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     scroll.scrollEnabled = YES;
     scroll.alwaysBounceVertical = YES;
@@ -407,12 +420,7 @@ static void layoutAdditions(UITabBarController *tab) {
         if (!UIEdgeInsetsEqualToEdgeInsets(scroll.verticalScrollIndicatorInsets, indicator))
             scroll.verticalScrollIndicatorInsets = indicator;
         UIRefreshControl *refresh = scroll.refreshControl;
-        if (refresh) {
-            [refresh removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
-            [refresh addTarget:linkTarget action:@selector(refreshWiFi:)
-                forControlEvents:UIControlEventValueChanged];
-            if (!busy) [refresh endRefreshing];
-        }
+        if (refresh && !busy) [refresh endRefreshing];
     }
     for (UIView *child in panel.subviews) {
         if ([child isKindOfClass:UILabel.class]) {

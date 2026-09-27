@@ -8,7 +8,6 @@ on:
       - src/NukeWirelessInfo.m
       - src/NWScanBridge.m
       - src/NWScanBridge.h
-      - src/NWRefreshThunk.S
       - .github/workflows/build-info.yml
 
 permissions:
@@ -31,7 +30,7 @@ jobs:
             -framework UIKit -framework Foundation \
             -framework QuartzCore -framework SystemConfiguration \
             -o prebuilt/NukeWirelessInfo_ios.dylib \
-            src/NukeWirelessInfo.m src/NWScanBridge.m src/NWRefreshThunk.S
+            src/NukeWirelessInfo.m src/NWScanBridge.m
           file prebuilt/NukeWirelessInfo_ios.dylib
       - name: Save compiled Info library
         shell: bash

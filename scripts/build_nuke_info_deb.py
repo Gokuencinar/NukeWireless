@@ -27,7 +27,7 @@ os.environ.setdefault("HARPY_SOURCE_DEB", str(source))
 from package_utils import get_tar_member, pack_ar, read_ar, regular, symlink, tar_bytes  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "dist" / "com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb"
+OUTPUT = ROOT / "dist" / "com.gokuencinar.nukewireless_1.0.25+rh25.4_iphoneos-arm64e.deb"
 EXPECTED_SOURCE_SHA256 = "f4b5282bf8aec2eef2a35f84f644aa3bb6e4a16230b7c7cd2789fea6da65cdbc"
 INFO_LIBRARY = "usr/lib/TweakInject/NukeWirelessInfo.dylib"
 INFO_FILTER = "usr/lib/TweakInject/NukeWirelessInfo.plist"
@@ -61,7 +61,7 @@ def main() -> None:
         raise ValueError("source deb differs from the known-working Nuke Wireless 1.0.25 package")
     info_binary = (ROOT / "prebuilt" / "NukeWirelessInfo_ios.dylib").read_bytes()
     if (b"https://buymeacoffee.com/gokuen" not in info_binary or
-        b"NWBuild-rh25.3" not in info_binary or b"BSSID" not in info_binary or
+        b"NWBuild-rh25.4" not in info_binary or b"BSSID" not in info_binary or
         b"requestWhenInUseAuthorization" in info_binary):
         raise ValueError("Info extension binary does not match this source")
 
@@ -85,15 +85,13 @@ def main() -> None:
     executable = next(payload for member, payload in data_entries
         if member.name.lstrip("./") == "Applications/HarpyReloaded.app/HarpyReloaded")
     if hashlib.sha256(executable).hexdigest() != "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11":
-        raise ValueError("native refresh bridge is incompatible with this executable")
-    if executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
-        raise ValueError("native refresh entry point does not match the verified ABI")
+        raise ValueError("extension is incompatible with this executable")
 
     for index, (member, payload) in enumerate(control_entries):
         name = member.name.lstrip("./")
         if name == "control":
             payload = replace_once(payload, b"Version: 1.0.25+rh25\n",
-                                   b"Version: 1.0.25+rh25.3\n")
+                                   b"Version: 1.0.25+rh25.4\n")
             member.size = len(payload)
             control_entries[index] = (member, payload)
         elif name == "postinst":
