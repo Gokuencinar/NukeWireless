@@ -1,0 +1,41 @@
+name: Build Harpy Reloaded RootHide library
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/HarpyRootHidePaths.c
+      - .github/workflows/build-tweak.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile iOS arm64 library
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang \
+            -arch arm64 -miphoneos-version-min=16.3 \
+            -isysroot "$sdk" -fPIC -fblocks -O2 \
+            -dynamiclib -Wl,-undefined,dynamic_lookup \
+            -o prebuilt/HarpyRootHidePaths_ios.dylib \
+            src/HarpyRootHidePaths.c
+          file prebuilt/HarpyRootHidePaths_ios.dylib
+      - name: Save compiled library
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prebuilt/HarpyRootHidePaths_ios.dylib
+          if ! git diff --cached --quiet; then
+            git commit -m "Build Harpy Reloaded RootHide 1.0.26 library"
+            git push origin HEAD:main
+          fi

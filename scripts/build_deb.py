@@ -16,7 +16,7 @@ from package_utils import (
 )
 
 HERE = Path(__file__).resolve().parents[1] / "build"
-OUTPUT = HERE.parent / "dist" / "xyz.cypwn.harpy-reloaded_1.0.24+rh24_iphoneos-arm64e.deb"
+OUTPUT = HERE.parent / "dist" / "xyz.cypwn.harpy-reloaded_1.0.26+rh26_iphoneos-arm64e.deb"
 
 ENTITLEMENTS = b'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,6 +25,7 @@ ENTITLEMENTS = b'''<?xml version="1.0" encoding="UTF-8"?>
 <key>com.apple.private.security.no-sandbox</key><true/>
 <key>com.apple.private.security.storage.AppBundles</key><true/>
 <key>com.apple.private.security.storage.AppDataContainers</key><true/>
+<key>com.apple.developer.networking.wifi-info</key><true/>
 </dict></plist>
 '''
 
@@ -52,6 +53,9 @@ FILTER = b'''<?xml version="1.0" encoding="UTF-8"?>
 
 
 def main() -> None:
+    tweak_binary = (HERE.parent / "prebuilt" / "HarpyRootHidePaths_ios.dylib").read_bytes()
+    if b"HarpyRootHide 1.0.26" not in tweak_binary:
+        raise ValueError("prebuilt tweak is not the compiled 1.0.26 source")
     parts = read_ar(SOURCE.read_bytes())
     old_control = None
     with tarfile.open(fileobj=io.BytesIO(get_tar_member(parts, "control.tar")), mode="r:*") as tf:
@@ -63,13 +67,13 @@ def main() -> None:
         raise ValueError("unexpected package")
     fields = []
     for line in old_control.replace("\r", "").splitlines():
-        if line.startswith(("Version:", "Architecture:", "Depends:", "Description:", "Installed-Size:", "Maintainer:", "Depiction:", "SileoDepiction:", "Icon:")):
+        if line.startswith(("Version:", "Architecture:", "Pre-Depends:", "Depends:", "Description:", "Installed-Size:", "Maintainer:", "Depiction:", "SileoDepiction:", "Icon:")):
             continue
         if line:
             fields.append(line)
     fields += [
         "Maintainer: Local RootHide test build",
-        "Version: 1.0.24+rh24",
+        "Version: 1.0.26+rh26",
         "Architecture: iphoneos-arm64e",
         "Pre-Depends: rootless-compat (>= 0.9)",
         "Depends: firmware (>= 16.0), ldid, arpoison, network-cmds, ellekit",
@@ -85,9 +89,15 @@ def main() -> None:
             name = old.name.lstrip("./")
             if not name or name in ("var", "var/jb"):
                 continue
-            if not name.startswith("var/jb/"):
+            if name.startswith("var/jb/"):
+                name = name[len("var/jb/"):]
+            elif name not in ("Applications", "usr") and not name.startswith(("Applications/", "usr/")):
                 raise ValueError(f"unexpected path: {name}")
-            name = name[len("var/jb/"):]
+            if (name.startswith("usr/share/harpy-reloaded-roothide/") or
+                name == "usr/share/harpy-reloaded-roothide" or
+                name.startswith("usr/lib/TweakInject/HarpyRootHidePaths.") or
+                name.endswith(".roothidepatch")):
+                continue
             if name in kept:
                 raise ValueError(f"duplicate entry: {name}")
             kept.add(name)
@@ -98,24 +108,25 @@ def main() -> None:
             info.mtime = 0
             if old.isfile():
                 data = tf.extractfile(old).read()
-                if name == "usr/libexec/harpy-reloaded/aegis":
+                if name == "usr/libexec/harpy-reloaded/aegis" and old.name.lstrip("./").startswith("var/jb/"):
                     data = (HERE / "aegis_roothide_patched").read_bytes()
                 elif name == "Applications/HarpyReloaded.app/Info.plist":
                     info_plist = plistlib.loads(data)
-                    info_plist["CFBundleShortVersionString"] = "1.0.24"
-                    info_plist["CFBundleVersion"] = "24"
+                    info_plist["CFBundleShortVersionString"] = "1.0.26"
+                    info_plist["CFBundleVersion"] = "26"
                     data = plistlib.dumps(info_plist, fmt=plistlib.FMT_BINARY)
                 elif name == "Applications/HarpyReloaded.app/HarpyReloaded":
                     old = b"http://standards-oui.ieee.org/oui/oui.txt\0"
                     new = b"https://standards-oui.ieee.org/oui/oui.txt\0"
-                    if data.count(old) != 1:
+                    if data.count(old) == 1:
+                        offset = data.index(old)
+                        if data[offset + len(old):offset + len(new)] != b"\0":
+                            raise ValueError("no padding after IEEE vendor URL")
+                        patched = bytearray(data)
+                        patched[offset:offset + len(new)] = new
+                        data = bytes(patched)
+                    elif data.count(new) != 1:
                         raise ValueError("unexpected IEEE vendor URL in source app")
-                    offset = data.index(old)
-                    if data[offset + len(old):offset + len(new)] != b"\0":
-                        raise ValueError("no padding after IEEE vendor URL")
-                    patched = bytearray(data)
-                    patched[offset:offset + len(new)] = new
-                    data = bytes(patched)
                 info.size = len(data)
             else:
                 data = None
@@ -130,8 +141,9 @@ def main() -> None:
     entries += [
         regular("usr/share/harpy-reloaded-roothide/roothide.entitlements", ENTITLEMENTS),
         regular("usr/share/harpy-reloaded-roothide/oui_vendors.plist", (HERE / "oui_vendors.plist").read_bytes()),
-        regular("usr/lib/TweakInject/HarpyRootHidePaths.dylib", (HERE.parent / "prebuilt" / "HarpyRootHidePaths_ios.dylib").read_bytes(), 0o755),
+        regular("usr/lib/TweakInject/HarpyRootHidePaths.dylib", tweak_binary, 0o755),
         regular("usr/lib/TweakInject/HarpyRootHidePaths.plist", FILTER),
+        regular("Applications/HarpyReloaded.app/CreditsAvatar.jpg", (HERE.parent / "assets" / "CreditsAvatar.jpg").read_bytes()),
     ]
     for executable in (
         "Applications/HarpyReloaded.app/HarpyReloaded",
