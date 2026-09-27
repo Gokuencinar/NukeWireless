@@ -11,6 +11,7 @@ import hashlib
 import io
 import os
 from pathlib import Path
+import plistlib
 import sys
 import tarfile
 
@@ -27,12 +28,13 @@ os.environ.setdefault("HARPY_SOURCE_DEB", str(source))
 from package_utils import get_tar_member, pack_ar, read_ar, regular, symlink, tar_bytes  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "dist" / "com.gokuencinar.nukewireless_1.0.25+rh25.1_iphoneos-arm64e.deb"
+OUTPUT = ROOT / "dist" / "com.gokuencinar.nukewireless_1.0.25+rh25.2_iphoneos-arm64e.deb"
 EXPECTED_SOURCE_SHA256 = "f4b5282bf8aec2eef2a35f84f644aa3bb6e4a16230b7c7cd2789fea6da65cdbc"
 INFO_LIBRARY = "usr/lib/TweakInject/NukeWirelessInfo.dylib"
 INFO_FILTER = "usr/lib/TweakInject/NukeWirelessInfo.plist"
 INFO_PATCH = INFO_LIBRARY + ".roothidepatch"
 ENTITLEMENTS = "usr/share/nukewireless-roothide/roothide.entitlements"
+APP_PLIST = "Applications/HarpyReloaded.app/Info.plist"
 
 
 def read_zstd_tar(archive: bytes) -> list[tuple[tarfile.TarInfo, bytes | None]]:
@@ -73,6 +75,7 @@ def main() -> None:
     required = {
         "Applications/HarpyReloaded.app/HarpyReloaded",
         "Applications/HarpyReloaded.app/CreditsAvatar.jpg",
+        APP_PLIST,
         "usr/lib/TweakInject/HarpyRootHidePaths.dylib",
         "usr/lib/TweakInject/NukeWirelessPaths.dylib",
         ENTITLEMENTS,
@@ -84,7 +87,7 @@ def main() -> None:
         name = member.name.lstrip("./")
         if name == "control":
             payload = replace_once(payload, b"Version: 1.0.25+rh25\n",
-                                   b"Version: 1.0.25+rh25.1\n")
+                                   b"Version: 1.0.25+rh25.2\n")
             member.size = len(payload)
             control_entries[index] = (member, payload)
         elif name == "postinst":
@@ -100,6 +103,14 @@ def main() -> None:
             payload = replace_once(payload, b"</dict></plist>",
                 b"<key>com.apple.developer.networking.wifi-info</key><true/>\n"
                 b"</dict></plist>")
+            member.size = len(payload)
+            data_entries[index] = (member, payload)
+        elif member.name.lstrip("./") == APP_PLIST:
+            app_plist = plistlib.loads(payload)
+            app_plist["NSLocationWhenInUseUsageDescription"] = (
+                "Nuke Wireless usa la ubicación al mostrar Info para leer el nombre "
+                "y el BSSID de la red Wi-Fi actual.")
+            payload = plistlib.dumps(app_plist, fmt=plistlib.FMT_BINARY, sort_keys=False)
             member.size = len(payload)
             data_entries[index] = (member, payload)
 

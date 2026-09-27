@@ -16,7 +16,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile Info extension for iOS arm64
+      - name: Compile Nuke Wireless extension for iOS arm64
         shell: bash
         run: |
           set -euo pipefail
@@ -27,6 +27,7 @@ jobs:
             -dynamiclib -Wl,-undefined,dynamic_lookup \
             -framework UIKit -framework Foundation \
             -framework QuartzCore -framework SystemConfiguration \
+            -framework NetworkExtension -framework CoreLocation \
             -o prebuilt/NukeWirelessInfo_ios.dylib \
             src/NukeWirelessInfo.m
           file prebuilt/NukeWirelessInfo_ios.dylib

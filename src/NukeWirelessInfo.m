@@ -2,7 +2,10 @@
 #import <QuartzCore/QuartzCore.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 #import <SystemConfiguration/CaptiveNetwork.h>
+#import <NetworkExtension/NetworkExtension.h>
+#import <CoreLocation/CoreLocation.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import <arpa/inet.h>
 #import <ifaddrs.h>
 #import <net/if.h>
@@ -12,12 +15,22 @@
 
 /* Info-only extension for the user's Nuke Wireless 1.0.25 package. */
 static const NSInteger kInfoOverlayTag = 90721;
-static const NSInteger kNetworkLabelTag = 90722;
+static const NSInteger kRefreshButtonTag = 90730;
+static const NSInteger kNetworkRowTag = 90800;
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
+static NSArray<NSString *> *networkKeys(void) {
+    return @[@"SSID", @"BSSID", @"IPv4", @"Puerta de enlace", @"Máscara", @"DNS"];
+}
+static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString *> *values);
+static void refreshNetworkRows(UIView *overlay);
 
-@interface NWInfoLinkTarget : NSObject
+@interface NWInfoLinkTarget : NSObject <CLLocationManagerDelegate>
+@property (nonatomic, weak) UIView *overlay;
+@property (nonatomic, strong) CLLocationManager *locationManager;
 - (void)openGitHub:(id)sender;
 - (void)openCoffee:(id)sender;
+- (void)copyNetworkValue:(UIButton *)sender;
+- (void)refreshWiFi:(id)sender;
 @end
 
 @implementation NWInfoLinkTarget
@@ -30,6 +43,23 @@ static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
     (void)sender;
     [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://buymeacoffee.com/gokuen"]
                                    options:@{} completionHandler:nil];
+}
+- (void)copyNetworkValue:(UIButton *)sender {
+    NSString *value = sender.accessibilityValue;
+    if (value.length && ![value isEqualToString:@"No disponible"] &&
+        ![value isEqualToString:@"Ubicación no autorizada"])
+        UIPasteboard.generalPasteboard.string = value;
+}
+- (void)refreshWiFi:(id)sender {
+    Class targetClass = NSClassFromString(@"NukeWirelessBulkButtonTarget");
+    id target = targetClass ? [targetClass new] : nil;
+    SEL refresh = NSSelectorFromString(@"refreshTriggered:");
+    if ([target respondsToSelector:refresh])
+        ((void (*)(id, SEL, id))objc_msgSend)(target, refresh, sender);
+}
+- (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager {
+    (void)manager;
+    if (self.overlay) refreshNetworkRows(self.overlay);
 }
 @end
 
@@ -60,11 +90,9 @@ static void interfaceIPv4(NSString **address, NSString **mask) {
     freeifaddrs(interfaces);
 }
 
-static NSString *networkDetails(void) {
+static NSDictionary<NSString *, NSString *> *networkDetails(void) {
     NSString *address = nil, *mask = nil;
     interfaceIPv4(&address, &mask);
-    if (!address) return @"Wi-Fi: sin conexión IPv4";
-
     NSDictionary *wifi = CFBridgingRelease(CNCopyCurrentNetworkInfo(CFSTR("en0")));
     NSString *ssid = wifi[@"SSID"];
     NSString *bssid = wifi[@"BSSID"];
@@ -90,10 +118,18 @@ static NSString *networkDetails(void) {
             dnsServer = servers.firstObject;
         CFRelease(store);
     }
-    return [NSString stringWithFormat:
-        @"SSID: %@\nBSSID: %@\nIPv4: %@\nPuerta de enlace: %@\nMáscara: %@\nDNS: %@",
-        available(ssid), available(bssid), address, available(router),
-        available(mask), available(dnsServer)];
+    CLAuthorizationStatus location = [CLLocationManager authorizationStatus];
+    NSString *missingWiFi = (location == kCLAuthorizationStatusDenied ||
+        location == kCLAuthorizationStatusRestricted) ?
+        @"Ubicación no autorizada" : @"No disponible";
+    return @{
+        @"SSID": ssid.length ? ssid : missingWiFi,
+        @"BSSID": bssid.length ? bssid : missingWiFi,
+        @"IPv4": available(address),
+        @"Puerta de enlace": available(router),
+        @"Máscara": available(mask),
+        @"DNS": available(dnsServer),
+    };
 }
 
 static UIScrollView *findInfoScroll(UIView *view, CGFloat *largestArea) {
@@ -141,11 +177,57 @@ static void infoButton(UIView *parent, CGRect frame, NSString *title,
     [parent addSubview:button];
 }
 
+static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString *> *values) {
+    NSArray<NSString *> *keys = networkKeys();
+    for (NSUInteger index = 0; index < keys.count; ++index) {
+        UIButton *row = (UIButton *)[overlay viewWithTag:kNetworkRowTag + index];
+        NSString *value = values[keys[index]] ?: @"No disponible";
+        row.accessibilityValue = value;
+        UILabel *valueLabel = (UILabel *)[row viewWithTag:1];
+        valueLabel.text = value;
+    }
+}
+
+static void refreshNetworkRows(UIView *overlay) {
+    if (!overlay) return;
+    updateNetworkRows(overlay, networkDetails());
+    __weak UIView *weakOverlay = overlay;
+    [NEHotspotNetwork fetchCurrentWithCompletionHandler:^(NEHotspotNetwork *network) {
+        UIView *current = weakOverlay;
+        if (!current || !network) return;
+        NSMutableDictionary *values = [networkDetails() mutableCopy];
+        if (network.SSID.length) values[@"SSID"] = network.SSID;
+        if (network.BSSID.length) values[@"BSSID"] = network.BSSID;
+        updateNetworkRows(current, values);
+    }];
+}
+
+static void presentWiFi(UIViewController *controller, UITabBarController *tab) {
+    (void)controller;
+    UIView *view = tab.selectedViewController.view;
+    if (!view || [view viewWithTag:kRefreshButtonTag]) return;
+    if (!linkTarget) linkTarget = [NWInfoLinkTarget new];
+    CGFloat width = view.bounds.size.width;
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.tag = kRefreshButtonTag;
+    button.frame = CGRectMake(width - 125, view.safeAreaInsets.top + 8, 113, 36);
+    button.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+    button.backgroundColor = [UIColor colorWithWhite:0.18 alpha:0.96];
+    button.layer.cornerRadius = 9;
+    [button setTitle:@"↻ Actualizar" forState:UIControlStateNormal];
+    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [button addTarget:linkTarget action:@selector(refreshWiFi:)
+        forControlEvents:UIControlEventTouchUpInside];
+    [view addSubview:button];
+}
+
 static void presentInfo(UIViewController *controller) {
     UITabBarController *tab = controller.tabBarController;
     if (!tab && [controller isKindOfClass:[UITabBarController class]])
         tab = (UITabBarController *)controller;
-    if (!tab || tab.selectedIndex != 2) return;
+    if (!tab) return;
+    if (tab.selectedIndex == 0) { presentWiFi(controller, tab); return; }
+    if (tab.selectedIndex != 2) return;
     CGFloat largestArea = 0;
     UIScrollView *scroll = tab.selectedViewController ?
         findInfoScroll(tab.selectedViewController.view, &largestArea) : nil;
@@ -153,13 +235,12 @@ static void presentInfo(UIViewController *controller) {
     if (!scroll) return;
     UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
     if (overlay) {
-        UILabel *network = (UILabel *)[overlay viewWithTag:kNetworkLabelTag];
-        network.text = networkDetails();
+        refreshNetworkRows(overlay);
         return;
     }
 
     CGFloat width = scroll.bounds.size.width;
-    overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 392, width, 370)];
+    overlay = [[UIControl alloc] initWithFrame:CGRectMake(0, 392, width, 548)];
     overlay.tag = kInfoOverlayTag;
     overlay.backgroundColor = UIColor.blackColor;
     [scroll addSubview:overlay];
@@ -167,6 +248,7 @@ static void presentInfo(UIViewController *controller) {
     contentSize.height = MAX(contentSize.height, CGRectGetMaxY(overlay.frame));
     scroll.contentSize = contentSize;
     if (!linkTarget) linkTarget = [NWInfoLinkTarget new];
+    linkTarget.overlay = overlay;
 
     NSString *avatarPath = [[NSBundle mainBundle] pathForResource:@"CreditsAvatar" ofType:@"jpg"];
     UIImageView *avatar = [[UIImageView alloc] initWithFrame:CGRectMake((width - 62) / 2, 8, 62, 62)];
@@ -177,16 +259,47 @@ static void presentInfo(UIViewController *controller) {
     [overlay addSubview:avatar];
 
     infoLabel(overlay, CGRectMake(15, 72, width - 30, 40),
-        @"Adaptación RootHide por Gokuencinar · GokuEn", 15,
+        @"Gokuencinar GokuEn", 16,
         NSTextAlignmentCenter, 0);
     infoButton(overlay, CGRectMake(35, 114, width - 70, 30),
         @"GitHub: @Gokuencinar", @selector(openGitHub:), NO);
     infoButton(overlay, CGRectMake(35, 148, width - 70, 36),
         @"Buy Me a Coffee", @selector(openCoffee:), YES);
-    infoLabel(overlay, CGRectMake(18, 190, width - 36, 24),
-        @"RED ACTUAL", 15, NSTextAlignmentLeft, 0);
-    infoLabel(overlay, CGRectMake(18, 216, width - 36, 146),
-        networkDetails(), 13, NSTextAlignmentLeft, kNetworkLabelTag);
+    infoLabel(overlay, CGRectMake(18, 193, width - 36, 27),
+        @"Red actual", 18, NSTextAlignmentLeft, 0);
+    UIView *card = [[UIView alloc] initWithFrame:CGRectMake(16, 228, width - 32, 300)];
+    card.backgroundColor = [UIColor colorWithWhite:0.13 alpha:1];
+    card.layer.cornerRadius = 13;
+    card.clipsToBounds = YES;
+    [overlay addSubview:card];
+    NSArray<NSString *> *keys = networkKeys();
+    for (NSUInteger index = 0; index < keys.count; ++index) {
+        UIButton *row = [UIButton buttonWithType:UIButtonTypeCustom];
+        row.tag = kNetworkRowTag + index;
+        row.frame = CGRectMake(0, index * 50, card.bounds.size.width, 50);
+        row.accessibilityLabel = keys[index];
+        [row addTarget:linkTarget action:@selector(copyNetworkValue:)
+            forControlEvents:UIControlEventTouchUpInside];
+        infoLabel(row, CGRectMake(12, 4, card.bounds.size.width - 24, 17),
+            keys[index], 11, NSTextAlignmentLeft, 0).textColor = UIColor.lightGrayColor;
+        UILabel *value = infoLabel(row,
+            CGRectMake(12, 21, card.bounds.size.width - 24, 24),
+            @"No disponible", 15, NSTextAlignmentLeft, 1);
+        value.userInteractionEnabled = NO;
+        if (index + 1 < keys.count) {
+            UIView *separator = [[UIView alloc] initWithFrame:
+                CGRectMake(12, 49, card.bounds.size.width - 24, 1)];
+            separator.backgroundColor = [UIColor colorWithWhite:0.25 alpha:1];
+            [row addSubview:separator];
+        }
+        [card addSubview:row];
+    }
+    refreshNetworkRows(overlay);
+    if ([CLLocationManager authorizationStatus] == kCLAuthorizationStatusNotDetermined) {
+        linkTarget.locationManager = [CLLocationManager new];
+        linkTarget.locationManager.delegate = linkTarget;
+        [linkTarget.locationManager requestWhenInUseAuthorization];
+    }
 }
 
 static void patchedViewDidAppear(UIViewController *controller, SEL selector, BOOL animated) {
