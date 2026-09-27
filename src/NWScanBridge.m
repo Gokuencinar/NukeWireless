@@ -123,7 +123,7 @@ BOOL NWRefreshScan(void) {
         0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9
     };
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
-    typedef void (__attribute__((swiftcall)) *NativeRefresh)(
+    typedef void (*NativeRefresh) __attribute__((swiftcall)) (
         void *, void *, void * __attribute__((swift_context)));
     NativeRefresh refresh = (NativeRefresh)(base + 0xc5a8);
     pendingStart = YES;
