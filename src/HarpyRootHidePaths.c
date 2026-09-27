@@ -5,14 +5,39 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
+#include <stdint.h>
+#if __has_include(<net/route.h>)
 #include <net/route.h>
+#else
+/* iPhoneOS SDKs omit the BSD routing-table declarations. */
+#define NET_RT_FLAGS 2
+#define RTF_LLINFO 0x400
+#define RTAX_DST 0
+#define RTAX_GATEWAY 1
+#define RTAX_MAX 8
+struct rt_metrics {
+    unsigned long rmx_locks, rmx_mtu, rmx_hopcount, rmx_expire;
+    unsigned long rmx_recvpipe, rmx_sendpipe, rmx_ssthresh, rmx_rtt;
+    unsigned long rmx_rttvar, rmx_weight;
+    uint32_t rmx_filler[3];
+};
+struct rt_msghdr {
+    unsigned short rtm_msglen;
+    unsigned char rtm_version, rtm_type;
+    unsigned short rtm_index;
+    int rtm_flags, rtm_addrs;
+    pid_t rtm_pid;
+    int rtm_seq, rtm_errno, rtm_use;
+    uint32_t rtm_inits;
+    struct rt_metrics rtm_rmx;
+};
+#endif
 #include <net/if_dl.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <time.h>
 
 typedef void *id;
