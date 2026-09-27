@@ -8,6 +8,7 @@
 #import <net/if.h>
 #import <dispatch/dispatch.h>
 #include <string.h>
+#include <dlfcn.h>
 
 /* Info-only extension for the user's Nuke Wireless 1.0.25 package. */
 static const NSInteger kInfoOverlayTag = 90721;
@@ -68,13 +69,21 @@ static NSString *networkDetails(void) {
     NSString *ssid = wifi[@"SSID"];
     NSString *bssid = wifi[@"BSSID"];
     NSString *router = nil, *dnsServer = nil;
-    SCDynamicStoreRef store = SCDynamicStoreCreate(NULL, CFSTR("NukeWirelessInfo"), NULL, NULL);
+    static void *systemConfiguration;
+    if (!systemConfiguration) systemConfiguration = dlopen(
+        "/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_LAZY);
+    CFTypeRef (*createStore)(CFAllocatorRef, CFStringRef, void *, void *) =
+        systemConfiguration ? dlsym(systemConfiguration, "SCDynamicStoreCreate") : NULL;
+    CFPropertyListRef (*copyValue)(CFTypeRef, CFStringRef) =
+        systemConfiguration ? dlsym(systemConfiguration, "SCDynamicStoreCopyValue") : NULL;
+    CFTypeRef store = createStore && copyValue ?
+        createStore(NULL, CFSTR("NukeWirelessInfo"), NULL, NULL) : NULL;
     if (store) {
-        NSDictionary *globalIPv4 = CFBridgingRelease(SCDynamicStoreCopyValue(
+        NSDictionary *globalIPv4 = CFBridgingRelease(copyValue(
             store, CFSTR("State:/Network/Global/IPv4")));
         if ([globalIPv4[@"PrimaryInterface"] isEqualToString:@"en0"])
             router = globalIPv4[@"Router"];
-        NSDictionary *globalDNS = CFBridgingRelease(SCDynamicStoreCopyValue(
+        NSDictionary *globalDNS = CFBridgingRelease(copyValue(
             store, CFSTR("State:/Network/Global/DNS")));
         NSArray *servers = globalDNS[@"ServerAddresses"];
         if ([servers.firstObject isKindOfClass:[NSString class]])
