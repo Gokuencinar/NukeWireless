@@ -15,6 +15,7 @@ static void (*oldStart)(id, SEL);
 static void (*oldFound)(id, SEL, id);
 static void (*oldFinished)(id, SEL, int);
 static void (*oldFailed)(id, SEL);
+extern void NWInvokeRefresh(void *adapter, const void *entry);
 
 static id readObject(id object, NSString *selector) {
     SEL sel = NSSelectorFromString(selector);
@@ -123,11 +124,8 @@ BOOL NWRefreshScan(void) {
         0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9
     };
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
-    typedef void (*NativeRefresh) __attribute__((swiftcall)) (
-        void *, void *, void * __attribute__((swift_context)));
-    NativeRefresh refresh = (NativeRefresh)(base + 0xc5a8);
     pendingStart = YES;
-    refresh(NULL, NULL, (__bridge void *)adapter);
+    NWInvokeRefresh((__bridge void *)adapter, base + 0xc5a8);
     // Unlock only if the native refresh never reached the scanner.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC),
         dispatch_get_main_queue(), ^{ if (pendingStart) pendingStart = NO; });
