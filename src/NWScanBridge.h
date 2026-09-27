@@ -1,5 +1,5 @@
-#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
 void NWInstallScanHooks(void);
-BOOL NWRefreshScan(UIView *wifiRootView);
+BOOL NWRefreshScan(void);
 BOOL NWScanBusy(void);
 NSString *NWScanSummary(void);
