@@ -296,7 +296,9 @@ static void updateWiFi(void);
 @end
 @implementation NWActions
 - (void)refresh:(id)sender {
+    syslog(LOG_NOTICE, "Nuke Wireless diagnostic: refresh action entered");
     BOOL started = NWRefreshScan(); updateWiFi();
+    syslog(LOG_NOTICE, "Nuke Wireless diagnostic: refresh action returned started=%d", started);
     if (!started && !NWScanBusy() && !NWBulkBusy()) showMessage(activeTab.selectedViewController, NWText(@"scan.unavailable"));
     if ([sender isKindOfClass:UIRefreshControl.class] && !NWScanBusy()) [(UIRefreshControl *)sender endRefreshing];
 }
@@ -436,5 +438,15 @@ __attribute__((constructor)) static void installExtension(void) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
+        __block NSUInteger attempts = 0;
+        [NSTimer scheduledTimerWithTimeInterval:10 repeats:YES block:^(NSTimer *timer) {
+            ++attempts;
+            if (attempts >= 8) { [timer invalidate]; return; }
+            if (activeTab.selectedIndex != 0 || NWScanBusy() || attempts < 2) return;
+            UIButton *button = (UIButton *)[activeTab.selectedViewController.view viewWithTag:refreshTag];
+            syslog(LOG_NOTICE, "Nuke Wireless diagnostic: simulate button=%d enabled=%d", button != nil, button.enabled);
+            if (button) [button sendActionsForControlEvents:UIControlEventTouchUpInside];
+            [timer invalidate];
+        }];
     });
 }
