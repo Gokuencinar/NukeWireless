@@ -11,20 +11,8 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <math.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev2";
-static void diagnostic(const char *event) {
-#ifdef NW_DIAGNOSTIC
-    syslog(LOG_NOTICE, "NukeWireless info: %s", event);
-    int fd = open("/var/mobile/Library/Caches/NukeWireless-install-trace.log", O_WRONLY | O_CREAT | O_APPEND, 0600);
-    if (fd >= 0) { write(fd, event, strlen(event)); write(fd, "\n", 1); close(fd); }
-#else
-    (void)event;
-#endif
-}
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev3";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -263,7 +251,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev2", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev3", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -385,11 +373,6 @@ static void installUI(UIViewController *controller) {
     UITabBarController *tab = controller.tabBarController;
     if (!tab && [controller isKindOfClass:UITabBarController.class]) tab = (UITabBarController *)controller;
     if (!tab || installingUI) return;
-#ifdef NW_DIAGNOSTIC
-    syslog(LOG_NOTICE, "NukeWireless tab: %p selected=%lu tabs=%lu window=%p host=%s", tab,
-           (unsigned long)tab.selectedIndex, (unsigned long)tab.viewControllers.count, tab.view.window,
-           NSStringFromClass(tab.selectedViewController.class).UTF8String);
-#endif
     activeTab = tab; installingUI = YES;
     if (tab.selectedIndex == 2 && tab.selectedViewController) {
         UIViewController *host = tab.selectedViewController;
@@ -413,7 +396,6 @@ static void installUI(UIViewController *controller) {
             ]];
             [info didMoveToParentViewController:host];
             objc_setAssociatedObject(host, &infoOverlayKey, info, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            diagnostic("info overlay attached");
         }
         [host.view bringSubviewToFront:info.view];
         host.tabBarItem.title = NWText(@"info.title");
@@ -425,13 +407,10 @@ static void installUI(UIViewController *controller) {
             button.configuration = UIButtonConfiguration.tintedButtonConfiguration; button.translatesAutoresizingMaskIntoConstraints = NO;
             bindButton(button,@selector(refresh:)); [root addSubview:button];
             [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
-            diagnostic("wifi refresh attached");
         }
     }
     installingUI = NO;
-    diagnostic("initial wifi update begin");
     updateWiFi();
-    diagnostic("initial wifi update end");
 }
 static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
@@ -454,21 +433,7 @@ static void labelText(UILabel *label, SEL sel, NSString *value) {
     if (objc_getAssociatedObject(label,&statusLabelKey)) value = NWScanSummary();
     originalLabelText(label,sel,value);
 }
-#ifdef NW_DIAGNOSTIC
-static void captureDiagnostic(NSString *name) {
-    UIView *view = activeTab.view.window ?: activeTab.view;
-    if (!view || CGRectIsEmpty(view.bounds)) { diagnostic("snapshot missing view"); return; }
-    UIGraphicsBeginImageContextWithOptions(view.bounds.size, YES, 0);
-    [view.layer renderInContext:UIGraphicsGetCurrentContext()];
-    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    NSString *path = [NSHomeDirectory() stringByAppendingFormat:@"/Library/Caches/NukeWireless-%@.png", name];
-    BOOL written = [UIImagePNGRepresentation(image) writeToFile:path atomically:YES];
-    diagnostic(written ? "snapshot written" : "snapshot write failed");
-}
-#endif
 __attribute__((constructor)) static void installExtension(void) {
-    diagnostic("constructor entered");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -483,19 +448,6 @@ __attribute__((constructor)) static void installExtension(void) {
         method = class_getInstanceMethod(UILabel.class,@selector(setText:));
         originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
-        diagnostic("main hooks installed");
-#ifdef NW_DIAGNOSTIC
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-            NSDictionary *network = networkDetails();
-            syslog(LOG_NOTICE, "NukeWireless network fields present: ssid=%d bssid=%d ipv4=%d gateway=%d mask=%d dns=%d",
-                   ![network[@"SSID"] isEqual:NWText(@"unavailable")],
-                   ![network[@"BSSID"] isEqual:NWText(@"unavailable")],
-                   ![network[@"IPv4"] isEqual:NWText(@"unavailable")],
-                   ![network[@"Puerta de enlace"] isEqual:NWText(@"unavailable")],
-                   ![network[@"Máscara"] isEqual:NWText(@"unavailable")],
-                   ![network[@"DNS"] isEqual:NWText(@"unavailable")]);
-        });
-#endif
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
@@ -503,26 +455,9 @@ __attribute__((constructor)) static void installExtension(void) {
                 NWReconcileDeviceStates(); updateWiFi();
             }
         }];
-        diagnostic("scene installation begin");
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
-        diagnostic("scene installation end");
-#ifdef NW_DIAGNOSTIC
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-            diagnostic("snapshot timer fired");
-            if (!activeTab) return;
-            captureDiagnostic(@"wifi");
-            NSInteger prior = activeTab.selectedIndex;
-            activeTab.selectedIndex = 2;
-            installUI(activeTab);
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 700 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-                captureDiagnostic(@"info");
-                activeTab.selectedIndex = prior;
-                installUI(activeTab);
-            });
-        });
-#endif
     });
 }

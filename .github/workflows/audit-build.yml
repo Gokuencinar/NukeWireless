@@ -16,6 +16,5 @@ jobs:
           name: nuke-wireless-private-development
           path: |
             build/audit/NukeWirelessInfo_ios.dylib
-            build/audit/NukeWirelessProbe.dylib
             build/audit/build-manifest.json
           retention-days: 7
