@@ -191,16 +191,20 @@ static const uint8_t *appExecutableBase(void) {
     return NULL;
 }
 BOOL NWRefreshScan(void) {
+    NSLog(@"Nuke Wireless diagnostic: refresh called main=%d busy=%d bulk=%d adapter=%d", NSThread.isMainThread, NWScanBusy(), bulkBusy, wifiAdapter != nil);
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
     const uint8_t *base = appExecutableBase();
     static const uint8_t prologue[] = {0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
+    NSLog(@"Nuke Wireless diagnostic: app base=%p prologue=%d", base, base ? memcmp(base + 0xc5a8, prologue, sizeof(prologue)) : -1);
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
     // The pinned Swift refresh clears Published.devices and schedules its scanner.
     // The start and callback hooks track that native scan without moving start
     // to a different thread or replacing its delegate.
+    NSLog(@"Nuke Wireless diagnostic: invoking native refresh");
     NWInvokeRefresh((__bridge void *)wifiAdapter, base + 0xc5a8);
+    NSLog(@"Nuke Wireless diagnostic: native refresh returned");
     return YES;
 }
 NSString *NWScanSummary(void) {
