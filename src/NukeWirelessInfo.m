@@ -13,7 +13,7 @@
 #include <math.h>
 #include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev5";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev6";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -255,7 +255,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev5", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev6", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -283,9 +283,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 @end
 
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
-static void (*originalDidLayout)(UIViewController *, SEL);
-static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
-static char wifiInsetKey, baseInsetKey;
+static char baseInsetKey, bulkBoundKey;
 static char infoOverlayKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
@@ -324,18 +322,26 @@ static void updateWiFi(void) {
     layingOut = YES;
     UIView *root = tab.selectedViewController.view;
     UIButton *refresh = (UIButton *)[root viewWithTag:refreshTag];
-    refresh.enabled = !NWScanBusy() && !NWBulkBusy();
-    [refresh setTitle:NWText(NWScanBusy() ? @"scan.scanning" : @"refresh") forState:UIControlStateNormal];
+    BOOL refreshEnabled = !NWScanBusy() && !NWBulkBusy();
+    if (refresh.enabled != refreshEnabled) refresh.enabled = refreshEnabled;
+    NSString *refreshTitle = NWText(NWScanBusy() ? @"scan.scanning" : @"refresh");
+    if (![refresh.currentTitle isEqualToString:refreshTitle]) [refresh setTitle:refreshTitle forState:UIControlStateNormal];
     if (refresh) [root bringSubviewToFront:refresh];
     UIButton *bulkButton = (UIButton *)[tab.view viewWithTag:90122];
     if ([bulkButton isKindOfClass:UIButton.class] && !bulkButton.hidden) {
         CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
         CGFloat width = MIN(186, MAX(0, tab.view.bounds.size.width - 24));
-        bulkButton.frame = CGRectMake((tab.view.bounds.size.width - width) / 2,
-                                      CGRectGetMinY(bar) - 58, width, 42);
-        bindButton(bulkButton, @selector(bulk:));
-        [bulkButton setTitle:NWBulkTitle() forState:UIControlStateNormal];
-        bulkButton.enabled = !NWBulkBusy();
+        CGRect position = CGRectMake((tab.view.bounds.size.width - width) / 2,
+                                     CGRectGetMinY(bar) - 58, width, 42);
+        if (!CGRectEqualToRect(bulkButton.frame, position)) bulkButton.frame = position;
+        if (!objc_getAssociatedObject(bulkButton, &bulkBoundKey)) {
+            bindButton(bulkButton, @selector(bulk:));
+            objc_setAssociatedObject(bulkButton, &bulkBoundKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        NSString *bulkTitle = NWBulkTitle();
+        if (![bulkButton.currentTitle isEqualToString:bulkTitle]) [bulkButton setTitle:bulkTitle forState:UIControlStateNormal];
+        BOOL bulkEnabled = !NWBulkBusy();
+        if (bulkButton.enabled != bulkEnabled) bulkButton.enabled = bulkEnabled;
     }
     UIScrollView *scroll = largestScroll(root);
     if (scroll) {
@@ -351,11 +357,11 @@ static void updateWiFi(void) {
             CGRect panelFrame = [bulkButton convertRect:bulkButton.bounds toView:root];
             CGFloat systemInset = scroll.adjustedContentInset.bottom - scroll.contentInset.bottom;
             CGFloat bottom = MAX(base.doubleValue, CGRectGetMaxY(scrollFrame)-CGRectGetMinY(panelFrame)-systemInset+16);
-            objc_setAssociatedObject(scroll,&wifiInsetKey,@(bottom),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             UIEdgeInsets inset = scroll.contentInset; inset.bottom = bottom;
             if (!UIEdgeInsetsEqualToEdgeInsets(inset,scroll.contentInset)) scroll.contentInset = inset;
             UIEdgeInsets indicator = scroll.verticalScrollIndicatorInsets; indicator.bottom = bottom;
-            scroll.verticalScrollIndicatorInsets = indicator;
+            if (!UIEdgeInsetsEqualToEdgeInsets(indicator,scroll.verticalScrollIndicatorInsets))
+                scroll.verticalScrollIndicatorInsets = indicator;
         }
     }
     layingOut = NO;
@@ -409,21 +415,8 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
     dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
-static void layout(UIViewController *controller, SEL sel) {
-    originalDidLayout(controller,sel);
-    if (controller == activeTab || controller == activeTab.selectedViewController) updateWiFi();
-    if (activeTab.selectedIndex == 2 && controller == activeTab.selectedViewController) {
-        UINavigationController *info = objc_getAssociatedObject(controller, &infoOverlayKey);
-        if (info) [controller.view bringSubviewToFront:info.view];
-    }
-}
-static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
-    NSNumber *minimum = objc_getAssociatedObject(scroll,&wifiInsetKey);
-    if (minimum) value.bottom = MAX(value.bottom, minimum.doubleValue);
-    originalContentInset(scroll,sel,value);
-}
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "Nuke Wireless: extension dev5 loaded");
+    syslog(LOG_NOTICE, "Nuke Wireless: extension dev6 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -431,10 +424,6 @@ __attribute__((constructor)) static void installExtension(void) {
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(changed:) name:NWStateChanged object:nil];
         Method method = class_getInstanceMethod(UIViewController.class,@selector(viewDidAppear:));
         originalViewDidAppear = (void *)method_setImplementation(method,(IMP)appeared);
-        method = class_getInstanceMethod(UIViewController.class,@selector(viewDidLayoutSubviews));
-        originalDidLayout = (void *)method_setImplementation(method,(IMP)layout);
-        method = class_getInstanceMethod(UIScrollView.class,@selector(setContentInset:));
-        originalContentInset = (void *)method_setImplementation(method,(IMP)inset);
         NWInstallPacketIntervalHook();
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {

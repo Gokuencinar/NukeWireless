@@ -6,6 +6,8 @@
 
 En `dev5` se corrigió otro fallo concreto de `dev3`/`dev4`: la etiqueta `90122` pertenece al propio `UIButton` creado por la extensión conservada. El código anterior lo trataba como un panel, recorría subviews buscando otro botón y nunca enlazaba «Bloquear todos» con la acción nueva. Se corrigió la referencia y la geometría del control. Info reduce los créditos y conserva la posición al actualizar la sección de red. `dev5` está instalada, pero los controles y la navegación todavía no se han podido observar en una sesión de pantalla; sus resultados siguen pendientes de validación.
 
+Actualización posterior: el usuario confirmó que `dev5` también se detenía en la pantalla azul. Se restauró `rh25.3`. Los registros muestran que `scannerStarted` entraba con el delegado correcto, pero no se ejecutaba el bloque diferido al hilo principal de la implementación `dev5`. `dev6` conserva el inicio del escáner en el hilo del llamador y observa sus callbacks. También elimina hooks globales de layout e inset y evita reasignar propiedades UI cuando su valor no cambia. Esta candidata no se ha instalado ni validado en dispositivo.
+
 ## Alcance y base
 
 Se trabaja sobre `main` en `ff5cb101ad405fc71e438a2b19da7caa783e25fc`, que conserva `rh25.3` tras retirar `rh25.4`. Rama de trabajo: `audit-rh25.5`. No se han creado releases ni modificado `main` o el repositorio público de paquetes.
