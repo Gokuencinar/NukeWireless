@@ -65,6 +65,22 @@ class PackageTests(unittest.TestCase):
         acknowledgements = plistlib.loads(self.after[package.APP+'Acknowledgements.plist'][1])
         self.assertTrue(all('title' in row and 'license' in row for row in acknowledgements))
 
+    def test_new_files_have_parent_directories_before_them(self):
+        archive = package.read_tar(get_tar_member(read_ar(RESULT.read_bytes()), 'data.tar'))
+        names = [m.name.lstrip('./').rstrip('/') for m, _ in archive]
+        new = set(self.after) - set(self.before)
+        for name in new:
+            if self.after[name][0].isdir(): continue
+            parent = str(Path(name).parent).replace('\\', '/')
+            while parent and parent != '.':
+                if parent in self.before:
+                    self.assertTrue(self.before[parent][0].isdir(), parent)
+                    break
+                self.assertIn(parent, names, (name, parent))
+                self.assertLess(names.index(parent), names.index(name), (name, parent))
+                self.assertTrue(self.after[parent][0].isdir(), parent)
+                parent = str(Path(parent).parent).replace('\\', '/')
+
     def test_control_and_signing(self):
         before = members(BASE,'control.tar'); after = members(RESULT,'control.tar')
         self.assertEqual(before['postinst'][1],after['postinst'][1])
@@ -78,7 +94,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
-        self.assertIn(b'NWBuild-rh25.5-dev1',binary)
+        self.assertIn(b'NWBuild-rh25.5-dev2',binary)
         for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
             self.assertNotIn(token,binary)
 

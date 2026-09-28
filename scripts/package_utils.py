@@ -68,6 +68,13 @@ def regular(path: str, data: bytes, mode: int = 0o644) -> tuple[tarfile.TarInfo,
     return info, data
 
 
+def directory(path: str, mode: int = 0o755) -> tuple[tarfile.TarInfo, None]:
+    info = tarfile.TarInfo("./" + path.rstrip("/") + "/")
+    info.type = tarfile.DIRTYPE
+    info.mode = mode
+    return info, None
+
+
 def symlink(path: str, target: str) -> tuple[tarfile.TarInfo, None]:
     info = tarfile.TarInfo("./" + path)
     info.type = tarfile.SYMTYPE
@@ -81,6 +88,5 @@ def get_tar_member(parts: dict[str, bytes], prefix: str) -> bytes:
     if len(found) != 1:
         raise ValueError(f"expected exactly one {prefix} member")
     return found[0][1]
-
 
 

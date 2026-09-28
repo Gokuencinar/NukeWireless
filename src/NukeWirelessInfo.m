@@ -11,8 +11,18 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <math.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev1";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev2";
+static void diagnostic(const char *event) {
+#ifdef NW_DIAGNOSTIC
+    int fd = open("/var/mobile/Library/Caches/NukeWireless-install-trace.log", O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (fd >= 0) { write(fd, event, strlen(event)); write(fd, "\n", 1); close(fd); }
+#else
+    (void)event;
+#endif
+}
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -251,7 +261,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev1", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev2", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -283,6 +293,7 @@ static void (*originalDidLayout)(UIViewController *, SEL);
 static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
 static void (*originalLabelText)(UILabel *, SEL, NSString *);
 static char wifiInsetKey, baseInsetKey, statusLabelKey;
+static char infoOverlayKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
 static BOOL installingUI, layingOut;
@@ -371,16 +382,34 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = controller.tabBarController;
     if (!tab && [controller isKindOfClass:UITabBarController.class]) tab = (UITabBarController *)controller;
-    if (!tab || tab.viewControllers.count < 3 || installingUI) return;
+    if (!tab || installingUI) return;
     activeTab = tab; installingUI = YES;
-    UIViewController *oldInfo = tab.viewControllers[2];
-    BOOL installed = [oldInfo isKindOfClass:UINavigationController.class] && [((UINavigationController *)oldInfo).viewControllers.firstObject isKindOfClass:NWInfoController.class];
-    if (!installed) {
-        UINavigationController *info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
-        info.tabBarItem = oldInfo.tabBarItem; info.tabBarItem.title = NWText(@"info.title");
-        NSMutableArray *tabs = [tab.viewControllers mutableCopy]; tabs[2] = info;
-        NSUInteger selection = tab.selectedIndex;
-        [tab setViewControllers:tabs animated:NO]; tab.selectedIndex = selection;
+    if (tab.selectedIndex == 2 && tab.selectedViewController) {
+        UIViewController *host = tab.selectedViewController;
+        UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
+        if (!info) {
+            info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
+            info.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+            UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
+            [appearance configureWithOpaqueBackground];
+            appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
+            info.navigationBar.standardAppearance = appearance;
+            info.navigationBar.scrollEdgeAppearance = appearance;
+            [host addChildViewController:info];
+            info.view.translatesAutoresizingMaskIntoConstraints = NO;
+            [host.view addSubview:info.view];
+            [NSLayoutConstraint activateConstraints:@[
+                [info.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
+                [info.view.bottomAnchor constraintEqualToAnchor:host.view.bottomAnchor],
+                [info.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
+                [info.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor]
+            ]];
+            [info didMoveToParentViewController:host];
+            objc_setAssociatedObject(host, &infoOverlayKey, info, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            diagnostic("info overlay attached");
+        }
+        [host.view bringSubviewToFront:info.view];
+        host.tabBarItem.title = NWText(@"info.title");
     }
     if (tab.selectedIndex == 0) {
         UIView *root = tab.selectedViewController.view;
@@ -389,6 +418,7 @@ static void installUI(UIViewController *controller) {
             button.configuration = UIButtonConfiguration.tintedButtonConfiguration; button.translatesAutoresizingMaskIntoConstraints = NO;
             bindButton(button,@selector(refresh:)); [root addSubview:button];
             [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
+            diagnostic("wifi refresh attached");
         }
     }
     installingUI = NO; updateWiFi();
@@ -400,6 +430,10 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
 static void layout(UIViewController *controller, SEL sel) {
     originalDidLayout(controller,sel);
     if (controller == activeTab || controller == activeTab.selectedViewController) updateWiFi();
+    if (activeTab.selectedIndex == 2 && controller == activeTab.selectedViewController) {
+        UINavigationController *info = objc_getAssociatedObject(controller, &infoOverlayKey);
+        if (info) [controller.view bringSubviewToFront:info.view];
+    }
 }
 static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
     NSNumber *minimum = objc_getAssociatedObject(scroll,&wifiInsetKey);
@@ -411,6 +445,7 @@ static void labelText(UILabel *label, SEL sel, NSString *value) {
     originalLabelText(label,sel,value);
 }
 __attribute__((constructor)) static void installExtension(void) {
+    diagnostic("constructor entered");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -425,6 +460,7 @@ __attribute__((constructor)) static void installExtension(void) {
         method = class_getInstanceMethod(UILabel.class,@selector(setText:));
         originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
+        diagnostic("main hooks installed");
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
