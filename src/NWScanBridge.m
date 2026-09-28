@@ -184,9 +184,16 @@ static void armWatchdog(uint64_t generation) {
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     NW_TRACE("Nuke Wireless scan: start hook entered");
     id adapter = scanner.delegate;
+    NW_TRACE("Nuke Wireless scan: delegate=%s hotspot=%d session=%d expected=%d",
+             NSStringFromClass([adapter class]).UTF8String, scanner.enableHotspot,
+             [adapter isKindOfClass:NWScanSession.class],
+             [adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]);
     if (scanner.enableHotspot || [adapter isKindOfClass:NWScanSession.class] ||
         ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
-        oldStart(scanner, sel); return;
+        NW_TRACE("Nuke Wireless scan: passthrough begin");
+        oldStart(scanner, sel);
+        NW_TRACE("Nuke Wireless scan: passthrough end");
+        return;
     }
     onMain(^{
         NW_TRACE("Nuke Wireless scan: main startup begin");
