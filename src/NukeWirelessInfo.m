@@ -428,7 +428,6 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
 __attribute__((constructor)) static void installExtension(void) {
     syslog(LOG_NOTICE, "Nuke Wireless: extension dev8 loaded");
     NWInstallScanHooks();
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 16 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{ NWRunBulkCycleDiagnostic(); });
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];

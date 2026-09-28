@@ -323,48 +323,6 @@ void NWConfirmBulk(UIViewController *presenter) {
     }]];
     [presenter presentViewController:alert animated:YES completion:nil];
 }
-// Temporary live verification. Never included in a distributed package.
-void NWRunBulkCycleDiagnostic(void) {
-    static BOOL attempted;
-    if (attempted || !NSThread.isMainThread || bulkBusy || NWScanBusy() || state.phase != NWComplete) return;
-    attempted = YES;
-    NSArray *already = activeIPs();
-    NSArray *items = [targets() copy];
-    NSLog(@"Nuke Wireless diagnostic: cycle start eligible=%lu existing=%lu", (unsigned long)items.count, (unsigned long)already.count);
-    if (already.count || !items.count || ![scanNetwork isEqualToString:networkIdentity()]) return;
-    bulkBusy = YES; bulkFailures = 0; notify();
-    bulkStep(items, 0, NO, state.generation, [scanNetwork copy]);
-    __block NSUInteger polls = 0;
-    __block void (^check)(void);
-    check = ^{
-        if (bulkBusy && polls++ < 60) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), check);
-            return;
-        }
-        NSArray *active = activeIPs();
-        NSLog(@"Nuke Wireless diagnostic: blocked active=%lu failures=%lu busy=%d", (unsigned long)active.count, (unsigned long)bulkFailures, bulkBusy);
-        if (bulkBusy) return;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            NSMutableArray *unblockItems = [NSMutableArray new];
-            for (NSString *ip in activeIPs()) [unblockItems addObject:@{@"ip":ip}];
-            NSLog(@"Nuke Wireless diagnostic: unblock start count=%lu", (unsigned long)unblockItems.count);
-            if (!unblockItems.count) return;
-            bulkBusy = YES; bulkFailures = 0; notify();
-            bulkStep(unblockItems, 0, YES, state.generation, [scanNetwork copy]);
-            __block NSUInteger finalPolls = 0;
-            __block void (^finish)(void);
-            finish = ^{
-                if (bulkBusy && finalPolls++ < 60) {
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), finish);
-                    return;
-                }
-                NSLog(@"Nuke Wireless diagnostic: cycle final active=%lu failures=%lu busy=%d", (unsigned long)activeIPs().count, (unsigned long)bulkFailures, bulkBusy);
-            };
-            finish();
-        });
-    };
-    check();
-}
 void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
