@@ -13,7 +13,7 @@
 #include <math.h>
 #include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev4";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev5";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -223,7 +223,14 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         dispatch_async(dispatch_get_main_queue(), ^{
             NWInfoController *controller = weakSelf;
             if (!controller || request != controller.requestID) return;
-            controller.values = values; [controller.tableView reloadData];
+            controller.values = values;
+            UITableView *table = controller.tableView;
+            CGPoint position = table.contentOffset;
+            [UIView performWithoutAnimation:^{
+                [table reloadSections:[NSIndexSet indexSetWithIndex:2] withRowAnimation:UITableViewRowAnimationNone];
+                [table layoutIfNeeded];
+                table.contentOffset = position;
+            }];
         });
     });
 }
@@ -237,10 +244,10 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
-        avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 32;
-        [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:64],[avatar.heightAnchor constraintEqualToConstant:64]]];
-        UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
-        UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[avatar,name]]; stack.axis = UILayoutConstraintAxisVertical; stack.alignment = UIStackViewAlignmentCenter; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
+        avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20;
+        [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:40],[avatar.heightAnchor constraintEqualToConstant:40]]];
+        UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
+        UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[avatar,name]]; stack.axis = UILayoutConstraintAxisHorizontal; stack.alignment = UIStackViewAlignmentCenter; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
         [cell.contentView addSubview:stack]; UILayoutGuide *g = cell.contentView.layoutMarginsGuide;
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
@@ -248,7 +255,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev4", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev5", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -278,8 +285,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
 static void (*originalDidLayout)(UIViewController *, SEL);
 static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
-static void (*originalLabelText)(UILabel *, SEL, NSString *);
-static char wifiInsetKey, baseInsetKey, statusLabelKey;
+static char wifiInsetKey, baseInsetKey;
 static char infoOverlayKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
@@ -321,27 +327,15 @@ static void updateWiFi(void) {
     refresh.enabled = !NWScanBusy() && !NWBulkBusy();
     [refresh setTitle:NWText(NWScanBusy() ? @"scan.scanning" : @"refresh") forState:UIControlStateNormal];
     if (refresh) [root bringSubviewToFront:refresh];
-    UIView *panel = [tab.view viewWithTag:90122];
-    if (panel && !panel.hidden) {
+    UIButton *bulkButton = (UIButton *)[tab.view viewWithTag:90122];
+    if ([bulkButton isKindOfClass:UIButton.class] && !bulkButton.hidden) {
         CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
-        panel.frame = CGRectMake(12, CGRectGetMinY(bar) - 116, MAX(0,tab.view.bounds.size.width-24), 108);
-        for (UIView *view in panel.subviews) {
-            if ([view isKindOfClass:UILabel.class]) {
-                UILabel *label = (UILabel *)view;
-                objc_setAssociatedObject(label, &statusLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                label.text = NWScanSummary(); CGRect f = label.frame; f.size.width = panel.bounds.size.width-28; label.frame = f;
-            } else if ([view isKindOfClass:UIButton.class]) {
-                UIButton *button = (UIButton *)view; BOOL isBulk = NO;
-                for (id target in button.allTargets) {
-                    NSArray *selectors = [button actionsForTarget:target forControlEvent:UIControlEventTouchUpInside];
-                    if ([selectors containsObject:@"bulkButtonTapped:"] || [selectors containsObject:@"bulk:"]) { isBulk = YES; break; }
-                }
-                if (isBulk) {
-                    bindButton(button,@selector(bulk:)); [button setTitle:NWBulkTitle() forState:UIControlStateNormal];
-                    button.enabled = !NWBulkBusy(); button.frame = CGRectMake(12,57,MAX(0,panel.bounds.size.width-118),40);
-                } else button.frame = CGRectMake(panel.bounds.size.width-96,57,84,40);
-            }
-        }
+        CGFloat width = MIN(186, MAX(0, tab.view.bounds.size.width - 24));
+        bulkButton.frame = CGRectMake((tab.view.bounds.size.width - width) / 2,
+                                      CGRectGetMinY(bar) - 58, width, 42);
+        bindButton(bulkButton, @selector(bulk:));
+        [bulkButton setTitle:NWBulkTitle() forState:UIControlStateNormal];
+        bulkButton.enabled = !NWBulkBusy();
     }
     UIScrollView *scroll = largestScroll(root);
     if (scroll) {
@@ -350,11 +344,11 @@ static void updateWiFi(void) {
         [control removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
         [control addTarget:actions action:@selector(refresh:) forControlEvents:UIControlEventValueChanged];
         if (!NWScanBusy()) [control endRefreshing];
-        if (panel && !panel.hidden) {
+        if ([bulkButton isKindOfClass:UIButton.class] && !bulkButton.hidden) {
             NSNumber *base = objc_getAssociatedObject(scroll,&baseInsetKey);
             if (!base) { base = @(scroll.contentInset.bottom); objc_setAssociatedObject(scroll,&baseInsetKey,base,OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
             CGRect scrollFrame = [scroll convertRect:scroll.bounds toView:root];
-            CGRect panelFrame = [panel convertRect:panel.bounds toView:root];
+            CGRect panelFrame = [bulkButton convertRect:bulkButton.bounds toView:root];
             CGFloat systemInset = scroll.adjustedContentInset.bottom - scroll.contentInset.bottom;
             CGFloat bottom = MAX(base.doubleValue, CGRectGetMaxY(scrollFrame)-CGRectGetMinY(panelFrame)-systemInset+16);
             objc_setAssociatedObject(scroll,&wifiInsetKey,@(bottom),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -428,12 +422,8 @@ static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
     if (minimum) value.bottom = MAX(value.bottom, minimum.doubleValue);
     originalContentInset(scroll,sel,value);
 }
-static void labelText(UILabel *label, SEL sel, NSString *value) {
-    if (objc_getAssociatedObject(label,&statusLabelKey)) value = NWScanSummary();
-    originalLabelText(label,sel,value);
-}
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "Nuke Wireless: extension dev4 loaded");
+    syslog(LOG_NOTICE, "Nuke Wireless: extension dev5 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -445,8 +435,6 @@ __attribute__((constructor)) static void installExtension(void) {
         originalDidLayout = (void *)method_setImplementation(method,(IMP)layout);
         method = class_getInstanceMethod(UIScrollView.class,@selector(setContentInset:));
         originalContentInset = (void *)method_setImplementation(method,(IMP)inset);
-        method = class_getInstanceMethod(UILabel.class,@selector(setText:));
-        originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
