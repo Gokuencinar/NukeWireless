@@ -244,13 +244,6 @@ static NSArray<NSDictionary *> *targets(void) {
     }
     return result;
 }
-void NWLogBulkStatus(void) {
-    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
-    uint32_t fallback = gateway ? gateway : configurationGateway();
-    NSLog(@"Nuke Wireless diagnostic: bulk status phase=%ld rows=%lu local=%d mask=%d commandGateway=%d fallbackGateway=%d targets=%lu",
-          (long)state.phase, (unsigned long)devices.count, local != 0, mask != 0,
-          gateway != 0, fallback != 0, (unsigned long)targets().count);
-}
 static NSArray<NSString *> *activeIPs(void) {
     NSMutableSet *all = [bulkOwned mutableCopy] ?: [NSMutableSet new];
     [all addObjectsFromArray:devices.allKeys];
@@ -262,6 +255,8 @@ NSString *NWBulkTitle(void) {
     if (bulkBusy) return NWText(@"bulk.working");
     return NWText(bulkOwned.count ? @"bulk.unblock" : @"bulk.block");
 }
+static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock,
+                           uint64_t generation, NSString *network, NSUInteger attempt);
 static void bulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock, uint64_t generation, NSString *network) {
     if (index >= items.count || (!unblock && (state.generation != generation || ![network isEqualToString:networkIdentity()]))) {
         if (index < items.count) bulkFailures += items.count - index;
@@ -282,10 +277,18 @@ static void bulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unbl
         if (unblock) ((void (*)(id, SEL, id))objc_msgSend)(cls, NSSelectorFromString(@"unblockIPWithIp:"), ip);
         else ((void (*)(id, SEL, id, id))objc_msgSend)(cls, NSSelectorFromString(@"blockGivenIPWithIp:targetMac:"), ip, items[index][@"mac"]);
     } @catch (NSException *exception) { NSLog(@"Nuke Wireless: bulk item exception (%@)", exception.name); }
-    // Root-task launch is synchronous in the pinned app; allow process startup before
-    // confirming the result. Each failed item is accounted for, then the batch advances.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+    verifyBulkStep(items, index, unblock, generation, network, 0);
+}
+static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock,
+                           uint64_t generation, NSString *network, NSUInteger attempt) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        if (!bulkBusy) return;
+        NSString *ip = items[index][@"ip"];
         BOOL success = isBlocked(ip) == !unblock;
+        if (!success && attempt < 7) {
+            verifyBulkStep(items, index, unblock, generation, network, attempt + 1);
+            return;
+        }
         if (!success) ++bulkFailures;
         if (success && !unblock) [bulkOwned addObject:ip];
         updateDeviceState(ip); notify();

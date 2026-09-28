@@ -13,7 +13,7 @@
 #include <math.h>
 #include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev6";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev8";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -255,7 +255,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev6", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev8", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -327,13 +327,23 @@ static void updateWiFi(void) {
     NSString *refreshTitle = NWText(NWScanBusy() ? @"scan.scanning" : @"refresh");
     if (![refresh.currentTitle isEqualToString:refreshTitle]) [refresh setTitle:refreshTitle forState:UIControlStateNormal];
     if (refresh) [root bringSubviewToFront:refresh];
-    UIButton *bulkButton = (UIButton *)[tab.view viewWithTag:90122];
-    if ([bulkButton isKindOfClass:UIButton.class] && !bulkButton.hidden) {
-        CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
-        CGFloat width = MIN(186, MAX(0, tab.view.bounds.size.width - 24));
-        CGRect position = CGRectMake((tab.view.bounds.size.width - width) / 2,
-                                     CGRectGetMinY(bar) - 58, width, 42);
-        if (!CGRectEqualToRect(bulkButton.frame, position)) bulkButton.frame = position;
+    UIView *bulkPanel = [tab.view viewWithTag:90122];
+    UIButton *bulkButton = [bulkPanel isKindOfClass:UIButton.class] ? (UIButton *)bulkPanel : nil;
+    if (!bulkButton) {
+        for (UIView *child in bulkPanel.subviews) {
+            if ([child isKindOfClass:UIButton.class] &&
+                (!bulkButton || child.bounds.size.width > bulkButton.bounds.size.width))
+                bulkButton = (UIButton *)child;
+        }
+    }
+    if (bulkButton && !bulkPanel.hidden && !bulkButton.hidden) {
+        if (bulkPanel == bulkButton) {
+            CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
+            CGFloat width = MIN(186, MAX(0, tab.view.bounds.size.width - 24));
+            CGRect position = CGRectMake((tab.view.bounds.size.width - width) / 2,
+                                         CGRectGetMinY(bar) - 58, width, 42);
+            if (!CGRectEqualToRect(bulkButton.frame, position)) bulkButton.frame = position;
+        }
         if (!objc_getAssociatedObject(bulkButton, &bulkBoundKey)) {
             bindButton(bulkButton, @selector(bulk:));
             objc_setAssociatedObject(bulkButton, &bulkBoundKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -350,11 +360,11 @@ static void updateWiFi(void) {
         [control removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
         [control addTarget:actions action:@selector(refresh:) forControlEvents:UIControlEventValueChanged];
         if (!NWScanBusy()) [control endRefreshing];
-        if ([bulkButton isKindOfClass:UIButton.class] && !bulkButton.hidden) {
+        if (bulkButton && !bulkPanel.hidden && !bulkButton.hidden) {
             NSNumber *base = objc_getAssociatedObject(scroll,&baseInsetKey);
             if (!base) { base = @(scroll.contentInset.bottom); objc_setAssociatedObject(scroll,&baseInsetKey,base,OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
             CGRect scrollFrame = [scroll convertRect:scroll.bounds toView:root];
-            CGRect panelFrame = [bulkButton convertRect:bulkButton.bounds toView:root];
+            CGRect panelFrame = [bulkPanel convertRect:bulkPanel.bounds toView:root];
             CGFloat systemInset = scroll.adjustedContentInset.bottom - scroll.contentInset.bottom;
             CGFloat bottom = MAX(base.doubleValue, CGRectGetMaxY(scrollFrame)-CGRectGetMinY(panelFrame)-systemInset+16);
             UIEdgeInsets inset = scroll.contentInset; inset.bottom = bottom;
@@ -416,7 +426,7 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "Nuke Wireless: extension dev6 loaded");
+    syslog(LOG_NOTICE, "Nuke Wireless: extension dev8 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -431,16 +441,6 @@ __attribute__((constructor)) static void installExtension(void) {
             if (activeTab.selectedIndex == 0 && activeTab.view.window) {
                 NWReconcileDeviceStates(); updateWiFi();
             }
-        }];
-        [NSTimer scheduledTimerWithTimeInterval:16 repeats:NO block:^(NSTimer *timer) {
-            (void)timer;
-            UIView *tagged = [activeTab.view viewWithTag:90122];
-            BOOL isButton = [tagged isKindOfClass:UIButton.class];
-            UIButton *button = isButton ? (UIButton *)tagged : nil;
-            NWLogBulkStatus();
-            NSLog(@"Nuke Wireless diagnostic: bulk tagged=%s button=%d hidden=%d enabled=%d bound=%d direct=%d",
-                  tagged ? object_getClassName(tagged) : "nil", isButton, button.hidden, button.enabled,
-                  [button.allTargets containsObject:actions], tagged.superview == activeTab.view);
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
