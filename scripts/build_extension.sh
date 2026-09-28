@@ -10,7 +10,7 @@ sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=16.3 -isysroot "$sdk" \
   -Wall -Wextra -Werror -fobjc-arc -fblocks -fPIC -O2 -dynamiclib \
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework SystemConfiguration \
+  -framework QuartzCore -framework CoreGraphics -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
   src/NukeWirelessInfo.m src/NWScanBridge.m src/NWResources.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
