@@ -8,4 +8,3 @@ NSString *NWScanSummary(void);
 NSString *NWBulkTitle(void);
 BOOL NWRefreshScan(void);
 void NWConfirmBulk(UIViewController *presenter);
-void NWLogBulkDiagnostics(void);
