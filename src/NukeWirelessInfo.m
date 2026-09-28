@@ -447,5 +447,8 @@ __attribute__((constructor)) static void installExtension(void) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            syslog(LOG_NOTICE, "Nuke Wireless diagnostic: automatic refresh started=%d", NWRefreshScan());
+        });
     });
 }
