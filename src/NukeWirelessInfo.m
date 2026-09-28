@@ -441,6 +441,13 @@ __attribute__((constructor)) static void installExtension(void) {
             NSLog(@"Nuke Wireless diagnostic: bulk tagged=%s button=%d hidden=%d enabled=%d bound=%d direct=%d",
                   tagged ? object_getClassName(tagged) : "nil", isButton, button.hidden, button.enabled,
                   [button.allTargets containsObject:actions], tagged.superview == activeTab.view);
+            NSLog(@"Nuke Wireless diagnostic: bulk container size=%.0fx%.0f children=%lu",
+                  tagged.bounds.size.width, tagged.bounds.size.height, (unsigned long)tagged.subviews.count);
+            for (UIView *child in tagged.subviews) {
+                NSLog(@"Nuke Wireless diagnostic: bulk child=%s size=%.0fx%.0f button=%d",
+                      object_getClassName(child), child.bounds.size.width, child.bounds.size.height,
+                      [child isKindOfClass:UIButton.class]);
+            }
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
