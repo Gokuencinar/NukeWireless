@@ -432,6 +432,16 @@ __attribute__((constructor)) static void installExtension(void) {
                 NWReconcileDeviceStates(); updateWiFi();
             }
         }];
+        [NSTimer scheduledTimerWithTimeInterval:16 repeats:NO block:^(NSTimer *timer) {
+            (void)timer;
+            UIView *tagged = [activeTab.view viewWithTag:90122];
+            BOOL isButton = [tagged isKindOfClass:UIButton.class];
+            UIButton *button = isButton ? (UIButton *)tagged : nil;
+            NWLogBulkStatus();
+            NSLog(@"Nuke Wireless diagnostic: bulk tagged=%s button=%d hidden=%d enabled=%d bound=%d direct=%d",
+                  tagged ? object_getClassName(tagged) : "nil", isButton, button.hidden, button.enabled,
+                  [button.allTargets containsObject:actions], tagged.superview == activeTab.view);
+        }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);

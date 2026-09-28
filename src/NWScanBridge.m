@@ -9,6 +9,7 @@
 #import <signal.h>
 #import <errno.h>
 #import <string.h>
+#import <dlfcn.h>
 #import <QuartzCore/QuartzCore.h>
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
@@ -60,12 +61,30 @@ static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
     }
     freeifaddrs(first);
 }
+static uint32_t configurationGateway(void) {
+    static void *framework;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        framework = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_LAZY);
+    });
+    if (!framework) return 0;
+    CFTypeRef (*create)(CFAllocatorRef, CFStringRef, void *, void *) = dlsym(framework, "SCDynamicStoreCreate");
+    CFPropertyListRef (*copyValue)(CFTypeRef, CFStringRef) = dlsym(framework, "SCDynamicStoreCopyValue");
+    if (!create || !copyValue) return 0;
+    CFTypeRef store = create(NULL, CFSTR("NukeWirelessScan"), NULL, NULL);
+    if (!store) return 0;
+    id value = CFBridgingRelease(copyValue(store, CFSTR("State:/Network/Global/IPv4")));
+    CFRelease(store);
+    if (![value isKindOfClass:NSDictionary.class] || ![value[@"PrimaryInterface"] isEqualToString:@"en0"])
+        return 0;
+    return ipv4(value[@"Router"]);
+}
 static NSString *networkIdentity(void) {
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
     // The scanner invokes this on the main thread during launch. Querying
     // MobileWiFi here can wait on wifid and stall the initial view transition.
     // The interface tuple is sufficient to reject stale scan and bulk results.
-    return [NSString stringWithFormat:@"%u/%u/%u", local, mask, gateway];
+    return [NSString stringWithFormat:@"%u/%u", local, mask];
 }
 static BOOL isBlocked(NSString *ip) {
     Class cls = commands(); SEL sel = NSSelectorFromString(@"runningBlocksForIpWithIp:");
@@ -211,6 +230,7 @@ NSString *NWScanSummary(void) {
 }
 static NSArray<NSDictionary *> *targets(void) {
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    if (!gateway) gateway = configurationGateway();
     NSMutableArray *result = [NSMutableArray new];
     for (NSString *ip in [[devices allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
         id device = devices[ip];
@@ -223,6 +243,13 @@ static NSArray<NSDictionary *> *targets(void) {
         if (NWEligibleAddress(ipv4(ip), local, mask, gateway, bytes)) [result addObject:@{@"ip":ip,@"mac":mac}];
     }
     return result;
+}
+void NWLogBulkStatus(void) {
+    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    uint32_t fallback = gateway ? gateway : configurationGateway();
+    NSLog(@"Nuke Wireless diagnostic: bulk status phase=%ld rows=%lu local=%d mask=%d commandGateway=%d fallbackGateway=%d targets=%lu",
+          (long)state.phase, (unsigned long)devices.count, local != 0, mask != 0,
+          gateway != 0, fallback != 0, (unsigned long)targets().count);
 }
 static NSArray<NSString *> *activeIPs(void) {
     NSMutableSet *all = [bulkOwned mutableCopy] ?: [NSMutableSet new];
