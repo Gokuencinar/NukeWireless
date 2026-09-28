@@ -13,10 +13,12 @@
 #include <math.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <syslog.h>
 
 __attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev2";
 static void diagnostic(const char *event) {
 #ifdef NW_DIAGNOSTIC
+    syslog(LOG_NOTICE, "NukeWireless info: %s", event);
     int fd = open("/var/mobile/Library/Caches/NukeWireless-install-trace.log", O_WRONLY | O_CREAT | O_APPEND, 0600);
     if (fd >= 0) { write(fd, event, strlen(event)); write(fd, "\n", 1); close(fd); }
 #else
