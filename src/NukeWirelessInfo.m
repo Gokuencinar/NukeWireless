@@ -124,10 +124,6 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
     };
 }
 
-NSString *NWNetworkIdentity(void) {
-    NSDictionary *association = currentAssociation();
-    return [NSString stringWithFormat:@"%@/%@", association[@"SSID"] ?: @"", association[@"BSSID"] ?: @""];
-}
 static void showMessage(UIViewController *controller, NSString *message) {
     if (controller.presentedViewController) return;
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Nuke Wireless" message:message preferredStyle:UIAlertControllerStyleAlert];

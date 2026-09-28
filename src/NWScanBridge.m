@@ -61,7 +61,10 @@ static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
 }
 static NSString *networkIdentity(void) {
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
-    return [NSString stringWithFormat:@"%u/%u/%u/%@", local, mask, gateway, NWNetworkIdentity()];
+    // The scanner invokes this on the main thread during launch. Querying
+    // MobileWiFi here can wait on wifid and stall the initial view transition.
+    // The interface tuple is sufficient to reject stale scan and bulk results.
+    return [NSString stringWithFormat:@"%u/%u/%u", local, mask, gateway];
 }
 static BOOL isBlocked(NSString *ip) {
     Class cls = commands(); SEL sel = NSSelectorFromString(@"runningBlocksForIpWithIp:");
