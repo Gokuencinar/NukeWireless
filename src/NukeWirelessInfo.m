@@ -200,12 +200,11 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = NWText(@"licenses");
-    NSDictionary *ack = [NSDictionary dictionaryWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"Acknowledgements" withExtension:@"plist"]];
-    self.entries = ack[@"PreferenceSpecifiers"] ?: @[];
+    self.entries = [NSArray arrayWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"Acknowledgements" withExtension:@"plist"]] ?: @[];
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 100;
 }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; (void)section; return self.entries.count; }
-- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index { (void)table; NSDictionary *entry = self.entries[index.row]; return textCell(entry[@"Title"] ?: @"", entry[@"FooterText"], NO); }
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index { (void)table; NSDictionary *entry = self.entries[index.row]; return textCell(entry[@"title"] ?: @"", entry[@"license"], NO); }
 @end
 
 @interface NWInfoController : UITableViewController
@@ -426,6 +425,13 @@ __attribute__((constructor)) static void installExtension(void) {
         method = class_getInstanceMethod(UILabel.class,@selector(setText:));
         originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
+        // Reconcile actions from the unchanged individual Swift controls too.
+        [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
+            (void)timer;
+            if (activeTab.selectedIndex == 0 && activeTab.view.window) {
+                NWReconcileDeviceStates(); updateWiFi();
+            }
+        }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);

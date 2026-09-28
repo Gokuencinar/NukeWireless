@@ -1,140 +1,108 @@
-"""Add only an Info extension to the known-working Nuke Wireless 1.0.25 package.
+"""Build the private development package from the pinned current baseline.
 
-The source archive and its maintainer scripts are read as data, never executed.
-Existing app and tweak binaries are copied unchanged.
+Archive scripts are data, never executed. The two stable path libraries and
+network helpers remain byte-identical. The app receives only two length-preserving
+visible text substitutions; no instructions, identifiers or Swift layouts change.
 """
-
 from __future__ import annotations
-
+import argparse
 import copy
-import hashlib
 import io
-import os
+import json
 from pathlib import Path
-import sys
+import plistlib
 import tarfile
-
-try:
-    import zstandard as zstd
-except ImportError as exc:
-    raise SystemExit("Install zstandard 0.25.0 before packaging") from exc
-
-if len(sys.argv) != 2:
-    raise SystemExit("Usage: python scripts/build_nuke_info_deb.py <Nuke-Wireless-1.0.25.deb>")
-
-source = Path(sys.argv[1]).resolve()
-os.environ.setdefault("HARPY_SOURCE_DEB", str(source))
-from package_utils import get_tar_member, pack_ar, read_ar, regular, symlink, tar_bytes  # noqa: E402
+from build_manifest import source_hashes, sha
+from package_utils import get_tar_member, pack_ar, read_ar, regular, tar_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "dist" / "com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb"
-EXPECTED_SOURCE_SHA256 = "f4b5282bf8aec2eef2a35f84f644aa3bb6e4a16230b7c7cd2789fea6da65cdbc"
+VERSION = "1.0.25+rh25.5~dev1"
+EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
+EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
+APP = "Applications/HarpyReloaded.app/"
 INFO_LIBRARY = "usr/lib/TweakInject/NukeWirelessInfo.dylib"
-INFO_FILTER = "usr/lib/TweakInject/NukeWirelessInfo.plist"
-INFO_PATCH = INFO_LIBRARY + ".roothidepatch"
-ENTITLEMENTS = "usr/share/nukewireless-roothide/roothide.entitlements"
-APP_PLIST = "Applications/HarpyReloaded.app/Info.plist"
+TEXT_EDITS = {
+    b"Thank you for using Harpy!": b"Welcome to Nuke Wireless!",
+    b"Harpy is licensed under the MIT license.": b"Nuke Wireless uses the MIT license.",
+}
 
+def read_tar(data):
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as tf:
+        result = [(copy.copy(m), tf.extractfile(m).read() if m.isfile() else None) for m in tf]
+    names = [m.name.lstrip("./") for m, _ in result]
+    if len(names) != len(set(names)):
+        raise ValueError("duplicate archive member")
+    return result
 
-def read_zstd_tar(archive: bytes) -> list[tuple[tarfile.TarInfo, bytes | None]]:
-    with zstd.ZstdDecompressor().stream_reader(io.BytesIO(archive)) as reader:
-        expanded = reader.read()
-    entries = []
-    with tarfile.open(fileobj=io.BytesIO(expanded), mode="r:") as tf:
-        for member in tf:
-            payload = tf.extractfile(member).read() if member.isfile() else None
-            if member.isfile() and len(payload) != member.size:
-                raise ValueError(f"truncated tar member: {member.name}")
-            entries.append((copy.copy(member), payload))
-    return entries
+def patch_visible_text(binary):
+    for old, new in TEXT_EDITS.items():
+        if len(new) > len(old) or binary.count(old + b"\0") != 1:
+            raise ValueError("visible text ABI does not match baseline")
+        # Native Swift strings encode their lengths in instructions: keep byte count.
+        binary = binary.replace(old + b"\0", new.ljust(len(old), b" ") + b"\0", 1)
+    return binary
 
-
-def replace_once(data: bytes, before: bytes, after: bytes) -> bytes:
-    if data.count(before) != 1:
-        raise ValueError(f"expected one occurrence of {before!r}")
-    return data.replace(before, after, 1)
-
-
-def main() -> None:
-    original = source.read_bytes()
-    if hashlib.sha256(original).hexdigest() != EXPECTED_SOURCE_SHA256:
-        raise ValueError("source deb differs from the known-working Nuke Wireless 1.0.25 package")
-    info_binary = (ROOT / "prebuilt" / "NukeWirelessInfo_ios.dylib").read_bytes()
-    if (b"https://buymeacoffee.com/gokuen" not in info_binary or
-        b"NWBuild-rh25.3" not in info_binary or b"BSSID" not in info_binary or
-        b"requestWhenInUseAuthorization" in info_binary):
-        raise ValueError("Info extension binary does not match this source")
-
-    parts = read_ar(original)
-    control_entries = read_zstd_tar(get_tar_member(parts, "control.tar"))
-    data_entries = read_zstd_tar(get_tar_member(parts, "data.tar"))
-    control_names = {member.name.lstrip("./") for member, _ in control_entries}
-    data_names = {member.name.lstrip("./") for member, _ in data_entries}
-    if not {"control", "postinst"}.issubset(control_names):
-        raise ValueError("missing package control files")
-    required = {
-        "Applications/HarpyReloaded.app/HarpyReloaded",
-        "Applications/HarpyReloaded.app/CreditsAvatar.jpg",
-        APP_PLIST,
-        "usr/lib/TweakInject/HarpyRootHidePaths.dylib",
-        "usr/lib/TweakInject/NukeWirelessPaths.dylib",
-        ENTITLEMENTS,
+def build(source, artifact, output):
+    raw = source.read_bytes()
+    if sha(raw) != EXPECTED_SOURCE_SHA256:
+        raise ValueError("baseline must be the current pinned rh25.3 package")
+    library = (artifact / "NukeWirelessInfo_ios.dylib").read_bytes()
+    manifest = json.loads((artifact / "build-manifest.json").read_text())
+    if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
+        raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev1" not in library:
+        raise ValueError("wrong development library version")
+    if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
+        raise ValueError("unexpected location-permission API")
+    parts = read_ar(raw)
+    control = read_tar(get_tar_member(parts, "control.tar"))
+    entries = read_tar(get_tar_member(parts, "data.tar"))
+    original = {m.name.lstrip("./"): data for m,data in entries}
+    executable = original[APP + "HarpyReloaded"]
+    if sha(executable) != EXPECTED_APP_SHA256 or executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
+        raise ValueError("incompatible native Swift refresh ABI")
+    metadata = plistlib.loads(original[APP + "Info.plist"])
+    metadata.update(CFBundleDisplayName="Nuke Wireless", CFBundleName="Nuke Wireless",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.1")
+    metadata["CFBundleIcons~ipad"] = metadata["CFBundleIcons"]
+    replacement = {
+        INFO_LIBRARY: library,
+        APP + "HarpyReloaded": patch_visible_text(executable),
+        APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
     }
-    if not required.issubset(data_names) or {INFO_LIBRARY, INFO_FILTER, INFO_PATCH} & data_names:
-        raise ValueError("unexpected source package contents")
-    executable = next(payload for member, payload in data_entries
-        if member.name.lstrip("./") == "Applications/HarpyReloaded.app/HarpyReloaded")
-    if hashlib.sha256(executable).hexdigest() != "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11":
-        raise ValueError("native refresh bridge is incompatible with this executable")
-    if executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
-        raise ValueError("native refresh entry point does not match the verified ABI")
-
-    for index, (member, payload) in enumerate(control_entries):
+    for i,(member,data) in enumerate(entries):
         name = member.name.lstrip("./")
-        if name == "control":
-            payload = replace_once(payload, b"Version: 1.0.25+rh25\n",
-                                   b"Version: 1.0.25+rh25.3\n")
-            member.size = len(payload)
-            control_entries[index] = (member, payload)
-        elif name == "postinst":
-            payload = replace_once(payload,
-                b"ldid -S /usr/lib/TweakInject/NukeWirelessPaths.dylib\n",
-                b"ldid -S /usr/lib/TweakInject/NukeWirelessPaths.dylib\n"
-                b"ldid -S /usr/lib/TweakInject/NukeWirelessInfo.dylib\n")
-            member.size = len(payload)
-            control_entries[index] = (member, payload)
-
-    for index, (member, payload) in enumerate(data_entries):
-        if member.name.lstrip("./") == ENTITLEMENTS:
-            payload = replace_once(payload, b"</dict></plist>",
-                b"<key>com.apple.developer.networking.wifi-info</key><true/>\n"
-                b"<key>com.apple.wifi.manager-access</key><true/>\n"
-                b"</dict></plist>")
-            member.size = len(payload)
-            data_entries[index] = (member, payload)
-
-    filter_data = next(payload for member, payload in data_entries
-        if member.name.lstrip("./") == "usr/lib/TweakInject/NukeWirelessPaths.plist")
-    data_entries.extend([
-        regular(INFO_LIBRARY, info_binary, 0o755),
-        regular(INFO_FILTER, filter_data),
-        symlink(INFO_PATCH, "/usr/lib/DynamicPatches/AutoPatches.dylib"),
-    ])
-
-    for member, payload in control_entries + data_entries:
-        if member.isfile() and len(payload) != member.size:
-            raise ValueError(f"tar member size mismatch: {member.name}: {member.size} != {len(payload)}")
-
-    output = pack_ar([
-        ("debian-binary", parts["debian-binary"]),
-        ("control.tar.gz", tar_bytes(control_entries)),
-        ("data.tar.gz", tar_bytes(data_entries)),
-    ])
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_bytes(output)
-    print(OUTPUT)
-    print("sha256", hashlib.sha256(output).hexdigest())
-
+        if name in replacement:
+            data = replacement[name]; member.size = len(data); entries[i] = (member,data)
+    bundle = APP + "NukeWirelessResources.bundle/"
+    entries += [regular(bundle + "Info.plist", plistlib.dumps({
+        "CFBundleIdentifier":"app.nukewireless.resources", "CFBundleName":"Nuke Wireless",
+        "CFBundleDevelopmentRegion":"en", "CFBundleLocalizations":["en","es"], "CFBundlePackageType":"BNDL",
+    })), regular(bundle + "oui_vendors.plist", original["usr/share/nukewireless-roothide/oui_vendors.plist"])]
+    for path in sorted((ROOT / "resources").rglob("*.strings")):
+        entries.append(regular(bundle + path.relative_to(ROOT / "resources").as_posix(),path.read_bytes()))
+    for i,(member,data) in enumerate(control):
+        if member.name.lstrip("./") == "control":
+            before = b"Version: 1.0.25+rh25.3\n"
+            if data.count(before) != 1: raise ValueError("unexpected baseline control")
+            data = data.replace(before, f"Version: {VERSION}\n".encode())
+            data = data.replace(b"Depends: firmware (>= 16.0)", b"Depends: firmware (>= 16.3)")
+            member.size = len(data); control[i] = (member,data)
+    for member,data in control + entries:
+        if member.isfile() and member.size != len(data): raise ValueError("wrong member size")
+    output.parent.mkdir(parents=True,exist_ok=True)
+    output.write_bytes(pack_ar([("debian-binary",parts["debian-binary"]),
+        ("control.tar.gz",tar_bytes(control)),("data.tar.gz",tar_bytes(entries))]))
+    report = {"version":VERSION,"baseline_sha256":sha(raw),"package_sha256":sha(output.read_bytes()),
+              "extension":manifest, "app_before":sha(executable),"app_after":sha(replacement[APP+"HarpyReloaded"]),
+              "changed_existing_files": sorted(replacement), "release_published":False}
+    output.with_suffix(".manifest.json").write_text(json.dumps(report,indent=2)+"\n")
+    print(output); print("sha256",report["package_sha256"])
+    return report
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("baseline",type=Path)
+    parser.add_argument("--artifact",type=Path,default=ROOT / "build/audit")
+    parser.add_argument("--output",type=Path,default=ROOT / "dist" / f"com.gokuencinar.nukewireless_{VERSION}_iphoneos-arm64e.deb")
+    args=parser.parse_args(); build(args.baseline,args.artifact,args.output)

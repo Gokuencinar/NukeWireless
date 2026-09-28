@@ -40,7 +40,7 @@ _cave_start:
     .long 0x94000000         // patched call: memcmp
     cbnz w0, denied
 
-    // The parent must be exactly the expected Harpy executable.
+    // The parent must be exactly the expected app executable (legacy path retained).
     add x0, sp, #0x1000
     add x0, x0, x21
     adr x1, app_suffix

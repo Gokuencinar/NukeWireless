@@ -77,7 +77,11 @@ static BOOL isBlocked(NSString *ip) {
 static void updateDeviceState(NSString *ip) {
     id device = devices[ip]; SEL sel = NSSelectorFromString(@"setIsBlocking:");
     BOOL blocked = isBlocked(ip);
-    if ([device respondsToSelector:sel]) ((void (*)(id, SEL, BOOL))objc_msgSend)(device, sel, blocked);
+    SEL getter = NSSelectorFromString(@"isBlocking");
+    if ([device respondsToSelector:sel] && [device respondsToSelector:getter] &&
+        ((BOOL (*)(id, SEL))objc_msgSend)(device, getter) != blocked)
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(device, sel, blocked);
+    if (blocked) [bulkOwned addObject:ip];
     if (!blocked) [bulkOwned removeObject:ip];
 }
 
@@ -198,6 +202,10 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     });
 }
 BOOL NWScanBusy(void) { return NWStateBusy(&state); }
+void NWReconcileDeviceStates(void) {
+    if (!NSThread.isMainThread || NWScanBusy() || bulkBusy) return;
+    for (NSString *ip in devices.allKeys) updateDeviceState(ip);
+}
 BOOL NWBulkBusy(void) { return bulkBusy; }
 BOOL NWRefreshScan(void) {
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;

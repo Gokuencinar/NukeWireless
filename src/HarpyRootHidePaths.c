@@ -1,4 +1,4 @@
-/* RootHide path adapter for the user's Harpy Reloaded app.
+/* Legacy RootHide path adapter for Nuke Wireless; preserved as historical source.
  * This library is injected only into me.midnightchips.harpy-reloaded.
  */
 

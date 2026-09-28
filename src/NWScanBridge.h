@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 FOUNDATION_EXPORT NSNotificationName const NWStateChanged;
 void NWInstallScanHooks(void);
+void NWReconcileDeviceStates(void);
 BOOL NWScanBusy(void);
 BOOL NWBulkBusy(void);
 NSString *NWScanSummary(void);

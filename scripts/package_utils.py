@@ -1,4 +1,4 @@
-"""Build a RootHide test package from the user-supplied Harpy Reloaded deb.
+"""Archive helpers for the Nuke Wireless RootHide package.
 
 The original maintainer scripts are treated as data and are never executed.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 import tarfile
 
 
-SOURCE = Path(os.environ["HARPY_SOURCE_DEB"])
+SOURCE = Path(os.environ.get("HARPY_SOURCE_DEB", ""))  # Legacy builder compatibility.
 
 
 

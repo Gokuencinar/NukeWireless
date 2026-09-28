@@ -1,4 +1,4 @@
-"""Build a RootHide Harpy test package with runtime path repair.
+"""Historical base-package builder; current builds use build_nuke_info_deb.py.
 
 The original package scripts are only read as inert archive data.
 """
@@ -73,7 +73,7 @@ def main() -> None:
         "Architecture: iphoneos-arm64e",
         "Pre-Depends: rootless-compat (>= 0.9)",
         "Depends: firmware (>= 16.0), ldid, arpoison, network-cmds, ellekit",
-        "Description: Harpy Reloaded RootHide path repair test for iOS 16",
+        "Description: Nuke Wireless legacy RootHide path repair test for iOS 16",
     ]
     control = ("\n".join(fields) + "\n").encode()
     control_entries = [regular("control", control), regular("postinst", POSTINST, 0o755)]
