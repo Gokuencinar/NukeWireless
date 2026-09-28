@@ -9,11 +9,23 @@
 #import <signal.h>
 #import <errno.h>
 #include <syslog.h>
+#include <stdarg.h>
+#include <stdio.h>
 #import <QuartzCore/QuartzCore.h>
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
 #ifdef NW_DIAGNOSTIC_SCAN
-#define NW_TRACE(...) syslog(LOG_NOTICE, __VA_ARGS__)
+static void NWFileTrace(const char *format, ...) {
+    FILE *file = fopen("/var/mobile/nuke-scan-trace.log", "a");
+    if (!file) return;
+    va_list arguments;
+    va_start(arguments, format);
+    vfprintf(file, format, arguments);
+    va_end(arguments);
+    fputc('\n', file);
+    fclose(file);
+}
+#define NW_TRACE(...) do { syslog(LOG_NOTICE, __VA_ARGS__); NWFileTrace(__VA_ARGS__); } while (0)
 #else
 #define NW_TRACE(...) ((void)0)
 #endif
