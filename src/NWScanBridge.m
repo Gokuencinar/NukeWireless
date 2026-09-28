@@ -8,6 +8,7 @@
 #import <arpa/inet.h>
 #import <signal.h>
 #import <errno.h>
+#import <string.h>
 #import <QuartzCore/QuartzCore.h>
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
@@ -179,9 +180,19 @@ void NWReconcileDeviceStates(void) {
     for (NSString *ip in known) updateDeviceState(ip);
 }
 BOOL NWBulkBusy(void) { return bulkBusy; }
+static const uint8_t *appExecutableBase(void) {
+    for (uint32_t index = 0; index < _dyld_image_count(); index++) {
+        const char *path = _dyld_get_image_name(index);
+        if (!path) continue;
+        const char *name = strrchr(path, '/');
+        if (name && strcmp(name + 1, "HarpyReloaded") == 0)
+            return (const uint8_t *)_dyld_get_image_header(index);
+    }
+    return NULL;
+}
 BOOL NWRefreshScan(void) {
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
-    const uint8_t *base = (const uint8_t *)_dyld_get_image_header(0);
+    const uint8_t *base = appExecutableBase();
     static const uint8_t prologue[] = {0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
