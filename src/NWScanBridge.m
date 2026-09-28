@@ -231,6 +231,20 @@ static NSArray<NSString *> *activeIPs(void) {
     for (NSString *ip in all) if (isBlocked(ip)) [result addObject:ip];
     return [result sortedArrayUsingSelector:@selector(compare:)];
 }
+void NWLogBulkDiagnostics(void) {
+    if (!NSThread.isMainThread) return;
+    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    id registered = readObject(commands(), @"runningBlocksForArp");
+    NSArray *candidates = targets();
+    NSArray *active = activeIPs();
+    NSLog(@"Nuke Wireless diagnostic: bulk phase=%ld rows=%lu targets=%lu active=%lu owned=%lu local=%d mask=%d gateway=%d network=%d registry=%s count=%lu selectors=%d/%d", (long)state.phase,
+          (unsigned long)devices.count, (unsigned long)candidates.count, (unsigned long)active.count,
+          (unsigned long)bulkOwned.count, local != 0, mask != 0, gateway != 0,
+          [scanNetwork isEqualToString:networkIdentity()], registered ? object_getClassName(registered) : "nil",
+          [registered isKindOfClass:NSArray.class] ? (unsigned long)[registered count] : 0,
+          [commands() respondsToSelector:NSSelectorFromString(@"blockGivenIPWithIp:targetMac:")],
+          [commands() respondsToSelector:NSSelectorFromString(@"unblockIPWithIp:")]);
+}
 NSString *NWBulkTitle(void) {
     if (bulkBusy) return NWText(@"bulk.working");
     return NWText(bulkOwned.count ? @"bulk.unblock" : @"bulk.block");
