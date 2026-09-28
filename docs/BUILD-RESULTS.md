@@ -1,5 +1,15 @@
 # Resultado de la compilación privada
 
+## Candidata dev6 (solo local, sin instalar)
+
+- Versión: `1.0.25+rh25.5~dev6`.
+- El escáner nativo conserva el hilo de inicio de la app; sus callbacks actualizan el estado y las filas del puente. La capa de interfaz deja de interceptar globalmente `viewDidLayoutSubviews` y `setContentInset:`. Solo reasigna la geometría, los títulos y los insets cuando cambian.
+- CI privado: https://github.com/Gokuencinar/NukeWireless/actions/runs/36460316748 — correcto; pruebas C y Foundation y compilación iOS arm64.
+- Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev6_iphoneos-arm64e.deb`.
+- SHA-256: `f3aac3eeaaf5c22653dc1d5e0728d739f93567551087290639099373220818ff`.
+- Siete pruebas de paquete y prueba de ABI: correctas.
+- **Sin validación de interfaz en dispositivo.** No se ha instalado esta candidata. El iPhone conserva `rh25.3`, que el usuario ha confirmado que abre. No hay release ni cambio en `main`.
+
 ## Candidata dev5 (retirada)
 
 - Versión: `1.0.25+rh25.5~dev5`.
