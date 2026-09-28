@@ -1,12 +1,16 @@
-# Auditoría de Nuke Wireless — 1.0.25+rh25.5~dev3
+# Auditoría de Nuke Wireless — 1.0.25+rh25.5~dev7
+
+**Actualización del 28 de septiembre:** `dev7` está instalada y arranca en iOS 16.3.1/Dopamine RootHide. El primer escaneo terminó con 14 equipos en la instalación final. Una biblioteca diagnóstica con la misma corrección, pero con pulsación automática temporal, completó dos escaneos consecutivos (12 y 13 equipos). El fallo «The scanner is not ready» venía de usar `_dyld_get_image_header(0)`: RootHide carga `systemhook` en el índice 0 y el ejecutable de la app está en el 1. La candidata final no contiene la pulsación ni los registros diagnósticos. Quedan pendientes las comprobaciones de uso de Bloquear todos e Info.
+
+La biblioteca de `dev7` procede del binario `dev6` fijado por SHA-256 mediante el parche reproducible `scripts/build_dev7_patch.py`; no se recompiló desde la fuente porque GitHub Actions rechazó la asignación de un runner macOS por facturación/límite de gasto. La fuente ahora busca el ejecutable por nombre para una futura compilación.
 
 **Candidata retirada.** Aunque `dpkg` la instaló y los registros confirmaron la carga de la extensión, el usuario comprobó que quedaba fija en la pantalla azul inicial. Se restauró `1.0.25+rh25.3` y el usuario confirmó que vuelve a abrir normalmente. Las observaciones de esta auditoría son resultados de código y diagnósticos parciales; no constituyen validación de `dev3` como versión funcional.
 
 `dev4` es una hipótesis de reparación sin validar en dispositivo: elimina la consulta síncrona a MobileWiFi de la identidad de red invocada durante el escaneo inicial en el hilo principal. La lectura de SSID y BSSID para Info sigue en segundo plano. No se atribuye aún a esa llamada la causa demostrada de la pantalla azul.
 
-En `dev5` se corrigió otro fallo concreto de `dev3`/`dev4`: la etiqueta `90122` pertenece al propio `UIButton` creado por la extensión conservada. El código anterior lo trataba como un panel, recorría subviews buscando otro botón y nunca enlazaba «Bloquear todos» con la acción nueva. Se corrigió la referencia y la geometría del control. Info reduce los créditos y conserva la posición al actualizar la sección de red. `dev5` está instalada, pero los controles y la navegación todavía no se han podido observar en una sesión de pantalla; sus resultados siguen pendientes de validación.
+En `dev5` se corrigió otro fallo concreto de `dev3`/`dev4`: la etiqueta `90122` pertenece al propio `UIButton` creado por la extensión conservada. El código anterior lo trataba como un panel, recorría subviews buscando otro botón y nunca enlazaba «Bloquear todos» con la acción nueva. Se corrigió la referencia y la geometría del control. Info reduce los créditos y conserva la posición al actualizar la sección de red. `dev5` quedó retirada por el bloqueo de arranque.
 
-Actualización posterior: el usuario confirmó que `dev5` también se detenía en la pantalla azul. Se restauró `rh25.3`. Los registros muestran que `scannerStarted` entraba con el delegado correcto, pero no se ejecutaba el bloque diferido al hilo principal de la implementación `dev5`. `dev6` conserva el inicio del escáner en el hilo del llamador y observa sus callbacks. También elimina hooks globales de layout e inset y evita reasignar propiedades UI cuando su valor no cambia. Esta candidata no se ha instalado ni validado en dispositivo.
+Después se confirmó que `dev5` también se detenía en la pantalla azul. Los registros muestran que `scannerStarted` entraba con el delegado correcto, pero no se ejecutaba el bloque diferido al hilo principal de la implementación `dev5`. `dev6` conservó el inicio del escáner en el hilo del llamador y observó sus callbacks; abrió normalmente, pero Actualizar fallaba por la imagen dyld incorrecta. `dev7` corrige esa selección.
 
 ## Alcance y base
 

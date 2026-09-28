@@ -1,6 +1,18 @@
 # Resultado de la compilación privada
 
-## Candidata dev6 (solo local, sin instalar)
+## Candidata dev7 (instalada en el iPhone)
+
+- Versión: `1.0.25+rh25.5~dev7`.
+- RootHide carga `systemhook` como imagen dyld 0. Un parche de una instrucción en la biblioteca `dev6` selecciona la imagen 1 y conserva la comprobación del prólogo de la función Swift. También cambia los textos de versión sin alterar longitudes.
+- Reproducción: `python scripts/build_dev7_patch.py`; tres pruebas en `tests/test_dev7_patch.py`, correctas. Entrada y biblioteca base fijadas por SHA-256.
+- Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev7_iphoneos-arm64e.deb`.
+- SHA-256: `708e7a7cdbca4610b3b7fd5c8c8bf39ae1115602d5e6537e3a5c6bc9987cf184`.
+- Diagnóstico en dispositivo con el mismo cambio de instrucción: escaneo 1 completo con 12 filas, botón Actualizar activado automáticamente y escaneo 2 completo con 13 filas; no hubo cierre. La biblioteca final elimina la pulsación automática y sus registros.
+- Instalación final por SSH: `dpkg -i` correcto; `dpkg-query` muestra `dev7`; la biblioteca instalada contiene la instrucción y marca `dev7` esperadas, sin diagnóstico. Tras abrir la app se registró la carga de la extensión y un escaneo inicial completo con 14 filas.
+- GitHub Actions no compiló la fuente nueva: el run privado `36462904448` falló antes de asignar runner por pagos recientes fallidos o límite de gasto. `dev7` es un parche binario reproducible, no una compilación de la fuente actual. La solución fuente busca el ejecutable por nombre y queda pendiente de compilación macOS.
+- No se creó release ni se modificó `main` o el repositorio público de paquetes. Bloquear todos e Info no tienen aún validación completa de interacción.
+
+## Candidata dev6 (sustituida por dev7)
 
 - Versión: `1.0.25+rh25.5~dev6`.
 - El escáner nativo conserva el hilo de inicio de la app; sus callbacks actualizan el estado y las filas del puente. La capa de interfaz deja de interceptar globalmente `viewDidLayoutSubviews` y `setContentInset:`. Solo reasigna la geometría, los títulos y los insets cuando cambian.
@@ -8,7 +20,7 @@
 - Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev6_iphoneos-arm64e.deb`.
 - SHA-256: `f3aac3eeaaf5c22653dc1d5e0728d739f93567551087290639099373220818ff`.
 - Siete pruebas de paquete y prueba de ABI: correctas.
-- **Sin validación de interfaz en dispositivo.** No se ha instalado esta candidata. El iPhone conserva `rh25.3`, que el usuario ha confirmado que abre. No hay release ni cambio en `main`.
+- Se instaló y el usuario confirmó que veía la interfaz y las pestañas. El escaneo inicial terminaba, pero Actualizar mostraba «The scanner is not ready» porque tomaba el índice dyld 0. `dev7` corrige esa condición. No hay release ni cambio en `main`.
 
 ## Candidata dev5 (retirada)
 

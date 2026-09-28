@@ -4,14 +4,14 @@ Nuke Wireless is in development. This repository and its development artifacts a
 
 ## Desarrollo actual
 
-**Estado actual:** `1.0.25+rh25.3` está restaurada en el iPhone. El usuario confirmó que `dev5` también queda en la pantalla azul inicial, por lo que `dev3`, `dev4` y `dev5` están retiradas y no deben instalarse. Los registros de `dev5` muestran que el hook difería el inicio del escáner al hilo principal y ese bloque no llegó a ejecutarse durante la captura; es una causa probable, no una explicación completa demostrada. `dev1` y `dev2` también están retiradas.
+**Estado actual:** `1.0.25+rh25.5~dev7` está instalada en el iPhone (iOS 16.3.1, Dopamine RootHide). Arranca y termina el escaneo inicial. Un diagnóstico con la misma corrección de instrucción pulsó Actualizar automáticamente: el segundo escaneo terminó con 13 equipos tras un primero de 12. La versión instalada no contiene esa pulsación automática. Bloquear todos y el desplazamiento de Info siguen pendientes de comprobación visual completa.
 
-`dev6` es una corrección experimental sin instalar: conserva el inicio nativo del escáner en su hilo, registra los resultados mediante callbacks y elimina los hooks globales de layout e inset que podían desencadenar pases repetidos de la interfaz. No se considera una versión funcional hasta comprobarla en el iPhone.
+`dev6` resolvió el bloqueo de arranque, pero Actualizar mostraba «The scanner is not ready». RootHide carga `systemhook` como imagen dyld 0; el código buscaba ahí la función Swift del ejecutable. `dev7` usa la imagen 1, comprobada por el prólogo del ejecutable fijado por hash. Se generó mediante un parche de cuatro bytes a la biblioteca `dev6` porque GitHub Actions no inicia runners macOS por el límite de facturación de la cuenta. La fuente incluye la solución general que busca la imagen por nombre, pendiente de una nueva compilación macOS.
 
 La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes son experimentales hasta resolver la regresión de arranque:
 
 - Info usa una tabla con alturas calculadas, sin banner ni superposiciones de altura fija. Incluye créditos, avatar, enlaces, red actual y copia al portapapeles.
-- Actualizar y deslizar ejecutan la renovación nativa de la lista con una nueva instancia del escáner por sesión, descarte de callbacks antiguos y recuperación tras errores.
+- Actualizar y deslizar ejecutan la renovación nativa de la lista; el puente observa sus callbacks y recupera el estado tras errores.
 - Bloquear todos utiliza los métodos del bloqueo/desbloqueo individual. Excluye el iPhone, la puerta de enlace y direcciones inválidas; contabiliza fallos parciales.
 - Ajustes avanzados mantiene el intervalo entre paquetes y permite actualizar/restaurar la tabla de fabricantes. No incluye el antiguo botón para repetir la introducción.
 - La extensión dispone de textos en español e inglés según el idioma del sistema.
@@ -34,7 +34,16 @@ En macOS con Xcode:
 bash scripts/build_extension.sh
 ```
 
-Ejecuta las pruebas C y Foundation, compila para iOS arm64 y escribe la biblioteca y su manifiesto en `build/audit/`. El workflow `audit-build.yml` ejecuta lo mismo en la rama de desarrollo. Solo sube un artefacto temporal dentro del repositorio privado: no crea releases, no modifica `main` y no hace commits automáticos.
+Ejecuta las pruebas C y Foundation, compila para iOS arm64 y escribe la biblioteca y su manifiesto en `build/audit/`. El workflow `audit-build.yml` ejecuta lo mismo en la rama de desarrollo cuando GitHub permite iniciar runners. Solo sube un artefacto temporal dentro del repositorio privado: no crea releases, no modifica `main` y no hace commits automáticos.
+
+La candidata instalada `dev7` se reproduce localmente desde el paquete `dev6` fijado por SHA-256:
+
+```text
+python scripts/build_dev7_patch.py
+python tests/test_dev7_patch.py
+```
+
+El empaquetador comprueba el hash de entrada y la instrucción exacta antes de parchear. `dev7` no equivale a una recompilación de la fuente actual; el parche solo adapta la selección de imagen dyld para este dispositivo RootHide.
 
 En Windows o macOS con Python 3:
 
