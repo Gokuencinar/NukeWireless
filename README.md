@@ -1,14 +1,14 @@
 # Nuke Wireless
 
-Nuke Wireless is in development. This repository and its development artifacts are private.
+Nuke Wireless is in development. This repository is public; development builds are not releases.
 
 ## Desarrollo actual
 
-**Estado actual:** `1.0.25+rh25.5~dev7` está instalada en el iPhone (iOS 16.3.1, Dopamine RootHide). Arranca y termina el escaneo inicial. Un diagnóstico con la misma corrección de instrucción pulsó Actualizar automáticamente: el segundo escaneo terminó con 13 equipos tras un primero de 12. La versión instalada no contiene esa pulsación automática. Bloquear todos y el desplazamiento de Info siguen pendientes de comprobación visual completa.
+**Estado actual:** `1.0.25+rh25.5~dev8` está instalada en el iPhone (iOS 16.3.1, Dopamine RootHide). Arranca y termina el escaneo inicial. «Bloquear todos» enlaza ahora el botón real dentro del panel heredado y encuentra la puerta de enlace mediante SystemConfiguration cuando la propiedad antigua está vacía. Una prueba diagnóstica tocó el botón, contó 11 equipos aptos y abrió la confirmación; la cerró sin bloquearlos. El bloqueo y desbloqueo reales de toda la red siguen pendientes de prueba en un entorno controlado.
 
-`dev6` resolvió el bloqueo de arranque, pero Actualizar mostraba «The scanner is not ready». RootHide carga `systemhook` como imagen dyld 0; el código buscaba ahí la función Swift del ejecutable. `dev7` usa la imagen 1, comprobada por el prólogo del ejecutable fijado por hash. Se generó mediante un parche de cuatro bytes a la biblioteca `dev6` porque GitHub Actions no inicia runners macOS por el límite de facturación de la cuenta. La fuente incluye la solución general que busca la imagen por nombre, pendiente de una nueva compilación macOS.
+`dev6` resolvió el bloqueo de arranque, pero Actualizar mostraba «The scanner is not ready». RootHide carga `systemhook` como imagen dyld 0; el código buscaba ahí la función Swift del ejecutable. `dev7` fue un parche binario para ese dispositivo. Desde que el repositorio es público, GitHub Actions compiló la solución fuente que busca el ejecutable por nombre; `dev8` contiene esa compilación y la corrección de los controles masivos.
 
-La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes son experimentales hasta resolver la regresión de arranque:
+La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes forman parte de la candidata instalada:
 
 - Info usa una tabla con alturas calculadas, sin banner ni superposiciones de altura fija. Incluye créditos, avatar, enlaces, red actual y copia al portapapeles.
 - Actualizar y deslizar ejecutan la renovación nativa de la lista; el puente observa sus callbacks y recupera el estado tras errores.
@@ -26,7 +26,7 @@ Las rutas `HarpyReloaded.app`, las clases Swift `_TtC13HarpyReloaded…`, el bun
 
 Objetivo: iOS 16.3 con Dopamine RootHide. SSID/BSSID se consultan mediante MobileWiFi sin solicitar ubicación; el acceso efectivo depende del dispositivo.
 
-## Compilación privada
+## Compilación
 
 En macOS con Xcode:
 
@@ -34,9 +34,9 @@ En macOS con Xcode:
 bash scripts/build_extension.sh
 ```
 
-Ejecuta las pruebas C y Foundation, compila para iOS arm64 y escribe la biblioteca y su manifiesto en `build/audit/`. El workflow `audit-build.yml` ejecuta lo mismo en la rama de desarrollo cuando GitHub permite iniciar runners. Solo sube un artefacto temporal dentro del repositorio privado: no crea releases, no modifica `main` y no hace commits automáticos.
+Ejecuta las pruebas C y Foundation, compila para iOS arm64 y escribe la biblioteca y su manifiesto en `build/audit/`. El workflow `audit-build.yml` ejecuta lo mismo en la rama de desarrollo y sube un artefacto temporal. No crea releases, no modifica `main` y no hace commits automáticos.
 
-La candidata instalada `dev7` se reproduce localmente desde el paquete `dev6` fijado por SHA-256:
+La antigua candidata `dev7` se reproduce localmente desde el paquete `dev6` fijado por SHA-256:
 
 ```text
 python scripts/build_dev7_patch.py
@@ -53,6 +53,6 @@ python tests/test_package.py
 python tests/test_native_abi.py
 ```
 
-Antes de empaquetar en Windows, descarga la biblioteca y `build-manifest.json` del build privado a `build/audit/`. El empaquetador rechaza una base distinta o un artefacto que no corresponda a las fuentes actuales. No ejecuta scripts del paquete. El paquete de desarrollo y su manifiesto quedan en `dist/` y están excluidos de Git.
+Antes de empaquetar en Windows, descarga la biblioteca y `build-manifest.json` de Actions a `build/audit/`. El empaquetador rechaza una base distinta o un artefacto que no corresponda a las fuentes actuales. No ejecuta scripts del paquete. El paquete de desarrollo y su manifiesto quedan en `dist/` y están excluidos de Git.
 
 `dev3` se instaló por SSH en iOS 16.3.1 con Dopamine RootHide, pero no llegó a la interfaz principal. La carga de la extensión y la creación del control en los registros no prueban un arranque funcional. Se restauró la base `rh25.3` y se retiró la deb de la carpeta de entrega. Véase el informe.

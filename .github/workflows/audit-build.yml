@@ -1,4 +1,4 @@
-name: Private development build
+name: Development build
 on:
   push:
     branches: [audit-rh25.5]
@@ -13,7 +13,7 @@ jobs:
         run: bash scripts/build_extension.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: nuke-wireless-private-development
+          name: nuke-wireless-development
           path: |
             build/audit/NukeWirelessInfo_ios.dylib
             build/audit/build-manifest.json

@@ -1,6 +1,16 @@
-# Resultado de la compilación privada
+# Resultado de la compilación de desarrollo
 
-## Candidata dev7 (instalada en el iPhone)
+## Candidata dev8 (instalada en el iPhone)
+
+- Versión: `1.0.25+rh25.5~dev8`; compilación iOS arm64 desde fuente en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36467454122), correcta.
+- Se enlaza el botón ancho que está dentro del panel `UIView` con etiqueta `90122`; se conserva el botón Nombres y la geometría del panel. SystemConfiguration proporciona la puerta de enlace cuando `MCCommands.gatewayIP` devuelve cero.
+- Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev8_iphoneos-arm64e.deb`; SHA-256: `746a3f3df420a2eb7c9f955f06a99591d3f5a6c73c02619e98296ccb5d5006ab`.
+- Siete pruebas del paquete y comprobación de ABI nativa: correctas.
+- Prueba diagnóstica con la misma lógica: botón presente, enlazado y habilitado; el toque abrió la confirmación para 11 objetivos y un `UIAlertController`. Se cerró sin confirmar, de modo que ningún equipo fue bloqueado en esa prueba.
+- Instalación final por SSH: `dpkg-query` muestra `dev8`; la app cargó la extensión y completó el escaneo inicial con 13 filas. La biblioteca instalada contiene la marca `dev8` y no contiene el código diagnóstico.
+- Pendiente: comprobar en un entorno controlado el efecto real de Bloquear todos y Desbloquear todos sobre equipos de la red. No se creó release ni se modificó `main` o el repositorio público de paquetes.
+
+## Candidata dev7 (sustituida por dev8)
 
 - Versión: `1.0.25+rh25.5~dev7`.
 - RootHide carga `systemhook` como imagen dyld 0. Un parche de una instrucción en la biblioteca `dev6` selecciona la imagen 1 y conserva la comprobación del prólogo de la función Swift. También cambia los textos de versión sin alterar longitudes.
