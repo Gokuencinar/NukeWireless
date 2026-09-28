@@ -1,5 +1,7 @@
 # Auditoría de Nuke Wireless — 1.0.25+rh25.5~dev3
 
+**Candidata retirada.** Aunque `dpkg` la instaló y los registros confirmaron la carga de la extensión, el usuario comprobó que quedaba fija en la pantalla azul inicial. Se restauró `1.0.25+rh25.3` y el usuario confirmó que vuelve a abrir normalmente. Las observaciones de esta auditoría son resultados de código y diagnósticos parciales; no constituyen validación de `dev3` como versión funcional.
+
 ## Alcance y base
 
 Se trabaja sobre `main` en `ff5cb101ad405fc71e438a2b19da7caa783e25fc`, que conserva `rh25.3` tras retirar `rh25.4`. Rama de trabajo: `audit-rh25.5`. No se han creado releases ni modificado `main` o el repositorio público de paquetes.
@@ -65,6 +67,6 @@ El hash definitivo y la ejecución privada de CI se registran en `BUILD-RESULTS.
 
 El iPhone respondió por SSH. La primera candidata `dev1` no podía instalarse: el TAR contenía archivos nuevos sin las entradas de sus directorios. Se corrigió y se añadió una prueba que reproduce ese requisito. En un reemplazo directo de biblioteca durante la depuración, iOS rechazó una firma/cdhash y omitió la extensión; la instalación de la deb mediante `dpkg -i` terminó con `install ok installed`.
 
-La candidata limpia `dev3` se instaló en iOS 16.3.1 con Dopamine RootHide. El registro del propio proceso confirmó `extension dev3 loaded` y `Wi-Fi refresh ready`, sin error de validación de la biblioteca durante ese arranque. Una compilación diagnóstica anterior, ejecutada en el mismo dispositivo, devolvió valores disponibles para SSID, BSSID, IPv4, puerta de enlace, máscara y DNS; no se registraron sus valores. El avatar quedó presente en el paquete instalado. La sonda temporal fue retirada del iPhone y del proyecto.
+La candidata `dev3` se instaló en iOS 16.3.1 con Dopamine RootHide. El registro del propio proceso confirmó `extension dev3 loaded` y `Wi-Fi refresh ready`, sin error de validación de la biblioteca durante ese arranque. **Esto fue insuficiente:** el usuario comprobó que no pasaba de la pantalla azul inicial. Una compilación diagnóstica anterior devolvió valores disponibles para SSID, BSSID, IPv4, puerta de enlace, máscara y DNS; no se registraron sus valores. El avatar quedó presente en el paquete instalado. La sonda temporal fue retirada del iPhone y del proyecto. Después se reinstaló `rh25.3` y el usuario confirmó que la app abre.
 
-**Pendiente de validación interactiva:** pulsar «Actualizar» y comprobar dos escaneos completos, ejecutar y revertir «Bloquear todos», abrir Info para confirmar que el banner desaparece y comprobar su scroll, enlaces y copia al portapapeles. Tampoco se ha verificado la descarga IEEE en el propio iPhone ni el aspecto con otros tamaños o Dynamic Type. Las pruebas de lógica, compilación y estructura no demuestran eficacia real del aislamiento de red.
+**Pendiente:** localizar y corregir primero el bloqueo de arranque. Después, pulsar «Actualizar» y comprobar dos escaneos completos, ejecutar y revertir «Bloquear todos», abrir Info para confirmar que el banner desaparece y comprobar su scroll, enlaces y copia al portapapeles. Tampoco se ha verificado la descarga IEEE en el propio iPhone ni el aspecto con otros tamaños o Dynamic Type. Las pruebas de lógica, compilación y estructura no demuestran eficacia real del aislamiento de red.

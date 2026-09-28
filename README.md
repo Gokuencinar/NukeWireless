@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository and its development artifacts a
 
 ## Desarrollo actual
 
-La rama `audit-rh25.5` prepara **1.0.25+rh25.5~dev3**, sin release ni publicación en el repositorio de paquetes. Parte del paquete fijado `1.0.25+rh25.3`. Las candidatas `dev1` y `dev2` se retiraron tras detectar defectos de instalación y de recursos.
+**Estado actual:** `1.0.25+rh25.3` está restaurada en el iPhone y el usuario confirmó que abre con normalidad. La candidata `1.0.25+rh25.5~dev3` queda **retirada**: se instala y carga la extensión, pero la app permanece en la pantalla azul inicial. No debe distribuirse ni instalarse. Las candidatas `dev1` y `dev2` también están retiradas.
+
+La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes son experimentales hasta resolver la regresión de arranque:
 
 - Info usa una tabla con alturas calculadas, sin banner ni superposiciones de altura fija. Incluye créditos, avatar, enlaces, red actual y copia al portapapeles.
 - Actualizar y deslizar ejecutan la renovación nativa de la lista con una nueva instancia del escáner por sesión, descarte de callbacks antiguos y recuperación tras errores.
@@ -42,4 +44,4 @@ python tests/test_native_abi.py
 
 Antes de empaquetar en Windows, descarga la biblioteca y `build-manifest.json` del build privado a `build/audit/`. El empaquetador rechaza una base distinta o un artefacto que no corresponda a las fuentes actuales. No ejecuta scripts del paquete. El paquete de desarrollo y su manifiesto quedan en `dist/` y están excluidos de Git.
 
-La candidata se instaló por SSH en iOS 16.3.1 con Dopamine RootHide. Se confirmó la carga de la extensión, la creación del control «Actualizar» y la disponibilidad de los seis campos de red. El toque de «Actualizar», el bloqueo masivo y el aspecto/scroll de Info aún requieren validación interactiva; véase el informe.
+`dev3` se instaló por SSH en iOS 16.3.1 con Dopamine RootHide, pero no llegó a la interfaz principal. La carga de la extensión y la creación del control en los registros no prueban un arranque funcional. Se restauró la base `rh25.3` y se retiró la deb de la carpeta de entrega. Véase el informe.
