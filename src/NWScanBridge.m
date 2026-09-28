@@ -204,7 +204,8 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
 BOOL NWScanBusy(void) { return NWStateBusy(&state); }
 void NWReconcileDeviceStates(void) {
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy) return;
-    for (NSString *ip in devices.allKeys) updateDeviceState(ip);
+    NSMutableSet *known = [bulkOwned mutableCopy]; [known addObjectsFromArray:devices.allKeys];
+    for (NSString *ip in known) updateDeviceState(ip);
 }
 BOOL NWBulkBusy(void) { return bulkBusy; }
 BOOL NWRefreshScan(void) {
@@ -249,7 +250,7 @@ static NSArray<NSString *> *activeIPs(void) {
 }
 NSString *NWBulkTitle(void) {
     if (bulkBusy) return NWText(@"bulk.working");
-    return NWText(activeIPs().count ? @"bulk.unblock" : @"bulk.block");
+    return NWText(bulkOwned.count ? @"bulk.unblock" : @"bulk.block");
 }
 static void bulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock, uint64_t generation, NSString *network) {
     if (index >= items.count || (!unblock && (state.generation != generation || ![network isEqualToString:networkIdentity()]))) {
@@ -259,6 +260,12 @@ static void bulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unbl
     NSString *ip = items[index][@"ip"];
     if (isBlocked(ip) == !unblock) {
         dispatch_async(dispatch_get_main_queue(), ^{ bulkStep(items, index + 1, unblock, generation, network); }); return;
+    }
+    // The preserved native process registry has 64 slots. Never launch a task it
+    // cannot track and subsequently release; report the remaining items as failures.
+    id registered = readObject(commands(), @"runningBlocksForArp");
+    if (!unblock && (![registered isKindOfClass:NSArray.class] || [registered count] >= 64)) {
+        bulkFailures += items.count - index; bulkBusy = NO; notify(); return;
     }
     @try {
         Class cls = commands();

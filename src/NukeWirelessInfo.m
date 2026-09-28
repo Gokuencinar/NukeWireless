@@ -426,7 +426,7 @@ __attribute__((constructor)) static void installExtension(void) {
         originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
         // Reconcile actions from the unchanged individual Swift controls too.
-        [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
+        [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
             if (activeTab.selectedIndex == 0 && activeTab.view.window) {
                 NWReconcileDeviceStates(); updateWiFi();
