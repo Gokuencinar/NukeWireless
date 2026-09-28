@@ -251,7 +251,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     if (index.section == 0) {
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"CreditsAvatar" ofType:@"jpg"]]];
+        UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
         avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 32;
         [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:64],[avatar.heightAnchor constraintEqualToConstant:64]]];
         UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
@@ -446,6 +446,19 @@ static void labelText(UILabel *label, SEL sel, NSString *value) {
     if (objc_getAssociatedObject(label,&statusLabelKey)) value = NWScanSummary();
     originalLabelText(label,sel,value);
 }
+#ifdef NW_DIAGNOSTIC
+static void captureDiagnostic(NSString *name) {
+    UIWindow *window = activeTab.view.window;
+    if (!window) { diagnostic("snapshot missing window"); return; }
+    UIGraphicsBeginImageContextWithOptions(window.bounds.size, YES, 0);
+    [window.layer renderInContext:UIGraphicsGetCurrentContext()];
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    NSString *path = [NSHomeDirectory() stringByAppendingFormat:@"/Library/Caches/NukeWireless-%@.png", name];
+    BOOL written = [UIImagePNGRepresentation(image) writeToFile:path atomically:YES];
+    diagnostic(written ? "snapshot written" : "snapshot write failed");
+}
+#endif
 __attribute__((constructor)) static void installExtension(void) {
     diagnostic("constructor entered");
     NWInstallScanHooks();
@@ -474,5 +487,19 @@ __attribute__((constructor)) static void installExtension(void) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
+#ifdef NW_DIAGNOSTIC
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (!activeTab.view.window) return;
+            captureDiagnostic(@"wifi");
+            NSInteger prior = activeTab.selectedIndex;
+            activeTab.selectedIndex = 2;
+            installUI(activeTab);
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                captureDiagnostic(@"info");
+                activeTab.selectedIndex = prior;
+                installUI(activeTab);
+            });
+        });
+#endif
     });
 }

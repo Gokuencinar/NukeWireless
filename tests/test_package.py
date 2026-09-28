@@ -51,6 +51,7 @@ class PackageTests(unittest.TestCase):
         self.assertFalse(any('LocationUsage' in key for key in info))
         bundle = package.APP+'NukeWirelessResources.bundle/'
         vendors = plistlib.loads(self.after[bundle+'oui_vendors.plist'][1])
+        self.assertTrue(self.after[bundle+'CreditsAvatar.png'][1].startswith(b'\x89PNG\r\n\x1a\n'))
         self.assertGreater(len(vendors),30000)
         self.assertTrue(all(re.fullmatch('[0-9A-F]{6}',k) and isinstance(v,str) and v for k,v in vendors.items()))
         languages = []

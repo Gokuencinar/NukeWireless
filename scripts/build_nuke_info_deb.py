@@ -83,6 +83,7 @@ def build(source, artifact, output):
     })), regular(bundle + "oui_vendors.plist", original["usr/share/nukewireless-roothide/oui_vendors.plist"])]
     for path in sorted((ROOT / "resources").rglob("*.strings")):
         entries.append(regular(bundle + path.relative_to(ROOT / "resources").as_posix(),path.read_bytes()))
+    entries.append(regular(bundle + "CreditsAvatar.png", (ROOT / "resources/CreditsAvatar.png").read_bytes()))
     for i,(member,data) in enumerate(control):
         if member.name.lstrip("./") == "control":
             before = b"Version: 1.0.25+rh25.3\n"
