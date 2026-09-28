@@ -442,23 +442,6 @@ __attribute__((constructor)) static void installExtension(void) {
                 NWReconcileDeviceStates(); updateWiFi();
             }
         }];
-        [NSTimer scheduledTimerWithTimeInterval:16 repeats:NO block:^(NSTimer *timer) {
-            (void)timer;
-            UIView *panel = [activeTab.view viewWithTag:90122];
-            UIButton *button = nil;
-            for (UIView *child in panel.subviews)
-                if ([child isKindOfClass:UIButton.class] &&
-                    (!button || child.bounds.size.width > button.bounds.size.width)) button = (UIButton *)child;
-            NSLog(@"Nuke Wireless diagnostic: bulk control button=%d bound=%d enabled=%d", button != nil,
-                  [button.allTargets containsObject:actions], button.enabled);
-            if (button && button.enabled && !NWScanBusy())
-                [button sendActionsForControlEvents:UIControlEventTouchUpInside];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-                UIViewController *shown = activeTab.selectedViewController.presentedViewController;
-                NSLog(@"Nuke Wireless diagnostic: bulk alert class=%s", shown ? object_getClassName(shown) : "nil");
-                [shown dismissViewControllerAnimated:NO completion:nil];
-            });
-        }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
