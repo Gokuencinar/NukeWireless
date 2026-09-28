@@ -11,6 +11,7 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <math.h>
+#include <syslog.h>
 
 __attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev3";
 static NSString *available(NSString *value) {
@@ -396,6 +397,7 @@ static void installUI(UIViewController *controller) {
             ]];
             [info didMoveToParentViewController:host];
             objc_setAssociatedObject(host, &infoOverlayKey, info, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            syslog(LOG_NOTICE, "Nuke Wireless: Info ready");
         }
         [host.view bringSubviewToFront:info.view];
         host.tabBarItem.title = NWText(@"info.title");
@@ -407,6 +409,7 @@ static void installUI(UIViewController *controller) {
             button.configuration = UIButtonConfiguration.tintedButtonConfiguration; button.translatesAutoresizingMaskIntoConstraints = NO;
             bindButton(button,@selector(refresh:)); [root addSubview:button];
             [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
+            syslog(LOG_NOTICE, "Nuke Wireless: Wi-Fi refresh ready");
         }
     }
     installingUI = NO;
@@ -434,6 +437,7 @@ static void labelText(UILabel *label, SEL sel, NSString *value) {
     originalLabelText(label,sel,value);
 }
 __attribute__((constructor)) static void installExtension(void) {
+    syslog(LOG_NOTICE, "Nuke Wireless: extension dev3 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
