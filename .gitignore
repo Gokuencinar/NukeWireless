@@ -3,6 +3,7 @@
 /work/
 /__pycache__/
 /scripts/__pycache__/
+/tests/__pycache__/
 *.deb
 *.o
 *.ips
