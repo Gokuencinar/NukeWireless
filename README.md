@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository and its development artifacts a
 
 ## Desarrollo actual
 
-**Estado actual:** `1.0.25+rh25.5~dev5` está instalada en el iPhone como candidata experimental. `dpkg` terminó correctamente y el proceso se mantuvo activo durante una comprobación remota breve; todavía no se ha verificado visualmente el arranque ni el resultado de los botones. La base `rh25.3` permanece en el dispositivo para restauración. `dev3` queda **retirada** porque la app permanecía en la pantalla azul inicial. `dev1` y `dev2` también están retiradas.
+**Estado actual:** `1.0.25+rh25.3` está restaurada en el iPhone. El usuario confirmó que `dev5` también queda en la pantalla azul inicial, por lo que `dev3`, `dev4` y `dev5` están retiradas y no deben instalarse. La captura de registros de `dev5` identifica una espera circular en el arranque del escáner: su inicio se intercepta fuera del hilo principal y la sustitución se difiere al hilo principal, que no ejecuta ese bloque durante el arranque. `dev1` y `dev2` también están retiradas.
 
 La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes son experimentales hasta resolver la regresión de arranque:
 

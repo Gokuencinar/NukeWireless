@@ -88,40 +88,18 @@ static void updateDeviceState(NSString *ip) {
     if (!blocked) [bulkOwned removeObject:ip];
 }
 
-@interface NWScanSession : NSObject
-@property (nonatomic) uint64_t generation;
-@property (nonatomic, strong) NWLegacyScanner *scanner;
-@property (nonatomic, strong) id adapter;
-@property (nonatomic, strong) dispatch_queue_t worker;
-@property (nonatomic, copy) NSString *network;
-@property (nonatomic) uint32_t localAddress;
-@end
-static NWScanSession *currentSession;
-static void retire(NWScanSession *session) {
-    if (!session) return;
-    // The native stop method waits for its operation queue. Never call it on main.
-    // Serializing start/stop per instance also prevents cancelling a half-built scan.
-    dispatch_async(session.worker, ^{
-        @try { [session.scanner stop]; }
-        @catch (NSException *exception) { NSLog(@"Nuke Wireless: stop failed (%@)", exception.name); }
-    });
-}
+static void (*oldFound)(id, SEL, id);
+static void (*oldFinished)(id, SEL, int);
+static void (*oldFailed)(id, SEL);
+static void (*oldProgress)(id, SEL, float, NSInteger);
 static void finish(uint64_t generation, BOOL success, int status) {
-    if (success && ![currentSession.network isEqualToString:networkIdentity()]) success = NO;
+    if (success && ![scanNetwork isEqualToString:networkIdentity()]) success = NO;
     if (!NWStateFinish(&state, generation, success)) return;
     [watchdog invalidate]; watchdog = nil;
-    NWScanSession *done = currentSession; currentSession = nil;
-    id adapter = done.adapter ?: wifiAdapter;
-    if (success) {
-        scanNetwork = networkIdentity();
-        ((void (*)(id, SEL, int))objc_msgSend)(adapter, NSSelectorFromString(@"lanScanDidFinishScanningWithStatus:"), status);
-    } else {
-        scanNetwork = nil;
-        ((void (*)(id, SEL))objc_msgSend)(adapter, NSSelectorFromString(@"lanScanDidFailedToScan"));
-    }
-    retire(done);
+    if (!success) scanNetwork = nil;
     NSLog(@"Nuke Wireless: scan %llu ended (%@), %lu rows", (unsigned long long)generation,
           success ? @"complete" : @"failed", (unsigned long)devices.count);
+    (void)status;
     notify();
 }
 static void armWatchdog(uint64_t generation) {
@@ -131,16 +109,16 @@ static void armWatchdog(uint64_t generation) {
         if (NWStateExpired(&state, CACurrentMediaTime())) finish(generation, NO, 1);
     }];
 }
-@implementation NWScanSession
-- (void)lanScanDidFindNewDevice:(id)device {
+static void foundDevice(id adapter, SEL sel, id device) {
+    oldFound(adapter, sel, device);
     onMain(^{
-        if (currentSession != self || !NWStateAccepts(&state, self.generation)) return;
+        if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
         state.progress = CACurrentMediaTime();
         NSString *ip = readObject(device, @"ipAddress");
         if (!ipv4(ip)) return;
         NSString *name = readObject(device, @"hostname");
-        // Match the legacy display rule, so the summary counts exactly the visible rows.
-        if (ipv4(ip) == self.localAddress && (!name.length || [name isEqualToString:@"Unknown Host"])) return;
+        uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+        if (ipv4(ip) == local && (!name.length || [name isEqualToString:@"Unknown Host"])) return;
         NSString *vendor = NWVendorForMAC(readObject(device, @"macAddress"));
         if (vendor.length) setObject(device, @"setBrand:", vendor);
         id existing = devices[ip];
@@ -153,56 +131,46 @@ static void armWatchdog(uint64_t generation) {
             }
         } else {
             devices[ip] = device;
-            // Preserve both legacy enrichment/alias hooks and the Swift published list.
-            ((void (*)(id, SEL, id))objc_msgSend)(self.adapter, NSSelectorFromString(@"lanScanDidFindNewDevice:"), device);
         }
         updateDeviceState(ip); notify();
     });
 }
-- (void)lanScanDidFinishScanningWithStatus:(int)status {
-    onMain(^{ if (currentSession == self) finish(self.generation, status == 0, status); });
+static void finishedScan(id adapter, SEL sel, int status) {
+    oldFinished(adapter, sel, status);
+    onMain(^{ if (adapter == wifiAdapter) finish(state.generation, status == 0, status); });
 }
-- (void)lanScanDidFailedToScan {
-    onMain(^{ if (currentSession == self) finish(self.generation, NO, 1); });
+static void failedScan(id adapter, SEL sel) {
+    oldFailed(adapter, sel);
+    onMain(^{ if (adapter == wifiAdapter) finish(state.generation, NO, 1); });
 }
-- (void)lanScanProgressPinged:(float)pinged from:(NSInteger)total {
+static void scanProgress(id adapter, SEL sel, float pinged, NSInteger total) {
+    if (oldProgress) oldProgress(adapter, sel, pinged, total);
     onMain(^{
-        if (currentSession != self || !NWStateAccepts(&state, self.generation)) return;
+        if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
         state.progress = CACurrentMediaTime();
-        SEL sel = NSSelectorFromString(@"lanScanProgressPinged:from:");
-        if ([self.adapter respondsToSelector:sel]) ((void (*)(id, SEL, float, NSInteger))objc_msgSend)(self.adapter, sel, pinged, total);
     });
 }
-@end
 
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     id adapter = scanner.delegate;
-    if (scanner.enableHotspot || [adapter isKindOfClass:NWScanSession.class] ||
-        ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
+    if (scanner.enableHotspot || ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
         oldStart(scanner, sel); return;
     }
     onMain(^{
-        NWScanSession *previous = currentSession; currentSession = nil; retire(previous);
         BOOL pending = state.phase == NWStarting && adapter == wifiAdapter;
         wifiAdapter = adapter;
         if (!pending) NWStateBegin(&state, CACurrentMediaTime());
         state.phase = NWScanning; state.progress = CACurrentMediaTime();
-        devices = [NSMutableDictionary new]; scanNetwork = nil;
-        NWScanSession *session = [NWScanSession new]; session.generation = state.generation; session.adapter = adapter;
-        session.network = networkIdentity();
-        uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway); session.localAddress = local;
-        session.worker = dispatch_queue_create("app.nukewireless.scan-session", DISPATCH_QUEUE_SERIAL);
-        session.scanner = [(NWLegacyScanner *)[NSClassFromString(@"MMLANScanner") alloc] initWithDelegate:session andEnableHotspot:NO];
-        currentSession = session; armWatchdog(session.generation); notify();
-        if (!session.scanner) { finish(session.generation, NO, 1); return; }
-        dispatch_async(session.worker, ^{
-            @try { oldStart(session.scanner, @selector(start)); }
-            @catch (NSException *exception) {
-                NSLog(@"Nuke Wireless: scan exception (%@)", exception.name);
-                onMain(^{ if (currentSession == session) finish(session.generation, NO, 1); });
-            }
-        });
+        devices = [NSMutableDictionary new]; scanNetwork = networkIdentity();
+        armWatchdog(state.generation); notify();
     });
+    // The caller may wait for start to return while the main thread is loading.
+    // Keep the native scanner on its original thread to avoid that startup deadlock.
+    @try { oldStart(scanner, sel); }
+    @catch (NSException *exception) {
+        NSLog(@"Nuke Wireless: native scan start failed (%@)", exception.name);
+        onMain(^{ if (adapter == wifiAdapter) finish(state.generation, NO, 1); });
+    }
 }
 BOOL NWScanBusy(void) { return NWStateBusy(&state); }
 void NWReconcileDeviceStates(void) {
@@ -218,8 +186,9 @@ BOOL NWRefreshScan(void) {
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
-    // The pinned Swift refresh clears Published.devices and schedules the anchor's start.
-    // The start hook above supplies a NEW underlying scanner and generation-gated delegate.
+    // The pinned Swift refresh clears Published.devices and schedules its scanner.
+    // The start and callback hooks track that native scan without moving start
+    // to a different thread or replacing its delegate.
     NWInvokeRefresh((__bridge void *)wifiAdapter, base + 0xc5a8);
     return YES;
 }
@@ -317,4 +286,15 @@ void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
     if (method && !oldStart) oldStart = (void *)method_setImplementation(method, (IMP)scannerStarted);
+    Class delegate = NSClassFromString(@"_TtC13HarpyReloaded10LanScanner");
+    method = class_getInstanceMethod(delegate, NSSelectorFromString(@"lanScanDidFindNewDevice:"));
+    if (method && !oldFound) oldFound = (void *)method_setImplementation(method, (IMP)foundDevice);
+    method = class_getInstanceMethod(delegate, NSSelectorFromString(@"lanScanDidFinishScanningWithStatus:"));
+    if (method && !oldFinished) oldFinished = (void *)method_setImplementation(method, (IMP)finishedScan);
+    method = class_getInstanceMethod(delegate, NSSelectorFromString(@"lanScanDidFailedToScan"));
+    if (method && !oldFailed) oldFailed = (void *)method_setImplementation(method, (IMP)failedScan);
+    method = class_getInstanceMethod(delegate, NSSelectorFromString(@"lanScanProgressPinged:from:"));
+    if (method && !oldProgress) oldProgress = (void *)method_setImplementation(method, (IMP)scanProgress);
+    NSLog(@"Nuke Wireless: native scan hooks start=%d callbacks=%d/%d/%d", oldStart != NULL,
+          oldFound != NULL, oldFinished != NULL, oldFailed != NULL);
 }

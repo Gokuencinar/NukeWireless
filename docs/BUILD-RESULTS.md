@@ -1,6 +1,6 @@
 # Resultado de la compilación privada
 
-## Candidata dev5 (instalada, pendiente de comprobar la interfaz)
+## Candidata dev5 (retirada)
 
 - Versión: `1.0.25+rh25.5~dev5`.
 - Corrección concreta: el control con etiqueta `90122` es el propio botón «Bloquear todos» en la biblioteca conservada, no un panel que contenga otro botón. Ahora se enlaza directamente con la acción masiva nueva.
@@ -9,8 +9,8 @@
 - Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev5_iphoneos-arm64e.deb`.
 - SHA-256: `609381b36361bd57b9b4783029a4e9ec7ccd50937afa303fab4a09020845e09a`.
 - Siete pruebas de paquete y prueba de ABI: correctas.
-- Instalación SSH: `dpkg -i` con código 0; `dpkg-query` confirma `dev5`. La orden de abrir la app produjo un proceso activo durante 12 segundos. No se pudo capturar la pantalla ni comprobar los botones o el desplazamiento por control remoto, por lo que **no se declaran funcionales**.
-- Sin release ni modificación de `main`; el paquete base `rh25.3` queda disponible en el iPhone para restauración.
+- Instalación SSH: `dpkg -i` con código 0; el usuario confirmó que queda en la pantalla azul. La traza del arranque confirma la carga de la extensión, instalación del hook y entrada en `scannerStarted` con delegado Wi-Fi, pero nunca se ejecuta el bloque de creación de sesión diferido al hilo principal. Se restauró `rh25.3` mediante `dpkg -i` y se verificó su versión y biblioteca instalada. **No instalar dev5.**
+- Sin release ni modificación de `main`; el paquete base `rh25.3` vuelve a estar instalado.
 
 ## Candidata dev4 (sin validar en el iPhone)
 
