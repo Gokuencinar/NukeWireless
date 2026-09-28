@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository and its development artifacts a
 
 ## Desarrollo actual
 
-**Estado actual:** `1.0.25+rh25.3` está restaurada en el iPhone y el usuario confirmó que abre con normalidad. La candidata `1.0.25+rh25.5~dev3` queda **retirada**: se instala y carga la extensión, pero la app permanece en la pantalla azul inicial. No debe distribuirse ni instalarse. Las candidatas `dev1` y `dev2` también están retiradas.
+**Estado actual:** `1.0.25+rh25.3` está restaurada en el iPhone y el usuario confirmó que abre con normalidad. La candidata `1.0.25+rh25.5~dev3` queda **retirada**: se instala y carga la extensión, pero la app permanece en la pantalla azul inicial. No debe distribuirse ni instalarse. Las candidatas `dev1` y `dev2` también están retiradas. `dev4` es experimental y todavía no se ha validado en el iPhone.
 
 La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes son experimentales hasta resolver la regresión de arranque:
 

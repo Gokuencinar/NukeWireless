@@ -2,6 +2,8 @@
 
 **Candidata retirada.** Aunque `dpkg` la instaló y los registros confirmaron la carga de la extensión, el usuario comprobó que quedaba fija en la pantalla azul inicial. Se restauró `1.0.25+rh25.3` y el usuario confirmó que vuelve a abrir normalmente. Las observaciones de esta auditoría son resultados de código y diagnósticos parciales; no constituyen validación de `dev3` como versión funcional.
 
+`dev4` es una hipótesis de reparación sin validar en dispositivo: elimina la consulta síncrona a MobileWiFi de la identidad de red invocada durante el escaneo inicial en el hilo principal. La lectura de SSID y BSSID para Info sigue en segundo plano. No se atribuye aún a esa llamada la causa demostrada de la pantalla azul.
+
 ## Alcance y base
 
 Se trabaja sobre `main` en `ff5cb101ad405fc71e438a2b19da7caa783e25fc`, que conserva `rh25.3` tras retirar `rh25.4`. Rama de trabajo: `audit-rh25.5`. No se han creado releases ni modificado `main` o el repositorio público de paquetes.
