@@ -56,7 +56,8 @@ La pantalla nueva no conserva variables, callbacks ni textos de la opción elimi
 3. Compilación iOS arm64 con mínimo 16.3 y `-Wall -Wextra -Werror`. El enlace también rechaza avisos; se ha eliminado la opción obsoleta `-undefined dynamic_lookup`.
 4. Seis pruebas de paquete: cambios limitados a los archivos previstos, textos sin cambios de longitud/instrucciones, metadatos/recursos/localizaciones, scripts de firma, procedencia de la biblioteca y rechazo de base desconocida o artefacto alterado.
 5. El manifiesto adjunto registra hashes de las fuentes y del resultado. El empaquetador no acepta bibliotecas antiguas con fuentes nuevas. Se retira el prebuilt obsoleto y el workflow anterior que hacía commits automáticos en `main`.
-6. Las dos bibliotecas de rutas, auxiliares de red, avatar, licencias y scripts de instalación permanecen idénticos a la base. Los scripts de instalación se inspeccionan como datos; no se ejecutan en el ordenador.
+6. Test de ABI sobre los metadatos Objective-C del paquete: clase concreta del escáner, tipos de callbacks y métodos de bloqueo/desbloqueo individual coinciden con las llamadas implementadas.
+7. Las dos bibliotecas de rutas, auxiliares de red, avatar, licencias y scripts de instalación permanecen idénticos a la base. Los scripts de instalación se inspeccionan como datos; no se ejecutan en el ordenador.
 
 El hash definitivo y la ejecución privada de CI se registran en `BUILD-RESULTS.md` junto al paquete preparado.
 

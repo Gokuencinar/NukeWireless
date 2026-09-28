@@ -37,6 +37,7 @@ En Windows o macOS con Python 3:
 ```text
 python scripts/build_nuke_info_deb.py dist/com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb
 python tests/test_package.py
+python tests/test_native_abi.py
 ```
 
 Antes de empaquetar en Windows, descarga la biblioteca y `build-manifest.json` del build privado a `build/audit/`. El empaquetador rechaza una base distinta o un artefacto que no corresponda a las fuentes actuales. No ejecuta scripts del paquete. El paquete de desarrollo y su manifiesto quedan en `dist/` y están excluidos de Git.
