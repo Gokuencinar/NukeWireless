@@ -296,9 +296,12 @@ static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOO
     });
 }
 void NWConfirmBulk(UIViewController *presenter) {
+    NSLog(@"Nuke Wireless diagnostic: bulk action entered phase=%ld rows=%lu modal=%d", (long)state.phase,
+          (unsigned long)devices.count, presenter.presentedViewController != nil);
     if (!NSThread.isMainThread || bulkBusy || !presenter || presenter.presentedViewController) return;
     NSArray<NSString *> *active = activeIPs(); BOOL unblock = active.count > 0;
     if (!unblock && (NWScanBusy() || state.phase != NWComplete || ![scanNetwork isEqualToString:networkIdentity()])) {
+        NSLog(@"Nuke Wireless diagnostic: bulk blocked by scan state");
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bulk.block") message:NWText(@"bulk.scanRequired") preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
         [presenter presentViewController:alert animated:YES completion:nil]; return;
@@ -307,11 +310,13 @@ void NWConfirmBulk(UIViewController *presenter) {
     if (unblock) { for (NSString *ip in active) [items addObject:@{@"ip":ip}]; }
     else [items addObjectsFromArray:targets()];
     if (!items.count) {
+        NSLog(@"Nuke Wireless diagnostic: bulk has no eligible targets");
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bulk.block") message:NWText(@"bulk.empty") preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
         [presenter presentViewController:alert animated:YES completion:nil]; return;
     }
     uint64_t generation = state.generation; NSString *network = [scanNetwork copy]; NSArray *snapshot = [items copy];
+    NSLog(@"Nuke Wireless diagnostic: bulk confirmation count=%lu unblock=%d", (unsigned long)snapshot.count, unblock);
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(unblock ? @"bulk.unblock" : @"bulk.block") message:[NSString stringWithFormat:NWText(@"bulk.confirm"), (unsigned long)snapshot.count] preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"continue") style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
