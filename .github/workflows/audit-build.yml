@@ -1,0 +1,20 @@
+name: Private development build
+on:
+  push:
+    branches: [audit-rh25.5]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests and iOS compile
+        run: bash scripts/build_extension.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuke-wireless-private-development
+          path: |
+            build/audit/NukeWirelessInfo_ios.dylib
+            build/audit/build-manifest.json
+          retention-days: 7

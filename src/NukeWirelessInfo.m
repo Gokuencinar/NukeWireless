@@ -2,71 +2,19 @@
 #import <QuartzCore/QuartzCore.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 #import "NWScanBridge.h"
+#import "NWResources.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <arpa/inet.h>
 #import <ifaddrs.h>
 #import <net/if.h>
-#import <dispatch/dispatch.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <math.h>
 
-/* Info-only extension for the user's Nuke Wireless 1.0.25 package. */
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.3";
-static const NSInteger kInfoOverlayTag = 90721;
-static const NSInteger kRefreshButtonTag = 90730;
-static const NSInteger kNetworkRowTag = 90800;
-static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
-static void (*originalDidLayout)(UIViewController *, SEL);
-static void (*originalContentSize)(UIScrollView *, SEL, CGSize);
-static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
-static void (*originalScrollEnabled)(UIScrollView *, SEL, BOOL);
-static BOOL (*originalCancelTouches)(UIScrollView *, SEL, UIView *);
-static void (*originalLabelText)(UILabel *, SEL, NSString *);
-static char infoScrollKey, wifiInsetKey, statusLabelKey;
-static __weak UITabBarController *activeTab;
-static void layoutAdditions(UITabBarController *tab);
-static NSArray<NSString *> *networkKeys(void) {
-    return @[@"SSID", @"BSSID", @"IPv4", @"Puerta de enlace", @"Máscara", @"DNS"];
-}
-static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString *> *values);
-static void refreshNetworkRows(UIView *overlay);
-
-@interface NWInfoLinkTarget : NSObject
-@property (nonatomic, weak) UIView *overlay;
-- (void)openGitHub:(id)sender;
-- (void)openCoffee:(id)sender;
-- (void)copyNetworkValue:(UIButton *)sender;
-- (void)refreshWiFi:(id)sender;
-@end
-
-@implementation NWInfoLinkTarget
-- (void)openGitHub:(id)sender {
-    (void)sender;
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/Gokuencinar"]
-                                   options:@{} completionHandler:nil];
-}
-- (void)openCoffee:(id)sender {
-    (void)sender;
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://buymeacoffee.com/gokuen"]
-                                   options:@{} completionHandler:nil];
-}
-- (void)copyNetworkValue:(UIButton *)sender {
-    NSString *value = sender.accessibilityValue;
-    if (value.length && ![value isEqualToString:@"No disponible"])
-        UIPasteboard.generalPasteboard.string = value;
-}
-- (void)refreshWiFi:(id)sender {
-    (void)sender;
-    NWRefreshScan();
-    layoutAdditions(activeTab);
-}
-@end
-
-static NWInfoLinkTarget *linkTarget;
-
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev1";
 static NSString *available(NSString *value) {
-    return value.length ? value : @"No disponible";
+    return value.length ? value : NWText(@"unavailable");
 }
 
 // MobileWiFi reads only the current association on the jailbroken device.
@@ -175,315 +123,312 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
     };
 }
 
-static UIScrollView *findInfoScroll(UIView *view, CGFloat *largestArea) {
-    UIScrollView *best = nil;
-    NSString *className = NSStringFromClass(view.class);
-    if ([view isKindOfClass:[UIScrollView class]] &&
-        [className containsString:@"HostingScrollView"]) {
-        CGFloat area = view.bounds.size.width * view.bounds.size.height;
-        if (area > *largestArea) {
-            *largestArea = area;
-            best = (UIScrollView *)view;
-        }
-    }
-    for (UIView *child in view.subviews) {
-        UIScrollView *candidate = findInfoScroll(child, largestArea);
-        if (candidate) best = candidate;
-    }
-    return best;
+NSString *NWNetworkIdentity(void) {
+    NSDictionary *association = currentAssociation();
+    return [NSString stringWithFormat:@"%@/%@", association[@"SSID"] ?: @"", association[@"BSSID"] ?: @""];
 }
-
-static UILabel *infoLabel(UIView *parent, CGRect frame, NSString *text,
-                          CGFloat fontSize, NSTextAlignment alignment, NSInteger tag) {
-    UILabel *label = [[UILabel alloc] initWithFrame:frame];
-    label.text = text;
-    label.textColor = UIColor.whiteColor;
-    label.font = [UIFont systemFontOfSize:fontSize];
-    label.textAlignment = alignment;
-    label.numberOfLines = 0;
-    label.tag = tag;
-    [parent addSubview:label];
-    return label;
+static void showMessage(UIViewController *controller, NSString *message) {
+    if (controller.presentedViewController) return;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Nuke Wireless" message:message preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+    [controller presentViewController:alert animated:YES completion:nil];
 }
-
-static void infoButton(UIView *parent, CGRect frame, NSString *title,
-                       SEL action, BOOL filled) {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    button.frame = frame;
-    [button setTitle:title forState:UIControlStateNormal];
-    if (filled) {
-        button.backgroundColor = UIColor.systemBlueColor;
-        button.layer.cornerRadius = 8;
-        [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
+    UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
+    content.text = title; content.secondaryText = detail;
+    content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
+    content.textProperties.adjustsFontForContentSizeCategory = YES;
+    content.secondaryTextProperties.adjustsFontForContentSizeCategory = YES;
+    cell.contentConfiguration = content;
+    cell.selectionStyle = link ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+    return cell;
+}
+@interface NWAdvancedController : UITableViewController
+@property (nonatomic, weak) UILabel *intervalLabel;
+@end
+@implementation NWAdvancedController
+- (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (void)viewDidLoad { [super viewDidLoad]; self.title = NWText(@"advanced.title"); self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 70; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 2; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : 2; }
+- (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return NWText(section == 0 ? @"interval.explanation" : @"vendors.explanation"); }
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
+    (void)table;
+    if (index.section == 1) {
+        UITableViewCell *cell = textCell(NWText(index.row == 0 ? @"vendors.update" : @"vendors.restore"), nil, YES);
+        cell.userInteractionEnabled = !NWVendorUpdateBusy();
+        if (NWVendorUpdateBusy()) { UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium]; [spinner startAnimating]; cell.accessoryView = spinner; }
+        return cell;
     }
-    [button addTarget:linkTarget action:action forControlEvents:UIControlEventTouchUpInside];
-    [parent addSubview:button];
+    UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    UILabel *label = [UILabel new]; label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody]; label.numberOfLines = 0; label.adjustsFontForContentSizeCategory = YES;
+    label.text = [NSString stringWithFormat:NWText(@"interval.value"), NWCurrentPacketInterval()]; self.intervalLabel = label;
+    UISlider *slider = [UISlider new]; slider.minimumValue = 0.2; slider.maximumValue = 5; slider.value = (float)NWCurrentPacketInterval(); slider.accessibilityLabel = NWText(@"interval.title");
+    [slider addTarget:self action:@selector(intervalChanged:) forControlEvents:UIControlEventValueChanged];
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[label,slider]]; stack.axis = UILayoutConstraintAxisVertical; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [cell.contentView addSubview:stack]; UILayoutGuide *g = cell.contentView.layoutMarginsGuide;
+    [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]];
+    return cell;
 }
-
-static void updateNetworkRows(UIView *overlay, NSDictionary<NSString *, NSString *> *values) {
-    NSArray<NSString *> *keys = networkKeys();
-    for (NSUInteger index = 0; index < keys.count; ++index) {
-        UIButton *row = (UIButton *)[overlay viewWithTag:kNetworkRowTag + index];
-        NSString *value = values[keys[index]] ?: @"No disponible";
-        row.accessibilityValue = value;
-        UILabel *valueLabel = (UILabel *)[row viewWithTag:1];
-        valueLabel.text = value;
+- (void)intervalChanged:(UISlider *)slider {
+    double value = round(slider.value * 10) / 10; NWSetPacketInterval(value);
+    self.intervalLabel.text = [NSString stringWithFormat:NWText(@"interval.value"), NWCurrentPacketInterval()];
+}
+- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
+    [table deselectRowAtIndexPath:index animated:YES]; if (index.section != 1 || NWVendorUpdateBusy()) return;
+    if (index.row == 0) {
+        __weak NWAdvancedController *weakSelf = self;
+        NWUpdateVendors(^(NSError *error) {
+            NWAdvancedController *controller = weakSelf;
+            [controller.tableView reloadData];
+            if (controller.view.window) showMessage(controller, error.localizedDescription ?: NWText(@"vendors.updated"));
+        });
+        [table reloadData];
+    } else {
+        NSError *error; BOOL restored = NWRestoreVendors(&error);
+        showMessage(self, restored ? NWText(@"vendors.restored") : error.localizedDescription);
     }
 }
+@end
 
-static void refreshNetworkRows(UIView *overlay) {
-    if (!overlay) return;
-    __weak UIView *weakOverlay = overlay;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+@interface NWLicensesController : UITableViewController
+@property (nonatomic, strong) NSArray *entries;
+@end
+@implementation NWLicensesController
+- (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (void)viewDidLoad {
+    [super viewDidLoad]; self.title = NWText(@"licenses");
+    NSDictionary *ack = [NSDictionary dictionaryWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"Acknowledgements" withExtension:@"plist"]];
+    self.entries = ack[@"PreferenceSpecifiers"] ?: @[];
+    self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 100;
+}
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; (void)section; return self.entries.count; }
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index { (void)table; NSDictionary *entry = self.entries[index.row]; return textCell(entry[@"Title"] ?: @"", entry[@"FooterText"], NO); }
+@end
+
+@interface NWInfoController : UITableViewController
+@property (nonatomic, strong) NSDictionary *values;
+@property (nonatomic) NSUInteger requestID;
+@end
+@implementation NWInfoController
+- (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (void)viewDidLoad {
+    [super viewDidLoad]; self.title = NWText(@"info.title");
+    self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
+    self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
+}
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated]; NSUInteger request = ++self.requestID;
+    __weak NWInfoController *weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
         NSDictionary *values = networkDetails();
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (weakOverlay) updateNetworkRows(weakOverlay, values);
+            NWInfoController *controller = weakSelf;
+            if (!controller || request != controller.requestID) return;
+            controller.values = values; [controller.tableView reloadData];
         });
     });
 }
-
-static void presentWiFi(UIViewController *controller, UITabBarController *tab) {
-    (void)controller;
-    UIView *view = tab.selectedViewController.view;
-    if (!view || [view viewWithTag:kRefreshButtonTag]) return;
-    if (!linkTarget) linkTarget = [NWInfoLinkTarget new];
-    CGFloat width = view.bounds.size.width;
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    button.tag = kRefreshButtonTag;
-    button.frame = CGRectMake(width - 125, view.safeAreaInsets.top + 8, 113, 36);
-    button.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-    button.backgroundColor = [UIColor colorWithWhite:0.18 alpha:0.96];
-    button.layer.cornerRadius = 9;
-    [button setTitle:@"↻ Actualizar" forState:UIControlStateNormal];
-    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    [button addTarget:linkTarget action:@selector(refreshWiFi:)
-        forControlEvents:UIControlEventTouchUpInside];
-    [view addSubview:button];
-}
-
-static void presentInfo(UIViewController *controller) {
-    UITabBarController *tab = controller.tabBarController;
-    if (!tab && [controller isKindOfClass:[UITabBarController class]])
-        tab = (UITabBarController *)controller;
-    if (!tab) return;
-    activeTab = tab;
-    if (tab.selectedIndex == 0) { presentWiFi(controller, tab); return; }
-    if (tab.selectedIndex != 2) return;
-    CGFloat largestArea = 0;
-    UIScrollView *scroll = tab.selectedViewController ?
-        findInfoScroll(tab.selectedViewController.view, &largestArea) : nil;
-    if (!scroll) scroll = findInfoScroll(controller.view, &largestArea);
-    if (!scroll) return;
-    objc_setAssociatedObject(scroll, &infoScrollKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    scroll.scrollEnabled = YES;
-    scroll.alwaysBounceVertical = YES;
-    scroll.canCancelContentTouches = YES;
-    scroll.delaysContentTouches = YES;
-    UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
-    if (overlay) {
-        refreshNetworkRows(overlay);
-        return;
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 4 : (section == 2 ? 6 : 1)); }
+- (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
+- (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
+- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
+    (void)table;
+    if (index.section == 0) {
+        UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"CreditsAvatar" ofType:@"jpg"]]];
+        avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 32;
+        [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:64],[avatar.heightAnchor constraintEqualToConstant:64]]];
+        UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
+        UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[avatar,name]]; stack.axis = UILayoutConstraintAxisVertical; stack.alignment = UIStackViewAlignmentCenter; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
+        [cell.contentView addSubview:stack]; UILayoutGuide *g = cell.contentView.layoutMarginsGuide;
+        [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
-
-    CGFloat width = scroll.bounds.size.width;
-    overlay = [[UIView alloc] initWithFrame:CGRectMake(0, 392, width, 548)];
-    overlay.tag = kInfoOverlayTag;
-    overlay.backgroundColor = UIColor.blackColor;
-    [scroll addSubview:overlay];
-    CGSize contentSize = scroll.contentSize;
-    contentSize.height = MAX(contentSize.height, CGRectGetMaxY(overlay.frame));
-    scroll.contentSize = contentSize;
-    if (!linkTarget) linkTarget = [NWInfoLinkTarget new];
-    linkTarget.overlay = overlay;
-
-    NSString *avatarPath = [[NSBundle mainBundle] pathForResource:@"CreditsAvatar" ofType:@"jpg"];
-    UIImageView *avatar = [[UIImageView alloc] initWithFrame:CGRectMake((width - 62) / 2, 8, 62, 62)];
-    avatar.image = [UIImage imageWithContentsOfFile:avatarPath];
-    avatar.contentMode = UIViewContentModeScaleAspectFill;
-    avatar.clipsToBounds = YES;
-    avatar.layer.cornerRadius = 31;
-    [overlay addSubview:avatar];
-
-    infoLabel(overlay, CGRectMake(15, 72, width - 30, 40),
-        @"Gokuencinar GokuEn", 16,
-        NSTextAlignmentCenter, 0);
-    infoButton(overlay, CGRectMake(35, 114, width - 70, 30),
-        @"GitHub: @Gokuencinar", @selector(openGitHub:), NO);
-    infoButton(overlay, CGRectMake(35, 148, width - 70, 36),
-        @"Buy Me a Coffee", @selector(openCoffee:), YES);
-    infoLabel(overlay, CGRectMake(18, 193, width - 36, 27),
-        @"Red actual", 18, NSTextAlignmentLeft, 0);
-    UIView *card = [[UIView alloc] initWithFrame:CGRectMake(16, 228, width - 32, 300)];
-    card.backgroundColor = [UIColor colorWithWhite:0.13 alpha:1];
-    card.layer.cornerRadius = 13;
-    card.clipsToBounds = YES;
-    [overlay addSubview:card];
-    NSArray<NSString *> *keys = networkKeys();
-    for (NSUInteger index = 0; index < keys.count; ++index) {
-        UIButton *row = [UIButton buttonWithType:UIButtonTypeCustom];
-        row.tag = kNetworkRowTag + index;
-        row.frame = CGRectMake(0, index * 50, card.bounds.size.width, 50);
-        row.accessibilityLabel = keys[index];
-        [row addTarget:linkTarget action:@selector(copyNetworkValue:)
-            forControlEvents:UIControlEventTouchUpInside];
-        infoLabel(row, CGRectMake(12, 4, card.bounds.size.width - 24, 17),
-            keys[index], 11, NSTextAlignmentLeft, 0).textColor = UIColor.lightGrayColor;
-        UILabel *value = infoLabel(row,
-            CGRectMake(12, 21, card.bounds.size.width - 24, 24),
-            @"No disponible", 15, NSTextAlignmentLeft, 1);
-        value.userInteractionEnabled = NO;
-        if (index + 1 < keys.count) {
-            UIView *separator = [[UIView alloc] initWithFrame:
-                CGRectMake(12, 49, card.bounds.size.width - 24, 1)];
-            separator.backgroundColor = [UIColor colorWithWhite:0.25 alpha:1];
-            [row addSubview:separator];
+    if (index.section == 1) {
+        NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
+        UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
+    }
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev1", NO);
+    NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
+    NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
+    UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
+    cell.accessoryType = UITableViewCellAccessoryNone; cell.accessibilityHint = NWText(@"network.copyHint"); return cell;
+}
+- (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
+    [table deselectRowAtIndexPath:index animated:YES];
+    if (index.section == 1) {
+        if (index.row < 2) {
+            NSURL *url = [NSURL URLWithString:index.row == 0 ? @"https://github.com/Gokuencinar" : @"https://buymeacoffee.com/gokuen"];
+            [UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];
+        } else {
+            UIViewController *destination = index.row == 2 ? (UIViewController *)[NWAdvancedController new] : [NWLicensesController new];
+            [self.navigationController pushViewController:destination animated:YES];
         }
-        [card addSubview:row];
-    }
-    refreshNetworkRows(overlay);
-}
-
-static void patchedViewDidAppear(UIViewController *controller, SEL selector, BOOL animated) {
-    originalViewDidAppear(controller, selector, animated);
-    __weak UIViewController *weakController = controller;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *strongController = weakController;
-        if (strongController) {
-            presentInfo(strongController);
-            layoutAdditions(activeTab);
+    } else if (index.section == 2) {
+        NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
+        NSString *value = self.values[keys[index.row]];
+        if (value.length && ![value isEqualToString:NWText(@"unavailable")]) {
+            UIPasteboard.generalPasteboard.string = value;
+            UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"network.copied"));
         }
-    });
-}
-
-static UIScrollView *findWiFiScroll(UIView *view, CGFloat *area) {
-    UIScrollView *best = nil;
-    if ([view isKindOfClass:UIScrollView.class]) {
-        CGFloat size = view.bounds.size.width * view.bounds.size.height;
-        if (size > *area) { *area = size; best = (UIScrollView *)view; }
     }
+}
+@end
+
+static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
+static void (*originalDidLayout)(UIViewController *, SEL);
+static void (*originalContentInset)(UIScrollView *, SEL, UIEdgeInsets);
+static void (*originalLabelText)(UILabel *, SEL, NSString *);
+static char wifiInsetKey, baseInsetKey, statusLabelKey;
+static __weak UITabBarController *activeTab;
+static const NSInteger refreshTag = 90730;
+static BOOL installingUI, layingOut;
+static void updateWiFi(void);
+@interface NWActions : NSObject
+- (void)refresh:(id)sender;
+- (void)bulk:(id)sender;
+- (void)changed:(NSNotification *)notification;
+@end
+@implementation NWActions
+- (void)refresh:(id)sender {
+    BOOL started = NWRefreshScan(); updateWiFi();
+    if (!started && !NWScanBusy() && !NWBulkBusy()) showMessage(activeTab.selectedViewController, NWText(@"scan.unavailable"));
+    if ([sender isKindOfClass:UIRefreshControl.class] && !NWScanBusy()) [(UIRefreshControl *)sender endRefreshing];
+}
+- (void)bulk:(id)sender { (void)sender; NWConfirmBulk(activeTab.selectedViewController); updateWiFi(); }
+- (void)changed:(NSNotification *)notification { (void)notification; updateWiFi(); }
+@end
+static NWActions *actions;
+static UIScrollView *largestScroll(UIView *view) {
+    UIScrollView *best = [view isKindOfClass:UIScrollView.class] ? (UIScrollView *)view : nil;
     for (UIView *child in view.subviews) {
-        UIScrollView *found = findWiFiScroll(child, area);
-        if (found) best = found;
+        UIScrollView *candidate = largestScroll(child);
+        if (candidate.bounds.size.width * candidate.bounds.size.height > best.bounds.size.width * best.bounds.size.height) best = candidate;
     }
     return best;
 }
-
-static void layoutAdditions(UITabBarController *tab) {
-    if (!tab || !tab.isViewLoaded) return;
+static void bindButton(UIButton *button, SEL action) {
+    [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+    [button addTarget:actions action:action forControlEvents:UIControlEventTouchUpInside];
+}
+static void updateWiFi(void) {
+    UITabBarController *tab = activeTab;
+    if (layingOut || !tab.isViewLoaded || tab.selectedIndex != 0) return;
+    layingOut = YES;
     UIView *root = tab.selectedViewController.view;
-    if (tab.selectedIndex == 2) {
-        CGFloat area = 0;
-        UIScrollView *scroll = findInfoScroll(root, &area);
-        UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
-        if (!overlay) return;
-        scroll.scrollEnabled = YES;
-        scroll.panGestureRecognizer.enabled = YES;
-        scroll.canCancelContentTouches = YES;
-        CGSize size = scroll.contentSize;
-        size.height = MAX(size.height, CGRectGetMaxY(overlay.frame) + 24);
-        if (!CGSizeEqualToSize(scroll.contentSize, size)) scroll.contentSize = size;
-        [scroll bringSubviewToFront:overlay];
-        return;
-    }
-    if (tab.selectedIndex != 0) return;
-    UIButton *button = (UIButton *)[root viewWithTag:kRefreshButtonTag];
-    BOOL busy = NWScanBusy();
-    button.enabled = !busy;
-    NSString *title = busy ? @"Escaneando…" : @"↻ Actualizar";
-    if (![button.currentTitle isEqualToString:title])
-        [button setTitle:title forState:UIControlStateNormal];
-    if (button) [root bringSubviewToFront:button];
-    CGFloat area = 0;
-    UIScrollView *scroll = findWiFiScroll(root, &area);
+    UIButton *refresh = (UIButton *)[root viewWithTag:refreshTag];
+    refresh.enabled = !NWScanBusy() && !NWBulkBusy();
+    [refresh setTitle:NWText(NWScanBusy() ? @"scan.scanning" : @"refresh") forState:UIControlStateNormal];
+    if (refresh) [root bringSubviewToFront:refresh];
     UIView *panel = [tab.view viewWithTag:90122];
-    if (scroll && panel && !panel.hidden) {
-        CGRect banner = [panel convertRect:panel.bounds toView:scroll];
-        CGFloat bottom = MAX(0, CGRectGetMaxY(scroll.bounds) - CGRectGetMinY(banner) + 16);
-        objc_setAssociatedObject(scroll, &wifiInsetKey, @(bottom), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        UIEdgeInsets inset = scroll.contentInset;
-        if (inset.bottom < bottom) { inset.bottom = bottom; scroll.contentInset = inset; }
-        UIEdgeInsets indicator = scroll.verticalScrollIndicatorInsets;
-        indicator.bottom = bottom;
-        if (!UIEdgeInsetsEqualToEdgeInsets(scroll.verticalScrollIndicatorInsets, indicator))
+    if (panel && !panel.hidden) {
+        CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
+        panel.frame = CGRectMake(12, CGRectGetMinY(bar) - 116, MAX(0,tab.view.bounds.size.width-24), 108);
+        for (UIView *view in panel.subviews) {
+            if ([view isKindOfClass:UILabel.class]) {
+                UILabel *label = (UILabel *)view;
+                objc_setAssociatedObject(label, &statusLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                label.text = NWScanSummary(); CGRect f = label.frame; f.size.width = panel.bounds.size.width-28; label.frame = f;
+            } else if ([view isKindOfClass:UIButton.class]) {
+                UIButton *button = (UIButton *)view; BOOL isBulk = NO;
+                for (id target in button.allTargets) {
+                    NSArray *selectors = [button actionsForTarget:target forControlEvent:UIControlEventTouchUpInside];
+                    if ([selectors containsObject:@"bulkButtonTapped:"] || [selectors containsObject:@"bulk:"]) { isBulk = YES; break; }
+                }
+                if (isBulk) {
+                    bindButton(button,@selector(bulk:)); [button setTitle:NWBulkTitle() forState:UIControlStateNormal];
+                    button.enabled = !NWBulkBusy(); button.frame = CGRectMake(12,57,MAX(0,panel.bounds.size.width-118),40);
+                } else button.frame = CGRectMake(panel.bounds.size.width-96,57,84,40);
+            }
+        }
+    }
+    UIScrollView *scroll = largestScroll(root);
+    if (scroll) {
+        if (!scroll.refreshControl) scroll.refreshControl = [UIRefreshControl new];
+        UIRefreshControl *control = scroll.refreshControl;
+        [control removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
+        [control addTarget:actions action:@selector(refresh:) forControlEvents:UIControlEventValueChanged];
+        if (!NWScanBusy()) [control endRefreshing];
+        if (panel && !panel.hidden) {
+            NSNumber *base = objc_getAssociatedObject(scroll,&baseInsetKey);
+            if (!base) { base = @(scroll.contentInset.bottom); objc_setAssociatedObject(scroll,&baseInsetKey,base,OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
+            CGRect scrollFrame = [scroll convertRect:scroll.bounds toView:root];
+            CGRect panelFrame = [panel convertRect:panel.bounds toView:root];
+            CGFloat systemInset = scroll.adjustedContentInset.bottom - scroll.contentInset.bottom;
+            CGFloat bottom = MAX(base.doubleValue, CGRectGetMaxY(scrollFrame)-CGRectGetMinY(panelFrame)-systemInset+16);
+            objc_setAssociatedObject(scroll,&wifiInsetKey,@(bottom),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            UIEdgeInsets inset = scroll.contentInset; inset.bottom = bottom;
+            if (!UIEdgeInsetsEqualToEdgeInsets(inset,scroll.contentInset)) scroll.contentInset = inset;
+            UIEdgeInsets indicator = scroll.verticalScrollIndicatorInsets; indicator.bottom = bottom;
             scroll.verticalScrollIndicatorInsets = indicator;
-        UIRefreshControl *refresh = scroll.refreshControl;
-        if (refresh) {
-            [refresh removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
-            [refresh addTarget:linkTarget action:@selector(refreshWiFi:)
-                forControlEvents:UIControlEventValueChanged];
-            if (!busy) [refresh endRefreshing];
         }
     }
-    for (UIView *child in panel.subviews) {
-        if ([child isKindOfClass:UILabel.class]) {
-            objc_setAssociatedObject(child, &statusLabelKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            ((UILabel *)child).text = NWScanSummary();
-            break;
+    layingOut = NO;
+}
+static void installUI(UIViewController *controller) {
+    UITabBarController *tab = controller.tabBarController;
+    if (!tab && [controller isKindOfClass:UITabBarController.class]) tab = (UITabBarController *)controller;
+    if (!tab || tab.viewControllers.count < 3 || installingUI) return;
+    activeTab = tab; installingUI = YES;
+    UIViewController *oldInfo = tab.viewControllers[2];
+    BOOL installed = [oldInfo isKindOfClass:UINavigationController.class] && [((UINavigationController *)oldInfo).viewControllers.firstObject isKindOfClass:NWInfoController.class];
+    if (!installed) {
+        UINavigationController *info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
+        info.tabBarItem = oldInfo.tabBarItem; info.tabBarItem.title = NWText(@"info.title");
+        NSMutableArray *tabs = [tab.viewControllers mutableCopy]; tabs[2] = info;
+        NSUInteger selection = tab.selectedIndex;
+        [tab setViewControllers:tabs animated:NO]; tab.selectedIndex = selection;
+    }
+    if (tab.selectedIndex == 0) {
+        UIView *root = tab.selectedViewController.view;
+        if (![root viewWithTag:refreshTag]) {
+            UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem]; button.tag = refreshTag;
+            button.configuration = UIButtonConfiguration.tintedButtonConfiguration; button.translatesAutoresizingMaskIntoConstraints = NO;
+            bindButton(button,@selector(refresh:)); [root addSubview:button];
+            [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
         }
     }
+    installingUI = NO; updateWiFi();
 }
-
-static void patchedDidLayout(UIViewController *controller, SEL selector) {
-    originalDidLayout(controller, selector);
-    if (activeTab && (controller == activeTab || controller == activeTab.selectedViewController))
-        layoutAdditions(activeTab);
+static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
+    originalViewDidAppear(controller,sel,animated);
+    dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
-
-static void patchedContentSize(UIScrollView *scroll, SEL sel, CGSize size) {
-    if (objc_getAssociatedObject(scroll, &infoScrollKey)) {
-        UIView *overlay = [scroll viewWithTag:kInfoOverlayTag];
-        if (overlay) size.height = MAX(size.height, CGRectGetMaxY(overlay.frame) + 24);
-    }
-    originalContentSize(scroll, sel, size);
+static void layout(UIViewController *controller, SEL sel) {
+    originalDidLayout(controller,sel);
+    if (controller == activeTab || controller == activeTab.selectedViewController) updateWiFi();
 }
-
-static void patchedContentInset(UIScrollView *scroll, SEL sel, UIEdgeInsets inset) {
-    NSNumber *minimum = objc_getAssociatedObject(scroll, &wifiInsetKey);
-    if (minimum) inset.bottom = MAX(inset.bottom, minimum.doubleValue);
-    originalContentInset(scroll, sel, inset);
+static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
+    NSNumber *minimum = objc_getAssociatedObject(scroll,&wifiInsetKey);
+    if (minimum) value.bottom = MAX(value.bottom, minimum.doubleValue);
+    originalContentInset(scroll,sel,value);
 }
-
-static void patchedScrollEnabled(UIScrollView *scroll, SEL sel, BOOL enabled) {
-    originalScrollEnabled(scroll, sel,
-        objc_getAssociatedObject(scroll, &infoScrollKey) ? YES : enabled);
+static void labelText(UILabel *label, SEL sel, NSString *value) {
+    if (objc_getAssociatedObject(label,&statusLabelKey)) value = NWScanSummary();
+    originalLabelText(label,sel,value);
 }
-
-static BOOL patchedCancelTouches(UIScrollView *scroll, SEL sel, UIView *view) {
-    if (objc_getAssociatedObject(scroll, &infoScrollKey)) return YES;
-    return originalCancelTouches(scroll, sel, view);
-}
-
-static void patchedLabelText(UILabel *label, SEL sel, NSString *text) {
-    if (!objc_getAssociatedObject(label, &statusLabelKey)) {
-        originalLabelText(label, sel, text);
-        return;
-    }
-    NSString *value = NWScanSummary();
-    if (![label.text isEqualToString:value]) originalLabelText(label, sel, value);
-}
-
-__attribute__((constructor)) static void installInfoExtension(void) {
-    Method method = class_getInstanceMethod([UIViewController class], @selector(viewDidAppear:));
-    if (method) originalViewDidAppear = (void *)method_setImplementation(
-        method, (IMP)patchedViewDidAppear);
-    method = class_getInstanceMethod(UIViewController.class, @selector(viewDidLayoutSubviews));
-    originalDidLayout = (void *)method_setImplementation(method, (IMP)patchedDidLayout);
-    method = class_getInstanceMethod(UIScrollView.class, @selector(setContentSize:));
-    originalContentSize = (void *)method_setImplementation(method, (IMP)patchedContentSize);
-    method = class_getInstanceMethod(UIScrollView.class, @selector(setContentInset:));
-    originalContentInset = (void *)method_setImplementation(method, (IMP)patchedContentInset);
-    method = class_getInstanceMethod(UIScrollView.class, @selector(setScrollEnabled:));
-    originalScrollEnabled = (void *)method_setImplementation(method, (IMP)patchedScrollEnabled);
-    method = class_getInstanceMethod(UIScrollView.class, @selector(touchesShouldCancelInContentView:));
-    originalCancelTouches = (void *)method_setImplementation(method, (IMP)patchedCancelTouches);
-    method = class_getInstanceMethod(UILabel.class, @selector(setText:));
-    originalLabelText = (void *)method_setImplementation(method, (IMP)patchedLabelText);
+__attribute__((constructor)) static void installExtension(void) {
     NWInstallScanHooks();
+    // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
-        [NSTimer scheduledTimerWithTimeInterval:0.5 repeats:YES block:^(NSTimer *timer) {
-            (void)timer;
-            if (UIApplication.sharedApplication.applicationState == UIApplicationStateActive)
-                layoutAdditions(activeTab);
-        }];
+        actions = [NWActions new];
+        [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(changed:) name:NWStateChanged object:nil];
+        Method method = class_getInstanceMethod(UIViewController.class,@selector(viewDidAppear:));
+        originalViewDidAppear = (void *)method_setImplementation(method,(IMP)appeared);
+        method = class_getInstanceMethod(UIViewController.class,@selector(viewDidLayoutSubviews));
+        originalDidLayout = (void *)method_setImplementation(method,(IMP)layout);
+        method = class_getInstanceMethod(UIScrollView.class,@selector(setContentInset:));
+        originalContentInset = (void *)method_setImplementation(method,(IMP)inset);
+        method = class_getInstanceMethod(UILabel.class,@selector(setText:));
+        originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
+        NWInstallPacketIntervalHook();
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:UIWindowScene.class]) continue;
+            for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
+        }
     });
 }

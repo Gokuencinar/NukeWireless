@@ -1,5 +1,9 @@
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+FOUNDATION_EXPORT NSNotificationName const NWStateChanged;
 void NWInstallScanHooks(void);
-BOOL NWRefreshScan(void);
 BOOL NWScanBusy(void);
+BOOL NWBulkBusy(void);
 NSString *NWScanSummary(void);
+NSString *NWBulkTitle(void);
+BOOL NWRefreshScan(void);
+void NWConfirmBulk(UIViewController *presenter);
