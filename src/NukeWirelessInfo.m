@@ -425,13 +425,6 @@ static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
 __attribute__((constructor)) static void installExtension(void) {
     syslog(LOG_NOTICE, "Nuke Wireless: extension dev5 loaded");
     syslog(LOG_NOTICE, "Nuke Wireless diagnostic: scan hooks disabled");
-    dispatch_async(dispatch_get_main_queue(), ^{
-        syslog(LOG_NOTICE, "Nuke Wireless diagnostic: minimal main entered");
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            syslog(LOG_NOTICE, "Nuke Wireless diagnostic: minimal main alive");
-        });
-    });
-    return;
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];
