@@ -153,6 +153,7 @@ static void scanProgress(id adapter, SEL sel, float pinged, NSInteger total) {
 
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     id adapter = scanner.delegate;
+    NSLog(@"Nuke Wireless diagnostic: native start entered delegate=%@", NSStringFromClass([adapter class]));
     if (scanner.enableHotspot || ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
         oldStart(scanner, sel); return;
     }
@@ -171,6 +172,7 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
         NSLog(@"Nuke Wireless: native scan start failed (%@)", exception.name);
         onMain(^{ if (adapter == wifiAdapter) finish(state.generation, NO, 1); });
     }
+    NSLog(@"Nuke Wireless diagnostic: native start returned");
 }
 BOOL NWScanBusy(void) { return NWStateBusy(&state); }
 void NWReconcileDeviceStates(void) {
