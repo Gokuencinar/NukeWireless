@@ -436,12 +436,9 @@ __attribute__((constructor)) static void installExtension(void) {
             (void)timer;
             NWLogBulkDiagnostics();
             UIButton *button = (UIButton *)[activeTab.view viewWithTag:90122];
-            CGPoint center = button ? [button convertPoint:CGPointMake(CGRectGetMidX(button.bounds), CGRectGetMidY(button.bounds)) toView:button.window] : CGPointZero;
-            UIView *hit = button.window ? [button.window hitTest:center withEvent:nil] : nil;
-            NSLog(@"Nuke Wireless diagnostic: bulk button=%d class=%s hidden=%d enabled=%d bound=%d title=%@ hit=%s hitTag=%ld", button != nil,
+            NSLog(@"Nuke Wireless diagnostic: bulk button=%d class=%s hidden=%d enabled=%d bound=%d title=%@", button != nil,
                   button ? object_getClassName(button) : "nil", button.hidden, button.enabled,
-                  [button.allTargets containsObject:actions], button.currentTitle,
-                  hit ? object_getClassName(hit) : "nil", (long)hit.tag);
+                  [button.allTargets containsObject:actions], button.currentTitle);
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
