@@ -8,9 +8,15 @@
 #import <arpa/inet.h>
 #import <signal.h>
 #import <errno.h>
+#include <syslog.h>
 #import <QuartzCore/QuartzCore.h>
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
+#ifdef NW_DIAGNOSTIC_SCAN
+#define NW_TRACE(...) syslog(LOG_NOTICE, __VA_ARGS__)
+#else
+#define NW_TRACE(...) ((void)0)
+#endif
 @interface NWLegacyScanner : NSObject
 - (instancetype)initWithDelegate:(id)delegate andEnableHotspot:(BOOL)hotspot;
 @property (nonatomic, weak) id delegate;
@@ -60,8 +66,11 @@ static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
     freeifaddrs(first);
 }
 static NSString *networkIdentity(void) {
+    NW_TRACE("Nuke Wireless scan: network identity begin");
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
-    return [NSString stringWithFormat:@"%u/%u/%u/%@", local, mask, gateway, NWNetworkIdentity()];
+    NSString *identity = [NSString stringWithFormat:@"%u/%u/%u/%@", local, mask, gateway, NWNetworkIdentity()];
+    NW_TRACE("Nuke Wireless scan: network identity end");
+    return identity;
 }
 static BOOL isBlocked(NSString *ip) {
     Class cls = commands(); SEL sel = NSSelectorFromString(@"runningBlocksForIpWithIp:");
@@ -173,12 +182,14 @@ static void armWatchdog(uint64_t generation) {
 @end
 
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
+    NW_TRACE("Nuke Wireless scan: start hook entered");
     id adapter = scanner.delegate;
     if (scanner.enableHotspot || [adapter isKindOfClass:NWScanSession.class] ||
         ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
         oldStart(scanner, sel); return;
     }
     onMain(^{
+        NW_TRACE("Nuke Wireless scan: main startup begin");
         NWScanSession *previous = currentSession; currentSession = nil; retire(previous);
         BOOL pending = state.phase == NWStarting && adapter == wifiAdapter;
         wifiAdapter = adapter;
@@ -187,10 +198,12 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
         devices = [NSMutableDictionary new]; scanNetwork = nil;
         NWScanSession *session = [NWScanSession new]; session.generation = state.generation; session.adapter = adapter;
         session.network = networkIdentity();
+        NW_TRACE("Nuke Wireless scan: network captured");
         uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway); session.localAddress = local;
         session.worker = dispatch_queue_create("app.nukewireless.scan-session", DISPATCH_QUEUE_SERIAL);
         session.scanner = [(NWLegacyScanner *)[NSClassFromString(@"MMLANScanner") alloc] initWithDelegate:session andEnableHotspot:NO];
         currentSession = session; armWatchdog(session.generation); notify();
+        NW_TRACE("Nuke Wireless scan: worker scheduled");
         if (!session.scanner) { finish(session.generation, NO, 1); return; }
         dispatch_async(session.worker, ^{
             @try { oldStart(session.scanner, @selector(start)); }
@@ -313,5 +326,6 @@ void NWConfirmBulk(UIViewController *presenter) {
 void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
+    NW_TRACE("Nuke Wireless scan: hook class=%p method=%p", cls, method);
     if (method && !oldStart) oldStart = (void *)method_setImplementation(method, (IMP)scannerStarted);
 }
