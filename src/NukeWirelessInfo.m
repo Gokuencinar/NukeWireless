@@ -481,6 +481,18 @@ __attribute__((constructor)) static void installExtension(void) {
         originalLabelText = (void *)method_setImplementation(method,(IMP)labelText);
         NWInstallPacketIntervalHook();
         diagnostic("main hooks installed");
+#ifdef NW_DIAGNOSTIC
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSDictionary *network = networkDetails();
+            syslog(LOG_NOTICE, "NukeWireless network fields present: ssid=%d bssid=%d ipv4=%d gateway=%d mask=%d dns=%d",
+                   ![network[@"SSID"] isEqual:NWText(@"unavailable")],
+                   ![network[@"BSSID"] isEqual:NWText(@"unavailable")],
+                   ![network[@"IPv4"] isEqual:NWText(@"unavailable")],
+                   ![network[@"Puerta de enlace"] isEqual:NWText(@"unavailable")],
+                   ![network[@"Máscara"] isEqual:NWText(@"unavailable")],
+                   ![network[@"DNS"] isEqual:NWText(@"unavailable")]);
+        });
+#endif
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
