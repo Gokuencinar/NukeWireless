@@ -424,7 +424,7 @@ static void inset(UIScrollView *scroll, SEL sel, UIEdgeInsets value) {
 }
 __attribute__((constructor)) static void installExtension(void) {
     syslog(LOG_NOTICE, "Nuke Wireless: extension dev5 loaded");
-    syslog(LOG_NOTICE, "Nuke Wireless diagnostic: scan hooks disabled");
+    NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];
@@ -447,8 +447,5 @@ __attribute__((constructor)) static void installExtension(void) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            syslog(LOG_NOTICE, "Nuke Wireless diagnostic: main queue alive without scan hooks");
-        });
     });
 }
