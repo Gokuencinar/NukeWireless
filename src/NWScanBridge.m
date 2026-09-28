@@ -180,13 +180,10 @@ void NWReconcileDeviceStates(void) {
 }
 BOOL NWBulkBusy(void) { return bulkBusy; }
 BOOL NWRefreshScan(void) {
-    NSLog(@"Nuke Wireless diagnostic: refresh main=%d busy=%d bulk=%d adapter=%d", NSThread.isMainThread,
-          NWScanBusy(), bulkBusy, wifiAdapter != nil);
+    NSLog(@"Nuke Wireless diagnostic: refresh function entered");
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
     const uint8_t *base = (const uint8_t *)_dyld_get_image_header(0);
     static const uint8_t prologue[] = {0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
-    NSLog(@"Nuke Wireless diagnostic: image=%s bytes=%02x%02x%02x%02x", _dyld_get_image_name(0),
-          base ? base[0xc5a8] : 0, base ? base[0xc5a9] : 0, base ? base[0xc5aa] : 0, base ? base[0xc5ab] : 0);
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
