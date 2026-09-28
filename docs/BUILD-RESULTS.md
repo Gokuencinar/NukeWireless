@@ -1,5 +1,17 @@
 # Resultado de la compilación privada
 
+## Candidata dev5 (instalada, pendiente de comprobar la interfaz)
+
+- Versión: `1.0.25+rh25.5~dev5`.
+- Corrección concreta: el control con etiqueta `90122` es el propio botón «Bloquear todos» en la biblioteca conservada, no un panel que contenga otro botón. Ahora se enlaza directamente con la acción masiva nueva.
+- Info: avatar de 40 puntos y créditos en una fila; al actualizar los datos de red se recarga solo su sección y se conserva la posición del scroll. Se retiró un hook global de `UILabel` que ya no tenía consumidores.
+- CI privado: https://github.com/Gokuencinar/NukeWireless/actions/runs/36432165683 — correcto; compilación iOS arm64, pruebas C y Foundation.
+- Paquete local: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev5_iphoneos-arm64e.deb`.
+- SHA-256: `609381b36361bd57b9b4783029a4e9ec7ccd50937afa303fab4a09020845e09a`.
+- Siete pruebas de paquete y prueba de ABI: correctas.
+- Instalación SSH: `dpkg -i` con código 0; `dpkg-query` confirma `dev5`. La orden de abrir la app produjo un proceso activo durante 12 segundos. No se pudo capturar la pantalla ni comprobar los botones o el desplazamiento por control remoto, por lo que **no se declaran funcionales**.
+- Sin release ni modificación de `main`; el paquete base `rh25.3` queda disponible en el iPhone para restauración.
+
 ## Candidata dev4 (sin validar en el iPhone)
 
 - Versión: `1.0.25+rh25.5~dev4`.
