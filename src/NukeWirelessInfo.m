@@ -493,14 +493,14 @@ __attribute__((constructor)) static void installExtension(void) {
             for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
         }
 #ifdef NW_DIAGNOSTIC
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
             diagnostic("snapshot timer fired");
             if (!activeTab) return;
             captureDiagnostic(@"wifi");
             NSInteger prior = activeTab.selectedIndex;
             activeTab.selectedIndex = 2;
             installUI(activeTab);
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 700 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
                 captureDiagnostic(@"info");
                 activeTab.selectedIndex = prior;
                 installUI(activeTab);
