@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Estado actual:** `1.0.25+rh25.5~dev8` está instalada en el iPhone (iOS 16.3.1, Dopamine RootHide). Arranca y termina el escaneo inicial. «Bloquear todos» enlaza ahora el botón real dentro del panel heredado y encuentra la puerta de enlace mediante SystemConfiguration cuando la propiedad antigua está vacía. Una prueba diagnóstica tocó el botón, contó 11 equipos aptos y abrió la confirmación; la cerró sin bloquearlos. El bloqueo y desbloqueo reales de toda la red siguen pendientes de prueba en un entorno controlado.
+**Estado actual:** `1.0.25+rh25.5~dev8` está instalada en el iPhone (iOS 16.3.1, Dopamine RootHide). Arranca y termina el escaneo inicial. «Bloquear todos» enlaza el botón real dentro del panel heredado y encuentra la puerta de enlace mediante SystemConfiguration cuando la propiedad antigua está vacía. Una prueba diagnóstica contó 11 equipos aptos y abrió la confirmación. El usuario confirmó en el iPhone que «Bloquear todos» y «Desbloquear todos» funcionan. La observación por SSH no permitió medir por separado el efecto sobre cada equipo de la red; después de la prueba no quedaron procesos `arpoison` activos.
 
 `dev6` resolvió el bloqueo de arranque, pero Actualizar mostraba «The scanner is not ready». RootHide carga `systemhook` como imagen dyld 0; el código buscaba ahí la función Swift del ejecutable. `dev7` fue un parche binario para ese dispositivo. Desde que el repositorio es público, GitHub Actions compiló la solución fuente que busca el ejecutable por nombre; `dev8` contiene esa compilación y la corrección de los controles masivos.
 

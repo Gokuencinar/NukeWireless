@@ -8,7 +8,8 @@
 - Siete pruebas del paquete y comprobación de ABI nativa: correctas.
 - Prueba diagnóstica con la misma lógica: botón presente, enlazado y habilitado; el toque abrió la confirmación para 11 objetivos y un `UIAlertController`. Se cerró sin confirmar, de modo que ningún equipo fue bloqueado en esa prueba.
 - Instalación final por SSH: `dpkg-query` muestra `dev8`; la app cargó la extensión y completó el escaneo inicial con 13 filas. La biblioteca instalada contiene la marca `dev8` y no contiene el código diagnóstico.
-- Pendiente: comprobar en un entorno controlado el efecto real de Bloquear todos y Desbloquear todos sobre equipos de la red. No se creó release ni se modificó `main` o el repositorio público de paquetes.
+- Comprobación de uso: el usuario confirmó en el iPhone que Bloquear todos y Desbloquear todos funcionan. Tras la prueba, SSH no encontró procesos `arpoison` activos. El registro remoto no permitió verificar de forma independiente el efecto en cada equipo. Se retiró el módulo temporal de diagnóstico y se restauró la biblioteca normal de `dev8`.
+- No se creó release ni se modificó `main` o el repositorio público de paquetes.
 
 ## Candidata dev7 (sustituida por dev8)
 
