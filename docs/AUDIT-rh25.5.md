@@ -1,4 +1,4 @@
-# Auditoría de Nuke Wireless — 1.0.25+rh25.5~dev1
+# Auditoría de Nuke Wireless — 1.0.25+rh25.5~dev3
 
 ## Alcance y base
 
@@ -40,7 +40,7 @@ La pantalla nueva no conserva variables, callbacks ni textos de la opción elimi
 
 ## Info, red y branding
 
-- Créditos: Gokuencinar GokuEn, avatar incluido en la base, GitHub y Buy Me a Coffee.
+- Créditos: Gokuencinar GokuEn, avatar descargado del perfil GitHub e incluido en `NukeWirelessResources.bundle`, GitHub y Buy Me a Coffee. Las candidatas anteriores buscaban un avatar que no estaba empaquetado.
 - Red: SSID, BSSID, IPv4, puerta de enlace, máscara y DNS. Tocar un valor disponible únicamente lo copia al portapapeles; no navega a otra pantalla.
 - Consulta de red fuera del hilo principal para Info. Se descartan resultados de una solicitud anterior de esa pantalla.
 - No se añaden CoreLocation, solicitudes de autorización de ubicación ni claves de permiso de ubicación.
@@ -54,17 +54,17 @@ La pantalla nueva no conserva variables, callbacks ni textos de la opción elimi
 1. Pruebas C ejecutadas en Windows y macOS: generaciones, reintentos, callbacks tardíos, doble finalización, límites temporales, 1.000 ciclos, exclusiones de objetivos y valores del intervalo.
 2. Pruebas Foundation en macOS: parser OUI, datos vacíos/incorrectos, sustitución del intervalo y conservación de tareas de restauración y tareas ajenas.
 3. Compilación iOS arm64 con mínimo 16.3 y `-Wall -Wextra -Werror`. El enlace también rechaza avisos; se ha eliminado la opción obsoleta `-undefined dynamic_lookup`.
-4. Seis pruebas de paquete: cambios limitados a los archivos previstos, textos sin cambios de longitud/instrucciones, metadatos/recursos/localizaciones, scripts de firma, procedencia de la biblioteca y rechazo de base desconocida o artefacto alterado.
+4. Siete pruebas de paquete: cambios limitados a los archivos previstos, textos sin cambios de longitud/instrucciones, metadatos/recursos/localizaciones, directorios TAR anteriores a sus archivos, scripts de firma, procedencia de la biblioteca y rechazo de base desconocida o artefacto alterado.
 5. El manifiesto adjunto registra hashes de las fuentes y del resultado. El empaquetador no acepta bibliotecas antiguas con fuentes nuevas. Se retira el prebuilt obsoleto y el workflow anterior que hacía commits automáticos en `main`.
 6. Test de ABI sobre los metadatos Objective-C del paquete: clase concreta del escáner, tipos de callbacks y métodos de bloqueo/desbloqueo individual coinciden con las llamadas implementadas.
-7. Las dos bibliotecas de rutas, auxiliares de red, avatar, licencias y scripts de instalación permanecen idénticos a la base. Los scripts de instalación se inspeccionan como datos; no se ejecutan en el ordenador.
+7. Las dos bibliotecas de rutas, auxiliares de red, licencias y scripts de instalación permanecen idénticos a la base. El avatar es nuevo. Los scripts de instalación se inspeccionan como datos; `postinst` sí se ejecutó al instalar la deb en el iPhone.
 
 El hash definitivo y la ejecución privada de CI se registran en `BUILD-RESULTS.md` junto al paquete preparado.
 
-## Pendiente de validación en dispositivo
+## Comprobación en dispositivo y límites
 
-El iPhone configurado responde, pero las credenciales SSH disponibles no permiten autenticar. No se ha instalado ni ejecutado esta candidata en el dispositivo. Los logs antiguos disponibles no prueban su funcionamiento.
+El iPhone respondió por SSH. La primera candidata `dev1` no podía instalarse: el TAR contenía archivos nuevos sin las entradas de sus directorios. Se corrigió y se añadió una prueba que reproduce ese requisito. En un reemplazo directo de biblioteca durante la depuración, iOS rechazó una firma/cdhash y omitió la extensión; la instalación de la deb mediante `dpkg -i` terminó con `install ok installed`.
 
-Quedan pendientes: descubrimiento real y repetido en iOS 16.3/Dopamine RootHide, eficacia del bloqueo y restauración de conectividad, convivencia de los hooks con SwiftUI en ejecución, lectura efectiva de SSID/BSSID, comportamiento con cambios reales de red, aspecto/scroll con distintos tamaños y Dynamic Type. También la descarga IEEE desde el propio iPhone y la firma/inyección durante la instalación.
+La candidata limpia `dev3` se instaló en iOS 16.3.1 con Dopamine RootHide. El registro del propio proceso confirmó `extension dev3 loaded` y `Wi-Fi refresh ready`, sin error de validación de la biblioteca durante ese arranque. Una compilación diagnóstica anterior, ejecutada en el mismo dispositivo, devolvió valores disponibles para SSID, BSSID, IPv4, puerta de enlace, máscara y DNS; no se registraron sus valores. El avatar quedó presente en el paquete instalado. La sonda temporal fue retirada del iPhone y del proyecto.
 
-Los tests de lógica, compilación y estructura del paquete pasan de forma independiente a esas validaciones. No demuestran ausencia total de regresiones en el binario original. No se solicita al usuario ninguna prueba durante este trabajo.
+**Pendiente de validación interactiva:** pulsar «Actualizar» y comprobar dos escaneos completos, ejecutar y revertir «Bloquear todos», abrir Info para confirmar que el banner desaparece y comprobar su scroll, enlaces y copia al portapapeles. Tampoco se ha verificado la descarga IEEE en el propio iPhone ni el aspecto con otros tamaños o Dynamic Type. Las pruebas de lógica, compilación y estructura no demuestran eficacia real del aislamiento de red.
