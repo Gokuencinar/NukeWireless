@@ -385,6 +385,11 @@ static void installUI(UIViewController *controller) {
     UITabBarController *tab = controller.tabBarController;
     if (!tab && [controller isKindOfClass:UITabBarController.class]) tab = (UITabBarController *)controller;
     if (!tab || installingUI) return;
+#ifdef NW_DIAGNOSTIC
+    syslog(LOG_NOTICE, "NukeWireless tab: %p selected=%lu tabs=%lu window=%p host=%s", tab,
+           (unsigned long)tab.selectedIndex, (unsigned long)tab.viewControllers.count, tab.view.window,
+           NSStringFromClass(tab.selectedViewController.class).UTF8String);
+#endif
     activeTab = tab; installingUI = YES;
     if (tab.selectedIndex == 2 && tab.selectedViewController) {
         UIViewController *host = tab.selectedViewController;
@@ -448,10 +453,10 @@ static void labelText(UILabel *label, SEL sel, NSString *value) {
 }
 #ifdef NW_DIAGNOSTIC
 static void captureDiagnostic(NSString *name) {
-    UIWindow *window = activeTab.view.window;
-    if (!window) { diagnostic("snapshot missing window"); return; }
-    UIGraphicsBeginImageContextWithOptions(window.bounds.size, YES, 0);
-    [window.layer renderInContext:UIGraphicsGetCurrentContext()];
+    UIView *view = activeTab.view.window ?: activeTab.view;
+    if (!view || CGRectIsEmpty(view.bounds)) { diagnostic("snapshot missing view"); return; }
+    UIGraphicsBeginImageContextWithOptions(view.bounds.size, YES, 0);
+    [view.layer renderInContext:UIGraphicsGetCurrentContext()];
     UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     NSString *path = [NSHomeDirectory() stringByAppendingFormat:@"/Library/Caches/NukeWireless-%@.png", name];
@@ -489,7 +494,8 @@ __attribute__((constructor)) static void installExtension(void) {
         }
 #ifdef NW_DIAGNOSTIC
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            if (!activeTab.view.window) return;
+            diagnostic("snapshot timer fired");
+            if (!activeTab) return;
             captureDiagnostic(@"wifi");
             NSInteger prior = activeTab.selectedIndex;
             activeTab.selectedIndex = 2;
