@@ -8,10 +8,7 @@
 #import <arpa/inet.h>
 #import <signal.h>
 #import <errno.h>
-#include <syslog.h>
 #import <QuartzCore/QuartzCore.h>
-
-#define NW_TRACE(...) syslog(LOG_NOTICE, __VA_ARGS__)
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
 @interface NWLegacyScanner : NSObject
@@ -180,13 +177,11 @@ static void armWatchdog(uint64_t generation) {
 
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     id adapter = scanner.delegate;
-    NW_TRACE("Nuke Wireless diagnostic: scanner delegate=%s hotspot=%d", NSStringFromClass([adapter class]).UTF8String, scanner.enableHotspot);
     if (scanner.enableHotspot || [adapter isKindOfClass:NWScanSession.class] ||
         ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
         oldStart(scanner, sel); return;
     }
     onMain(^{
-        NW_TRACE("Nuke Wireless diagnostic: scanner session begin");
         NWScanSession *previous = currentSession; currentSession = nil; retire(previous);
         BOOL pending = state.phase == NWStarting && adapter == wifiAdapter;
         wifiAdapter = adapter;
@@ -217,11 +212,10 @@ void NWReconcileDeviceStates(void) {
 }
 BOOL NWBulkBusy(void) { return bulkBusy; }
 BOOL NWRefreshScan(void) {
-    NW_TRACE("Nuke Wireless diagnostic: refresh main=%d busy=%d bulk=%d adapter=%d", NSThread.isMainThread, NWScanBusy(), bulkBusy, wifiAdapter != nil);
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
     const uint8_t *base = (const uint8_t *)_dyld_get_image_header(0);
     static const uint8_t prologue[] = {0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
-    if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) { NW_TRACE("Nuke Wireless diagnostic: refresh prologue mismatch"); return NO; }
+    if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
     // The pinned Swift refresh clears Published.devices and schedules the anchor's start.
@@ -323,5 +317,4 @@ void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
     if (method && !oldStart) oldStart = (void *)method_setImplementation(method, (IMP)scannerStarted);
-    NW_TRACE("Nuke Wireless diagnostic: hook class=%d method=%d installed=%d", cls != Nil, method != NULL, oldStart != NULL);
 }
