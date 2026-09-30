@@ -13,7 +13,7 @@
 #include <math.h>
 #include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev8";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev9";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -126,7 +126,7 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
 
 static void showMessage(UIViewController *controller, NSString *message) {
     if (controller.presentedViewController) return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Nuke Wireless" message:message preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"NukeWireless" message:message preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
     [controller presentViewController:alert animated:YES completion:nil];
 }
@@ -190,20 +190,6 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 }
 @end
 
-@interface NWLicensesController : UITableViewController
-@property (nonatomic, strong) NSArray *entries;
-@end
-@implementation NWLicensesController
-- (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
-- (void)viewDidLoad {
-    [super viewDidLoad]; self.title = NWText(@"licenses");
-    self.entries = [NSArray arrayWithContentsOfURL:[NSBundle.mainBundle URLForResource:@"Acknowledgements" withExtension:@"plist"]] ?: @[];
-    self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 100;
-}
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; (void)section; return self.entries.count; }
-- (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index { (void)table; NSDictionary *entry = self.entries[index.row]; return textCell(entry[@"title"] ?: @"", entry[@"license"], NO); }
-@end
-
 @interface NWInfoController : UITableViewController
 @property (nonatomic, strong) NSDictionary *values;
 @property (nonatomic) NSUInteger requestID;
@@ -235,7 +221,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     });
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 4 : (section == 2 ? 6 : 1)); }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 3 : (section == 2 ? 6 : 1)); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
@@ -252,10 +238,10 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title"), NWText(@"licenses")];
+        NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev8", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev9", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -268,8 +254,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
             NSURL *url = [NSURL URLWithString:index.row == 0 ? @"https://github.com/Gokuencinar" : @"https://buymeacoffee.com/gokuen"];
             [UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];
         } else {
-            UIViewController *destination = index.row == 2 ? (UIViewController *)[NWAdvancedController new] : [NWLicensesController new];
-            [self.navigationController pushViewController:destination animated:YES];
+            [self.navigationController pushViewController:[NWAdvancedController new] animated:YES];
         }
     } else if (index.section == 2) {
         NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -283,6 +268,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 @end
 
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
+static void (*originalViewWillAppear)(UIViewController *, SEL, BOOL);
 static char baseInsetKey, bulkBoundKey;
 static char infoOverlayKey;
 static __weak UITabBarController *activeTab;
@@ -304,6 +290,31 @@ static void updateWiFi(void);
 - (void)changed:(NSNotification *)notification { (void)notification; updateWiFi(); }
 @end
 static NWActions *actions;
+static UITabBarController *tabForController(UIViewController *controller) {
+    if ([controller isKindOfClass:UITabBarController.class]) return (UITabBarController *)controller;
+    return controller.tabBarController;
+}
+static void prepareInfoTab(UITabBarController *tab) {
+    if (!tab || installingUI || tab.viewControllers.count < 3) return;
+    UIViewController *oldInfo = tab.viewControllers[2];
+    if (objc_getAssociatedObject(oldInfo, &infoOverlayKey)) return;
+    installingUI = YES;
+    UINavigationController *info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
+    info.tabBarItem = oldInfo.tabBarItem;
+    info.tabBarItem.title = NWText(@"info.title");
+    UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
+    [appearance configureWithOpaqueBackground];
+    appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    info.navigationBar.standardAppearance = appearance;
+    info.navigationBar.scrollEdgeAppearance = appearance;
+    objc_setAssociatedObject(info, &infoOverlayKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NSMutableArray *controllers = [tab.viewControllers mutableCopy];
+    controllers[2] = info;
+    // Replace the legacy host before tab transitions; it cannot render its banner.
+    [tab setViewControllers:controllers animated:NO];
+    installingUI = NO;
+    syslog(LOG_NOTICE, "NukeWireless: Info tab ready before appearance");
+}
 static UIScrollView *largestScroll(UIView *view) {
     UIScrollView *best = [view isKindOfClass:UIScrollView.class] ? (UIScrollView *)view : nil;
     for (UIView *child in view.subviews) {
@@ -377,37 +388,10 @@ static void updateWiFi(void) {
     layingOut = NO;
 }
 static void installUI(UIViewController *controller) {
-    UITabBarController *tab = controller.tabBarController;
-    if (!tab && [controller isKindOfClass:UITabBarController.class]) tab = (UITabBarController *)controller;
+    UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
+    prepareInfoTab(tab);
     activeTab = tab; installingUI = YES;
-    if (tab.selectedIndex == 2 && tab.selectedViewController) {
-        UIViewController *host = tab.selectedViewController;
-        UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
-        if (!info) {
-            info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
-            info.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
-            UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
-            [appearance configureWithOpaqueBackground];
-            appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
-            info.navigationBar.standardAppearance = appearance;
-            info.navigationBar.scrollEdgeAppearance = appearance;
-            [host addChildViewController:info];
-            info.view.translatesAutoresizingMaskIntoConstraints = NO;
-            [host.view addSubview:info.view];
-            [NSLayoutConstraint activateConstraints:@[
-                [info.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
-                [info.view.bottomAnchor constraintEqualToAnchor:host.view.bottomAnchor],
-                [info.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
-                [info.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor]
-            ]];
-            [info didMoveToParentViewController:host];
-            objc_setAssociatedObject(host, &infoOverlayKey, info, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            syslog(LOG_NOTICE, "Nuke Wireless: Info ready");
-        }
-        [host.view bringSubviewToFront:info.view];
-        host.tabBarItem.title = NWText(@"info.title");
-    }
     if (tab.selectedIndex == 0) {
         UIView *root = tab.selectedViewController.view;
         if (![root viewWithTag:refreshTag]) {
@@ -425,8 +409,12 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
     dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
+static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
+    originalViewWillAppear(controller, sel, animated);
+    prepareInfoTab(tabForController(controller));
+}
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "Nuke Wireless: extension dev8 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev9 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -434,6 +422,8 @@ __attribute__((constructor)) static void installExtension(void) {
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(changed:) name:NWStateChanged object:nil];
         Method method = class_getInstanceMethod(UIViewController.class,@selector(viewDidAppear:));
         originalViewDidAppear = (void *)method_setImplementation(method,(IMP)appeared);
+        method = class_getInstanceMethod(UIViewController.class,@selector(viewWillAppear:));
+        originalViewWillAppear = (void *)method_setImplementation(method,(IMP)willAppear);
         NWInstallPacketIntervalHook();
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {

@@ -16,14 +16,14 @@ from build_manifest import source_hashes, sha
 from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, tar_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.25+rh25.5~dev8"
+VERSION = "1.0.25+rh25.5~dev9"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
 INFO_LIBRARY = "usr/lib/TweakInject/NukeWirelessInfo.dylib"
 TEXT_EDITS = {
-    b"Thank you for using Harpy!": b"Welcome to Nuke Wireless!",
-    b"Harpy is licensed under the MIT license.": b"Nuke Wireless uses the MIT license.",
+    b"Thank you for using Harpy!": b"Welcome to NukeWireless!",
+    b"Harpy is licensed under the MIT license.": b"NukeWireless uses the MIT license.",
 }
 
 def read_tar(data):
@@ -50,7 +50,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text())
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev8" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev9" not in library:
         raise ValueError("wrong development library version")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
@@ -62,8 +62,8 @@ def build(source, artifact, output):
     if sha(executable) != EXPECTED_APP_SHA256 or executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
         raise ValueError("incompatible native Swift refresh ABI")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleDisplayName="Nuke Wireless", CFBundleName="Nuke Wireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.8")
+    metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.9")
     metadata["CFBundleIcons~ipad"] = metadata["CFBundleIcons"]
     replacement = {
         INFO_LIBRARY: library,
@@ -78,7 +78,7 @@ def build(source, artifact, output):
     entries += [directory(bundle), directory(bundle + "en.lproj/"),
                 directory(bundle + "es.lproj/"),
                 regular(bundle + "Info.plist", plistlib.dumps({
-        "CFBundleIdentifier":"app.nukewireless.resources", "CFBundleName":"Nuke Wireless",
+        "CFBundleIdentifier":"app.nukewireless.resources", "CFBundleName":"NukeWireless",
         "CFBundleDevelopmentRegion":"en", "CFBundleLocalizations":["en","es"], "CFBundlePackageType":"BNDL",
     })), regular(bundle + "oui_vendors.plist", original["usr/share/nukewireless-roothide/oui_vendors.plist"])]
     for path in sorted((ROOT / "resources").rglob("*.strings")):
@@ -89,6 +89,8 @@ def build(source, artifact, output):
             before = b"Version: 1.0.25+rh25.3\n"
             if data.count(before) != 1: raise ValueError("unexpected baseline control")
             data = data.replace(before, f"Version: {VERSION}\n".encode())
+            data = data.replace(b"Name: Nuke Wireless\n", b"Name: NukeWireless\n")
+            data = data.replace(b"Description: Nuke Wireless ", b"Description: NukeWireless ")
             data = data.replace(b"Depends: firmware (>= 16.0)", b"Depends: firmware (>= 16.3)")
             member.size = len(data); control[i] = (member,data)
     for member,data in control + entries:
