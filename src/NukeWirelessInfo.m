@@ -87,7 +87,7 @@ static char splashCoverKey;
 static UIView *brandCover(CGRect frame) {
     UIView *cover = [[UIView alloc] initWithFrame:frame];
     cover.backgroundColor = [UIColor colorWithRed:0.01 green:0.02 blue:0.075 alpha:1];
-    cover.userInteractionEnabled = NO; cover.accessibilityElementsHidden = YES;
+    cover.userInteractionEnabled = NO; cover.accessibilityElementsHidden = YES; cover.tag = 90731;
     cover.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     UIImage *logo = [UIImage imageWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"NukeWirelessIcon.png"]];
     UIImageView *image = [[UIImageView alloc] initWithImage:logo];
@@ -107,6 +107,12 @@ static void prepareSplash(UIViewController *controller) {
     if (!cover) {
         cover = brandCover(controller.view.bounds); [controller.view addSubview:cover];
         objc_setAssociatedObject(controller, &splashCoverKey, cover, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // A SwiftUI host may survive the transition to the tabs. Never leave a
+        // launch decoration covering the interface, even if no tab is observed.
+        __weak UIView *weakCover = cover;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            [weakCover removeFromSuperview];
+        });
     }
     [controller.view bringSubviewToFront:cover];
 }
@@ -647,6 +653,7 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
+    [[tab.view.window viewWithTag:90731] removeFromSuperview];
     prepareInfoTab(tab);
     activeTab = tab; installingUI = YES;
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
