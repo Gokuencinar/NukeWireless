@@ -15,7 +15,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev11";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev12";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -143,6 +143,25 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     cell.selectionStyle = link ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     return cell;
 }
+// Presentation only: these helpers do not attach targets or alter row actions.
+static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkValue) {
+    UIListContentConfiguration *content = [cell.contentConfiguration copy];
+    if (![content isKindOfClass:UIListContentConfiguration.class]) return;
+    UIImageSymbolConfiguration *iconStyle = [UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightMedium];
+    content.image = [UIImage systemImageNamed:symbol withConfiguration:iconStyle];
+    content.imageProperties.tintColor = UIColor.systemBlueColor;
+    content.imageToTextPadding = 14;
+    content.secondaryTextProperties.color = UIColor.secondaryLabelColor;
+    if (networkValue) {
+        content.textProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
+        content.textProperties.color = UIColor.secondaryLabelColor;
+        content.secondaryTextProperties.font = [UIFontMetrics.defaultMetrics scaledFontForFont:
+            [UIFont monospacedSystemFontOfSize:15 weight:UIFontWeightMedium]];
+        content.secondaryTextProperties.color = UIColor.labelColor;
+        content.textToSecondaryTextVerticalPadding = 5;
+    }
+    cell.contentConfiguration = content;
+}
 @interface NWAdvancedController : UITableViewController
 @property (nonatomic, weak) UILabel *intervalLabel;
 @end
@@ -203,6 +222,10 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     [super viewDidLoad]; self.title = NWText(@"info.title");
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
     self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
+    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    self.tableView.tintColor = UIColor.systemBlueColor;
+    self.tableView.sectionHeaderHeight = UITableViewAutomaticDimension;
+    self.tableView.sectionFooterHeight = UITableViewAutomaticDimension;
 }
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated]; NSUInteger request = ++self.requestID;
@@ -233,7 +256,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
-        avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20;
+        avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20; avatar.layer.borderWidth = 1; avatar.layer.borderColor = UIColor.separatorColor.CGColor;
         [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:40],[avatar.heightAnchor constraintEqualToConstant:40]]];
         UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
         UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[avatar,name]]; stack.axis = UILayoutConstraintAxisHorizontal; stack.alignment = UIStackViewAlignmentCenter; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -243,12 +266,20 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     if (index.section == 1) {
         NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title")];
         NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") : nil;
-        UITableViewCell *cell = textCell(labels[index.row], detail, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
+        UITableViewCell *cell = textCell(labels[index.row], detail, YES);
+        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe"];
+        decorateCell(cell, symbols[index.row], NO);
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev11", NO);
+    if (index.section == 3) {
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev12", NO);
+        decorateCell(cell, @"app.badge", NO); return cell;
+    }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
+    NSArray *symbols = @[@"wifi", @"antenna.radiowaves.left.and.right", @"number", @"arrow.triangle.branch", @"square.split.2x2", @"network"];
+    decorateCell(cell, symbols[index.row], YES);
     cell.accessoryType = UITableViewCellAccessoryNone; cell.accessibilityHint = NWText(@"network.copyHint"); return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
@@ -471,7 +502,12 @@ static void installUI(UIViewController *controller) {
         UIView *root = tab.selectedViewController.view;
         if (![root viewWithTag:refreshTag]) {
             UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem]; button.tag = refreshTag;
-            button.configuration = UIButtonConfiguration.tintedButtonConfiguration; button.translatesAutoresizingMaskIntoConstraints = NO;
+            UIButtonConfiguration *appearance = UIButtonConfiguration.tintedButtonConfiguration;
+            appearance.image = [UIImage systemImageNamed:@"arrow.clockwise"];
+            appearance.imagePadding = 6;
+            appearance.cornerStyle = UIButtonConfigurationCornerStyleMedium;
+            appearance.contentInsets = NSDirectionalEdgeInsetsMake(10, 12, 10, 12);
+            button.configuration = appearance; button.translatesAutoresizingMaskIntoConstraints = NO;
             bindButton(button,@selector(refresh:)); [root addSubview:button];
             [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
             syslog(LOG_NOTICE, "Nuke Wireless: Wi-Fi refresh ready");
@@ -490,7 +526,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev11 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev12 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.

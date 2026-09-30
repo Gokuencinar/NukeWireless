@@ -6,7 +6,7 @@
 - Selector persistente Info → Idioma. Actualiza las preferencias de idioma de la app; el usuario confirma cerrar y la vuelve a abrir. El cierre está condicionado a no tener escaneos ni bloqueos activos.
 - Catálogos para la extensión, textos SwiftUI originales y controles UIKit (alertas, botones, títulos y campos). Los datos reales de redes/equipos conservan su contenido. Se protege la carga de recursos frente a una entrada recursiva en la traducción.
 - Siete pruebas del paquete correctas. SHA-256: `117dc4e785e4dc334293f4b5b0e2f5fa0ae43e1eacf7a0e24421dbd0118363ad`.
-- Instalación SSH correcta: `dpkg-query` muestra `1.0.25+rh25.5~dev11`. Se conserva dev10 en el iPhone como respaldo. Pendiente la confirmación del usuario sobre el selector y los menús del binario original; la fixture del simulador no ejecuta ese binario.
+- Instalación SSH correcta: `dpkg-query` muestra `1.0.25+rh25.5~dev11`. Se conserva dev10 en el iPhone como respaldo. El usuario confirmó que el cambio de idioma funciona perfectamente. La fixture del simulador no ejecuta el binario original.
 
 ## Candidata dev10 (30 de septiembre de 2026)
 

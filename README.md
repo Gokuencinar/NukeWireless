@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata:** `1.0.25+rh25.5~dev11`. Añade **Info → Idioma** para elegir español o inglés. La selección se guarda en la app y se aplica al cerrarla desde la confirmación y volver a abrirla. No permite cerrar para cambiar el idioma mientras hay un escaneo o bloqueos activos. Incluye catálogos para la extensión, las vistas SwiftUI originales y los controles UIKit; los nombres reales de redes/equipos y sus direcciones se conservan.
+**Mejora visual en preparación:** `1.0.25+rh25.5~dev12`. Añade iconos a las filas de Info, jerarquía de etiqueta/valor y tipografía monoespaciada en los datos de red, y un icono en Actualizar. Conserva las acciones, los controles del escáner y del bloqueo y el host SwiftUI de Info.
+
+**Última candidata instalada:** `1.0.25+rh25.5~dev11`. Añade **Info → Idioma** para elegir español o inglés. La selección se guarda en la app y se aplica al cerrarla desde la confirmación y volver a abrirla. No permite cerrar para cambiar el idioma mientras hay un escaneo o bloqueos activos. Incluye catálogos para la extensión, las vistas SwiftUI originales y los controles UIKit; los nombres reales de redes/equipos y sus direcciones se conservan.
 
 Las capturas del simulador confirman las pestañas, los textos de WiFi y el contenido de Info en ambos idiomas. La prueba conserva los hosts SwiftUI y verifica traducciones de alertas, botones y campos. El núcleo original se conserva como binario: estas pruebas no equivalen a comprobar visualmente cada ruta de la aplicación en el iPhone. `dev10` es la versión anterior confirmada por el usuario: Info abre y el título «Harpy» ya no aparece.
 
