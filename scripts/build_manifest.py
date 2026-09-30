@@ -18,5 +18,5 @@ if __name__ == '__main__':
         'sources': source_hashes(), 'binary_sha256': sha((out / 'NukeWirelessInfo_ios.dylib').read_bytes()),
         'launch_files': {p.relative_to(out / 'NukeLaunch.storyboardc').as_posix(): sha(p.read_bytes())
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
-        'version': '1.0.25+rh25.5~dev16', 'target': 'arm64-ios16.3',
+        'version': '1.0.25+rh25.5~dev17', 'target': 'arm64-ios16.3',
     }, indent=2) + '\n')

@@ -17,7 +17,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev16";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev17";
 // Semantic colors keep the restrained blue theme legible in both appearances.
 static UIColor *canvasColor(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
@@ -112,7 +112,11 @@ static void startupTrace(NSString *event) {
     if (fd >= 0) { (void)write(fd, data.bytes, data.length); close(fd); }
 }
 static void prepareStartupWindow(UIWindow *window) {
-    if (startupFinished || startupCover || !window.rootViewController || window.windowLevel != UIWindowLevelNormal) return;
+    if (startupFinished || !window.rootViewController || window.windowLevel != UIWindowLevelNormal) return;
+    if (startupCover) {
+        if (startupCover.superview == window) [window bringSubviewToFront:startupCover];
+        return;
+    }
     // The original splash is drawn inside a generic SwiftUI host, rather than
     // a UIViewController named SplashView. Cover the initial window instead.
     startupTrace([NSString stringWithFormat:@"cover window=%@ root=%@ bounds=%@", NSStringFromClass(window.class),
@@ -131,9 +135,10 @@ static void finishStartup(void) {
 static void (*originalWindowShow)(UIWindow *, SEL);
 static void (*originalWindowHidden)(UIWindow *, SEL, BOOL);
 static void windowShow(UIWindow *window, SEL sel) {
-    originalWindowShow(window, sel); prepareStartupWindow(window);
+    prepareStartupWindow(window); originalWindowShow(window, sel); prepareStartupWindow(window);
 }
 static void windowHidden(UIWindow *window, SEL sel, BOOL hidden) {
+    if (!hidden) prepareStartupWindow(window);
     originalWindowHidden(window, sel, hidden);
     if (!hidden) prepareStartupWindow(window);
 }
@@ -425,7 +430,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev16", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev17", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -710,7 +715,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev16 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev17 loaded");
     startupTrace(@"extension loaded: install synchronous window hooks");
     installStartupHooks();
     NWInstallLanguageHooks();
