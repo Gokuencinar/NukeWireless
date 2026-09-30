@@ -7,6 +7,7 @@
 #endif
 
 static NSString *const languageKey = @"NukeWirelessLanguage";
+static _Thread_local BOOL resolvingLocalization;
 NSString *NWLanguageCode(void) {
     NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:languageKey];
     if ([saved isEqualToString:@"en"] || [saved isEqualToString:@"es"]) return saved;
@@ -25,6 +26,8 @@ BOOL NWSetLanguage(NSString *code) {
 static NSDictionary *languageTables(void) {
     static NSDictionary *tables; static dispatch_once_t once;
     dispatch_once(&once, ^{
+        BOOL previous = resolvingLocalization;
+        resolvingLocalization = YES;
         NSMutableDictionary *result = [NSMutableDictionary new];
         for (NSString *code in @[@"en", @"es"]) {
             NSMutableDictionary *files = [NSMutableDictionary new];
@@ -36,6 +39,7 @@ static NSDictionary *languageTables(void) {
             result[code] = files;
         }
         tables = result;
+        resolvingLocalization = previous;
     });
     return tables;
 }
@@ -59,7 +63,6 @@ static NSString *nativeTranslation(NSString *text) {
 }
 NSString *NWNativeText(NSString *text) { return nativeTranslation(text) ?: text; }
 static NSString *(*oldLocalized)(NSBundle *, SEL, NSString *, NSString *, NSString *);
-static _Thread_local BOOL resolvingLocalization;
 static NSString *localized(NSBundle *bundle, SEL sel, NSString *key, NSString *value, NSString *table) {
     if (resolvingLocalization) return oldLocalized(bundle, sel, key, value, table);
     resolvingLocalization = YES;
