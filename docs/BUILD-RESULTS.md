@@ -1,12 +1,20 @@
 # Resultado de la compilación de desarrollo
 
-## Candidata dev9 (30 de septiembre de 2026)
+## Candidata dev10 (30 de septiembre de 2026)
+
+- Compilación y prueba UIKit/SwiftUI correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36736016724). La prueba cambia WiFi → Info → WiFi, conserva la identidad de los tres controladores, verifica el contenido opaco de Info, sus tres filas de enlaces/ajustes y la sustitución del título en UINavigationItem. Resultado: `[0, 0, 0]`.
+- Siete pruebas del paquete superadas; instalado por SSH como `1.0.25+rh25.5~dev10`.
+- SHA-256 del `.deb`: `6274311722abd8b315e8d8de4828c492e257b05f015894c2a6f666ec15d6ff03`.
+- Corrige el cierre de Info conservando el host SwiftUI original. La pantalla nueva se monta de forma síncrona en `viewWillAppear`, cubre el host y oculta sus subviews antiguas. El título de navegación WiFi se normaliza mediante `UINavigationItem.setTitle:` y también se revisan los items existentes.
+- El código de comprobación de interfaz solo se compila en la fixture del simulador; no forma parte de la biblioteca para el iPhone. Pendiente: confirmación visual del usuario en el dispositivo.
+
+## Candidata dev9 (retirada el 30 de septiembre de 2026)
 
 - Compilación iOS arm64 correcta en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36732810306); siete pruebas de estructura, textos, firma y procedencia del paquete superadas.
 - Paquete: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev9_iphoneos-arm64e.deb`; SHA-256: `d1a76a99e2064ff8054a574e483b2d1359304f96174cec331226f4f074b88a84`.
 - Nombre visible, metadatos y mensajes de bienvenida/licencia: NukeWireless. Los identificadores de clases Swift, rutas y ejecutable heredados se conservan porque forman parte de la ABI del binario original.
 - Info sustituye el tercer controlador de pestaña en `viewWillAppear`, antes de dibujar la pantalla antigua; elimina la capa superpuesta que se añadía después de `viewDidAppear`. Se retiran la fila, el controlador y las traducciones de Acknowledgements; el archivo de licencias sigue incluido en el paquete.
-- No instalada en el iPhone durante esta revisión. Pendiente: comprobar la transición visual y la navegación de Info en el dispositivo.
+- Tras instalarla por SSH, el usuario informó del cierre al entrar en Info y del título «Harpy» en WiFi. El crash `HarpyReloaded-2026-09-30-170820.ips` registra `swift_dynamicCastClassUnconditional` dentro de SwiftUI. Se restauró temporalmente dev8 y se convirtió la release dev9 en borrador.
 
 ## Candidata dev8 (instalada en el iPhone)
 
