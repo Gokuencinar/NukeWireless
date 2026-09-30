@@ -145,8 +145,9 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 }
 // Presentation only: these helpers do not attach targets or alter row actions.
 static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkValue) {
-    UIListContentConfiguration *content = [cell.contentConfiguration copy];
-    if (![content isKindOfClass:UIListContentConfiguration.class]) return;
+    id configuration = cell.contentConfiguration;
+    if (![configuration isKindOfClass:UIListContentConfiguration.class]) return;
+    UIListContentConfiguration *content = [configuration copy];
     UIImageSymbolConfiguration *iconStyle = [UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightMedium];
     content.image = [UIImage systemImageNamed:symbol withConfiguration:iconStyle];
     content.imageProperties.tintColor = UIColor.systemBlueColor;
