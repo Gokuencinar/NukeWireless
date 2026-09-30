@@ -1,5 +1,12 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev12 (30 de septiembre de 2026)
+
+- Mejora visual: iconos de Info, etiquetas de red compactas, valores con tipografía monoespaciada y un icono en Actualizar. Mantiene las acciones de las filas y el botón, así como el código de escaneo, bloqueo, preferencias e idioma de dev11.
+- Compilación y comprobación automática de navegación correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36743599853), fuente `1299400`. Se revisaron las capturas de Info y WiFi en español y de Info en inglés. No se ejecutó un ciclo de bloqueo en la red real.
+- Paquete generado con la base y el artefacto comprobados por el empaquetador. SHA-256: `0198e62998a3375790546a8030b29852c6161de988d5a928ff5a426400c533bb`.
+- El intento de conexión SSH agotó el tiempo antes de instalar. Dev11 permanece en el dispositivo; pendiente disponer de acceso SSH para instalar dev12.
+
 ## Candidata dev11 (30 de septiembre de 2026)
 
 - Compilación y pruebas de idioma/navegación correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36741754443), fuente `9a14a7f`. Se revisaron las cuatro capturas de WiFi e Info en español e inglés.

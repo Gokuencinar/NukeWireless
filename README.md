@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Mejora visual en preparación:** `1.0.25+rh25.5~dev12`. Añade iconos a las filas de Info, jerarquía de etiqueta/valor y tipografía monoespaciada en los datos de red, y un icono en Actualizar. Conserva las acciones, los controles del escáner y del bloqueo y el host SwiftUI de Info.
+**Mejora visual disponible:** `1.0.25+rh25.5~dev12`. Añade iconos a las filas de Info, jerarquía de etiqueta/valor y tipografía monoespaciada en los datos de red, y un icono en Actualizar. Conserva las acciones, los controles del escáner y del bloqueo y el host SwiftUI de Info. Compilación y navegación automática correctas en Actions; se revisaron las capturas en español e inglés. El intento de instalación por SSH no llegó a conectar, por lo que dev11 continúa en el iPhone.
 
 **Última candidata instalada:** `1.0.25+rh25.5~dev11`. Añade **Info → Idioma** para elegir español o inglés. La selección se guarda en la app y se aplica al cerrarla desde la confirmación y volver a abrirla. No permite cerrar para cambiar el idioma mientras hay un escaneo o bloqueos activos. Incluye catálogos para la extensión, las vistas SwiftUI originales y los controles UIKit; los nombres reales de redes/equipos y sus direcciones se conservan.
 
