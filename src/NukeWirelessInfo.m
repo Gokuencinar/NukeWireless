@@ -14,8 +14,10 @@
 #include <math.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev15";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev16";
 // Semantic colors keep the restrained blue theme legible in both appearances.
 static UIColor *canvasColor(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
@@ -101,10 +103,20 @@ static UIView *brandCover(CGRect frame) {
     ]];
     return cover;
 }
+static void startupTrace(NSString *event) {
+    static NSUInteger count;
+    if (count++ >= 12) return;
+    NSString *line = [NSString stringWithFormat:@"%.3f %@\n", NSDate.date.timeIntervalSince1970, event];
+    NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
+    int fd = open("/var/mobile/Library/Caches/NukeWireless-startup.log", O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (fd >= 0) { (void)write(fd, data.bytes, data.length); close(fd); }
+}
 static void prepareStartupWindow(UIWindow *window) {
     if (startupFinished || startupCover || !window.rootViewController || window.windowLevel != UIWindowLevelNormal) return;
     // The original splash is drawn inside a generic SwiftUI host, rather than
     // a UIViewController named SplashView. Cover the initial window instead.
+    startupTrace([NSString stringWithFormat:@"cover window=%@ root=%@ bounds=%@", NSStringFromClass(window.class),
+        NSStringFromClass(window.rootViewController.class), NSStringFromCGRect(window.bounds)]);
     UIView *cover = brandCover(window.bounds); [window addSubview:cover];
     startupCover = cover;
     // Decoration must never hold the app on its launch screen.
@@ -113,7 +125,26 @@ static void prepareStartupWindow(UIWindow *window) {
     });
 }
 static void finishStartup(void) {
+    if (!startupFinished) startupTrace(startupCover ? @"tabs ready: remove cover" : @"tabs ready: no cover");
     [startupCover removeFromSuperview]; startupCover = nil; startupFinished = YES;
+}
+static void (*originalWindowShow)(UIWindow *, SEL);
+static void (*originalWindowHidden)(UIWindow *, SEL, BOOL);
+static void windowShow(UIWindow *window, SEL sel) {
+    originalWindowShow(window, sel); prepareStartupWindow(window);
+}
+static void windowHidden(UIWindow *window, SEL sel, BOOL hidden) {
+    originalWindowHidden(window, sel, hidden);
+    if (!hidden) prepareStartupWindow(window);
+}
+static void installStartupHooks(void) {
+    Method show = class_getInstanceMethod(UIWindow.class, @selector(makeKeyAndVisible));
+    originalWindowShow = (void *)method_setImplementation(show, (IMP)windowShow);
+    Method hidden = class_getInstanceMethod(UIWindow.class, @selector(setHidden:));
+    originalWindowHidden = (void *)method_getImplementation(hidden);
+    // Add an override to UIWindow; do not change UIView's inherited method.
+    if (!class_addMethod(UIWindow.class, @selector(setHidden:), (IMP)windowHidden, method_getTypeEncoding(hidden)))
+        originalWindowHidden = (void *)method_setImplementation(hidden, (IMP)windowHidden);
 }
 static void styleWiFiCell(UIView *cell) {
     cell.layer.cornerRadius = 12;
@@ -394,7 +425,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev15", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev16", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -679,7 +710,9 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev15 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev16 loaded");
+    startupTrace(@"extension loaded: install synchronous window hooks");
+    installStartupHooks();
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
