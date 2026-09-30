@@ -50,7 +50,9 @@ static void styleNavigationBar(UINavigationBar *bar) {
     appearance.backgroundColor = canvasColor();
     appearance.shadowColor = [accentColor() colorWithAlphaComponent:0.18];
     appearance.titleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor};
-    appearance.largeTitleTextAttributes = appearance.titleTextAttributes;
+    appearance.largeTitleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor,
+        NSFontAttributeName:[[UIFontMetrics metricsForTextStyle:UIFontTextStyleLargeTitle] scaledFontForFont:
+            [UIFont systemFontOfSize:34 weight:UIFontWeightBold]]};
     bar.standardAppearance = appearance; bar.scrollEdgeAppearance = appearance;
     bar.compactAppearance = appearance; bar.tintColor = accentColor();
 }
