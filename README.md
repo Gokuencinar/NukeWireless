@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata:** `1.0.25+rh25.5~dev10`, instalada por SSH. Compilación, prueba de navegación con SwiftUI en simulador y siete pruebas del paquete correctas. Conserva el controlador de Info que SwiftUI necesita y monta la pantalla nueva antes de su aparición; elimina el acceso a Acknowledgements. Corrige también el título «Harpy» de la navegación WiFi a «NukeWireless». El usuario confirmó en el iPhone que Info ya no cierra la app y que el título «Harpy» ha desaparecido.
+**Última candidata:** `1.0.25+rh25.5~dev11`. Añade **Info → Idioma** para elegir español o inglés. La selección se guarda en la app y se aplica al cerrarla desde la confirmación y volver a abrirla. No permite cerrar para cambiar el idioma mientras hay un escaneo o bloqueos activos. Incluye catálogos para la extensión, las vistas SwiftUI originales y los controles UIKit; los nombres reales de redes/equipos y sus direcciones se conservan.
+
+Las capturas del simulador confirman las pestañas, los textos de WiFi y el contenido de Info en ambos idiomas. La prueba conserva los hosts SwiftUI y verifica traducciones de alertas, botones y campos. El núcleo original se conserva como binario: estas pruebas no equivalen a comprobar visualmente cada ruta de la aplicación en el iPhone. `dev10` es la versión anterior confirmada por el usuario: Info abre y el título «Harpy» ya no aparece.
 
 `dev9` quedó retirada de la release pública: reemplazar el controlador de pestaña provocó una conversión de tipo fallida en SwiftUI al entrar en Info, confirmada en el registro de cierre del dispositivo.
 
@@ -12,13 +14,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 `dev6` resolvió el bloqueo de arranque, pero Actualizar mostraba «The scanner is not ready». RootHide carga `systemhook` como imagen dyld 0; el código buscaba ahí la función Swift del ejecutable. `dev7` fue un parche binario para ese dispositivo. Desde que el repositorio es público, GitHub Actions compiló la solución fuente que busca el ejecutable por nombre; `dev8` contiene esa compilación y la corrección de los controles masivos.
 
-La rama `audit-rh25.5` conserva el trabajo de investigación, sin release ni publicación en el repositorio de paquetes. Los cambios siguientes forman parte de la candidata instalada:
+La rama `audit-rh25.5` conserva el trabajo de desarrollo. Las candidatas se distribuyen como prereleases; no se publican en el repositorio de paquetes. Los cambios siguientes forman parte de la candidata:
 
 - Info usa una tabla con alturas calculadas, sin banner ni superposiciones de altura fija. Incluye créditos, avatar, enlaces, red actual y copia al portapapeles.
 - Actualizar y deslizar ejecutan la renovación nativa de la lista; el puente observa sus callbacks y recupera el estado tras errores.
 - Bloquear todos utiliza los métodos del bloqueo/desbloqueo individual. Excluye el iPhone, la puerta de enlace y direcciones inválidas; contabiliza fallos parciales.
 - Ajustes avanzados mantiene el intervalo entre paquetes y permite actualizar/restaurar la tabla de fabricantes. No incluye el antiguo botón para repetir la introducción.
-- La extensión dispone de textos en español e inglés según el idioma del sistema.
+- Info incluye el selector de español e inglés; inicialmente usa el idioma del sistema y después conserva la elección del usuario.
 
 Consulta [el informe de auditoría](docs/AUDIT-rh25.5.md) para conocer las causas, pruebas y límites de validación.
 

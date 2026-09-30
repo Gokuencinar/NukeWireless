@@ -1,5 +1,13 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev11 (30 de septiembre de 2026)
+
+- Compilación y pruebas de idioma/navegación correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36741754443), fuente `9a14a7f`. Se revisaron las cuatro capturas de WiFi e Info en español e inglés.
+- Selector persistente Info → Idioma. Actualiza las preferencias de idioma de la app; el usuario confirma cerrar y la vuelve a abrir. El cierre está condicionado a no tener escaneos ni bloqueos activos.
+- Catálogos para la extensión, textos SwiftUI originales y controles UIKit (alertas, botones, títulos y campos). Los datos reales de redes/equipos conservan su contenido. Se protege la carga de recursos frente a una entrada recursiva en la traducción.
+- Siete pruebas del paquete correctas. SHA-256: `117dc4e785e4dc334293f4b5b0e2f5fa0ae43e1eacf7a0e24421dbd0118363ad`.
+- Instalación SSH correcta: `dpkg-query` muestra `1.0.25+rh25.5~dev11`. Se conserva dev10 en el iPhone como respaldo. Pendiente la confirmación del usuario sobre el selector y los menús del binario original; la fixture del simulador no ejecuta ese binario.
+
 ## Candidata dev10 (30 de septiembre de 2026)
 
 - Compilación y prueba UIKit/SwiftUI correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36736016724). La prueba cambia WiFi → Info → WiFi, conserva la identidad de los tres controladores, verifica el contenido opaco de Info, sus tres filas de enlaces/ajustes y la sustitución del título en UINavigationItem. Resultado: `[0, 0, 0]`.
