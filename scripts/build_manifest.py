@@ -16,5 +16,5 @@ if __name__ == '__main__':
     out = ROOT / 'build/audit'
     (out / 'build-manifest.json').write_text(json.dumps({
         'sources': source_hashes(), 'binary_sha256': sha((out / 'NukeWirelessInfo_ios.dylib').read_bytes()),
-        'version': '1.0.25+rh25.5~dev12', 'target': 'arm64-ios16.3',
+        'version': '1.0.25+rh25.5~dev13', 'target': 'arm64-ios16.3',
     }, indent=2) + '\n')

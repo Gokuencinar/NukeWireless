@@ -15,7 +15,45 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev12";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev13";
+// Semantic colors keep the restrained blue theme legible in both appearances.
+static UIColor *canvasColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
+            [UIColor colorWithRed:0.025 green:0.045 blue:0.085 alpha:1] :
+            [UIColor colorWithRed:0.94 green:0.96 blue:0.99 alpha:1];
+    }];
+}
+static UIColor *panelColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
+            [UIColor colorWithRed:0.065 green:0.09 blue:0.14 alpha:1] : UIColor.whiteColor;
+    }];
+}
+static UIColor *accentColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
+            [UIColor colorWithRed:0.22 green:0.74 blue:1 alpha:1] : UIColor.systemBlueColor;
+    }];
+}
+static void styleCell(UITableViewCell *cell) {
+    UIBackgroundConfiguration *background = UIBackgroundConfiguration.listGroupedCellConfiguration;
+    background.backgroundColor = panelColor();
+    background.strokeColor = [accentColor() colorWithAlphaComponent:0.16];
+    background.strokeWidth = 0.5;
+    cell.backgroundConfiguration = background;
+    cell.tintColor = accentColor();
+}
+static void styleNavigationBar(UINavigationBar *bar) {
+    UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
+    [appearance configureWithDefaultBackground];
+    appearance.backgroundColor = canvasColor();
+    appearance.shadowColor = [accentColor() colorWithAlphaComponent:0.18];
+    appearance.titleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor};
+    appearance.largeTitleTextAttributes = appearance.titleTextAttributes;
+    bar.standardAppearance = appearance; bar.scrollEdgeAppearance = appearance;
+    bar.compactAppearance = appearance; bar.tintColor = accentColor();
+}
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -140,6 +178,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     content.textProperties.adjustsFontForContentSizeCategory = YES;
     content.secondaryTextProperties.adjustsFontForContentSizeCategory = YES;
     cell.contentConfiguration = content;
+    styleCell(cell);
     cell.selectionStyle = link ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     return cell;
 }
@@ -150,7 +189,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     UIListContentConfiguration *content = [configuration copy];
     UIImageSymbolConfiguration *iconStyle = [UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightMedium];
     content.image = [UIImage systemImageNamed:symbol withConfiguration:iconStyle];
-    content.imageProperties.tintColor = UIColor.systemBlueColor;
+    content.imageProperties.tintColor = accentColor();
     content.imageToTextPadding = 14;
     content.secondaryTextProperties.color = UIColor.secondaryLabelColor;
     if (networkValue) {
@@ -168,7 +207,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
 @end
 @implementation NWAdvancedController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
-- (void)viewDidLoad { [super viewDidLoad]; self.title = NWText(@"advanced.title"); self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 70; }
+- (void)viewDidLoad { [super viewDidLoad]; self.title = NWText(@"advanced.title"); self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 70; self.tableView.backgroundColor = canvasColor(); self.tableView.tintColor = accentColor(); }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 2; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : 2; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return NWText(section == 0 ? @"interval.explanation" : @"vendors.explanation"); }
@@ -181,7 +220,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         return cell;
     }
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    cell.selectionStyle = UITableViewCellSelectionStyleNone; styleCell(cell);
     UILabel *label = [UILabel new]; label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody]; label.numberOfLines = 0; label.adjustsFontForContentSizeCategory = YES;
     label.text = [NSString stringWithFormat:NWText(@"interval.value"), NWCurrentPacketInterval()]; self.intervalLabel = label;
     UISlider *slider = [UISlider new]; slider.minimumValue = 0.2; slider.maximumValue = 5; slider.value = (float)NWCurrentPacketInterval(); slider.accessibilityLabel = NWText(@"interval.title");
@@ -223,8 +262,8 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     [super viewDidLoad]; self.title = NWText(@"info.title");
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
     self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
-    self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
-    self.tableView.tintColor = UIColor.systemBlueColor;
+    self.tableView.backgroundColor = canvasColor();
+    self.tableView.tintColor = accentColor();
     self.tableView.sectionHeaderHeight = UITableViewAutomaticDimension;
     self.tableView.sectionFooterHeight = UITableViewAutomaticDimension;
 }
@@ -255,7 +294,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     (void)table;
     if (index.section == 0) {
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone; styleCell(cell);
         UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
         avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20; avatar.layer.borderWidth = 1; avatar.layer.borderColor = UIColor.separatorColor.CGColor;
         [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:40],[avatar.heightAnchor constraintEqualToConstant:40]]];
@@ -273,7 +312,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev12", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev13", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -337,7 +376,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
 static void (*originalViewWillAppear)(UIViewController *, SEL, BOOL);
 static char baseInsetKey, bulkBoundKey;
-static char infoOverlayKey;
+static char infoOverlayKey, refreshItemKey, themedBarKey, themedTabKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
 static BOOL installingUI, layingOut;
@@ -387,15 +426,11 @@ static void prepareInfoTab(UITabBarController *tab) {
     UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
     if (!info) {
         info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
-        UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
-        [appearance configureWithOpaqueBackground];
-        appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
-        info.navigationBar.standardAppearance = appearance;
-        info.navigationBar.scrollEdgeAppearance = appearance;
+        styleNavigationBar(info.navigationBar);
         // SwiftUI owns the tab hosts and force-casts them during selection.
         // Keep the host identity and attach opaque content before its appearance.
         [host addChildViewController:info];
-        info.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+        info.view.backgroundColor = canvasColor();
         info.view.translatesAutoresizingMaskIntoConstraints = NO;
         [host.view addSubview:info.view];
         [NSLayoutConstraint activateConstraints:@[
@@ -424,18 +459,47 @@ static void bindButton(UIButton *button, SEL action) {
     [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
     [button addTarget:actions action:action forControlEvents:UIControlEventTouchUpInside];
 }
+static UINavigationBar *wifiNavigationBar(UIView *view) {
+    if ([view isKindOfClass:UINavigationBar.class] &&
+        [((UINavigationBar *)view).topItem.title isEqualToString:@"NukeWireless"])
+        return (UINavigationBar *)view;
+    for (UIView *child in view.subviews) {
+        UINavigationBar *bar = wifiNavigationBar(child);
+        if (bar) return bar;
+    }
+    return nil;
+}
+static void updateRefreshItem(UIView *root) {
+    UINavigationBar *bar = wifiNavigationBar(root);
+    UINavigationItem *item = bar.topItem;
+    if (!item) return;
+    // UIKit positions the icon alongside either a large or a collapsed title.
+    UIBarButtonItem *refresh = objc_getAssociatedObject(item, &refreshItemKey);
+    if (!refresh) {
+        refresh = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"arrow.clockwise"]
+            style:UIBarButtonItemStylePlain target:actions action:@selector(refresh:)];
+        objc_setAssociatedObject(item, &refreshItemKey, refresh, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![item.rightBarButtonItems containsObject:refresh]) {
+        NSMutableArray *items = [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray new];
+        [items insertObject:refresh atIndex:0]; item.rightBarButtonItems = items;
+    }
+    refresh.enabled = !NWScanBusy() && !NWBulkBusy();
+    refresh.accessibilityLabel = NWText(NWScanBusy() ? @"scan.scanning" : @"refresh");
+    refresh.tintColor = accentColor();
+    if (!objc_getAssociatedObject(bar, &themedBarKey)) {
+        styleNavigationBar(bar);
+        objc_setAssociatedObject(bar, &themedBarKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    [[root viewWithTag:refreshTag] removeFromSuperview];
+}
 static void updateWiFi(void) {
     UITabBarController *tab = activeTab;
     if (layingOut || !tab.isViewLoaded || tab.selectedIndex != 0) return;
     layingOut = YES;
     UIView *root = tab.selectedViewController.view;
     normalizeNavigationTitles(root);
-    UIButton *refresh = (UIButton *)[root viewWithTag:refreshTag];
-    BOOL refreshEnabled = !NWScanBusy() && !NWBulkBusy();
-    if (refresh.enabled != refreshEnabled) refresh.enabled = refreshEnabled;
-    NSString *refreshTitle = NWText(NWScanBusy() ? @"scan.scanning" : @"refresh");
-    if (![refresh.currentTitle isEqualToString:refreshTitle]) [refresh setTitle:refreshTitle forState:UIControlStateNormal];
-    if (refresh) [root bringSubviewToFront:refresh];
+    updateRefreshItem(root);
     UIView *bulkPanel = [tab.view viewWithTag:90122];
     UIButton *bulkButton = [bulkPanel isKindOfClass:UIButton.class] ? (UIButton *)bulkPanel : nil;
     if (!bulkButton) {
@@ -499,20 +563,14 @@ static void installUI(UIViewController *controller) {
     if (!tab || installingUI) return;
     prepareInfoTab(tab);
     activeTab = tab; installingUI = YES;
-    if (tab.selectedIndex == 0) {
-        UIView *root = tab.selectedViewController.view;
-        if (![root viewWithTag:refreshTag]) {
-            UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem]; button.tag = refreshTag;
-            UIButtonConfiguration *appearance = UIButtonConfiguration.tintedButtonConfiguration;
-            appearance.image = [UIImage systemImageNamed:@"arrow.clockwise"];
-            appearance.imagePadding = 6;
-            appearance.cornerStyle = UIButtonConfigurationCornerStyleMedium;
-            appearance.contentInsets = NSDirectionalEdgeInsetsMake(10, 12, 10, 12);
-            button.configuration = appearance; button.translatesAutoresizingMaskIntoConstraints = NO;
-            bindButton(button,@selector(refresh:)); [root addSubview:button];
-            [NSLayoutConstraint activateConstraints:@[[button.trailingAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.trailingAnchor constant:-12],[button.topAnchor constraintEqualToAnchor:root.safeAreaLayoutGuide.topAnchor constant:8],[button.heightAnchor constraintGreaterThanOrEqualToConstant:44]]];
-            syslog(LOG_NOTICE, "Nuke Wireless: Wi-Fi refresh ready");
-        }
+    if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
+        UITabBarAppearance *appearance = [UITabBarAppearance new];
+        [appearance configureWithDefaultBackground];
+        appearance.backgroundColor = canvasColor();
+        appearance.shadowColor = [accentColor() colorWithAlphaComponent:0.18];
+        tab.tabBar.standardAppearance = appearance; tab.tabBar.scrollEdgeAppearance = appearance;
+        tab.tabBar.tintColor = accentColor();
+        objc_setAssociatedObject(tab.tabBar, &themedTabKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     installingUI = NO;
     updateWiFi();
@@ -527,7 +585,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev12 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev13 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
