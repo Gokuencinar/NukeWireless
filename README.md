@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev14`. Sustituye el fondo de inicio antiguo por un storyboard con el logotipo actual sobre azul oscuro. Decora el host SplashView con el mismo logotipo y limita esa decoración a dos segundos o hasta que aparecen las pestañas. WiFi añade una cuadrícula tenue en el fondo de las listas nativas, bordes cian en sus celdas y acabado del panel inferior; conserva los controles, datos y acciones de dev13. Compilación y navegación automática correctas en Actions; instalación SSH confirmada. El aspecto final de la lista y la transición de carga en el iPhone quedan pendientes de confirmación del usuario.
+**Última candidata instalada:** `1.0.25+rh25.5~dev15`. Conserva el estilo WiFi confirmado de dev14 y añade un aviso visible tras copiar un dato válido de red. La decoración de carga ahora se coloca sobre la ventana inicial, sin depender de un controlador llamado SplashView; se retira al aparecer las pestañas y tiene un límite de cuatro segundos. Compilación y navegación automática correctas e instalación SSH confirmada. Pendiente confirmación física de la transición de inicio.
+
+El usuario confirmó el resto de dev14, pero la pantalla azul de carga continuaba. Apartar su caché de SplashBoard tampoco resolvió el problema.
 
 `dev13` fue confirmada por el usuario como funcional, incluido el ajuste de Actualizar.
 

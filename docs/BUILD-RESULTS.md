@@ -1,5 +1,14 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev15 (30 de septiembre de 2026)
+
+- El usuario confirmó la UI de dev14, pero continuaba viendo la carga azul. El plist y el storyboard nuevos estaban presentes en el paquete instalado. Se apartó la caché SplashBoard de este bundle dentro de su contenedor, conservándola en Caches como respaldo; el usuario confirmó que el problema persistía.
+- Se sustituye la selección del controlador por nombre SplashView por una decoración de la ventana normal inicial. No recibe toques ni modifica las vistas originales; se elimina al aparecer el tab y, como límite, a los cuatro segundos. No vuelve a añadirse durante la sesión.
+- Copiar un dato válido de red muestra ahora showMessage con network.copied, traducido según el idioma; conserva la escritura al portapapeles y el anuncio de accesibilidad.
+- Compilación y navegación automática correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36763637587), fuente `2896163`. La fixture no reproduce la carga del binario original: sigue pendiente la confirmación del iPhone.
+- SHA-256: `bf9edddbfe91a6e576d91a2211151f4641de415178aa6806a237f1c24c76ce51`.
+- Instalación SSH correcta: dpkg 0 y `install ok installed 1.0.25+rh25.5~dev15`; dev14 conservada como respaldo.
+
 ## Candidata dev14 (30 de septiembre de 2026)
 
 - Inicio: storyboard NukeLaunch con fondo azul oscuro y el icono NukeWirelessIcon ya incluido en la base; elimina UILaunchScreen/AccentColor del plist y registra UILaunchStoryboardName. Storyboard compilado con ibtool; archivos registrados por SHA-256 en el manifiesto y comprobados al empaquetar.
