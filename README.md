@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev13`. Actualizar utiliza un icono dentro de la barra de navegación, que coloca el control junto al título grande o compacto y conserva la acción de escaneo. Info y las barras usan fondos adaptativos azul noche/azul claro, acentos cian/azules y bordes sutiles. Conserva los iconos y la jerarquía de datos de dev12. Compilación y navegación automática correctas en Actions; instalación SSH confirmada por el gestor de paquetes. Se conserva dev12 como respaldo. El scroll en el iPhone queda pendiente de confirmación del usuario.
+**Última candidata instalada:** `1.0.25+rh25.5~dev14`. Sustituye el fondo de inicio antiguo por un storyboard con el logotipo actual sobre azul oscuro. Decora el host SplashView con el mismo logotipo y limita esa decoración a dos segundos o hasta que aparecen las pestañas. WiFi añade una cuadrícula tenue en el fondo de las listas nativas, bordes cian en sus celdas y acabado del panel inferior; conserva los controles, datos y acciones de dev13. Compilación y navegación automática correctas en Actions; instalación SSH confirmada. El aspecto final de la lista y la transición de carga en el iPhone quedan pendientes de confirmación del usuario.
+
+`dev13` fue confirmada por el usuario como funcional, incluido el ajuste de Actualizar.
 
 **Cambio de idioma comprobado:** `1.0.25+rh25.5~dev11`. Añade **Info → Idioma** para elegir español o inglés. La selección se guarda en la app y se aplica al cerrarla desde la confirmación y volver a abrirla. No permite cerrar para cambiar el idioma mientras hay un escaneo o bloqueos activos. Incluye catálogos para la extensión, las vistas SwiftUI originales y los controles UIKit; los nombres reales de redes/equipos y sus direcciones se conservan.
 

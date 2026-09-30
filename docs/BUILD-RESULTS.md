@@ -1,12 +1,21 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev14 (30 de septiembre de 2026)
+
+- Inicio: storyboard NukeLaunch con fondo azul oscuro y el icono NukeWirelessIcon ya incluido en la base; elimina UILaunchScreen/AccentColor del plist y registra UILaunchStoryboardName. Storyboard compilado con ibtool; archivos registrados por SHA-256 en el manifiesto y comprobados al empaquetar.
+- Decoración acotada al host SplashView original: no recibe toques, se retira al observar las pestañas y tiene un límite de dos segundos para no cubrir una interfaz alojada en el mismo host.
+- WiFi: backgroundView no interactivo con cuadrícula tenue para UITableView/UICollectionView, borde cian en celdas visibles y panel inferior. Sin cambiar datasource, delegates, tamaños, acciones o código de escaneo/bloqueo/idioma.
+- Compilación, storyboard y navegación automática correctos en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36761149914), fuente `4c7ecd2`. La fixture usa un VStack en WiFi, por lo que no valida el aspecto de la lista original ni la transición de SplashView.
+- SHA-256: `7f39e29964119523d2b8fe45befc2b6b471d7eaf989e21f8c55e3498bc249501`.
+- Instalación SSH completada con dpkg 0 y `install ok installed 1.0.25+rh25.5~dev14`. Dev13 conservada como respaldo. Pendiente revisión visual por el usuario.
+
 ## Candidata dev13 (30 de septiembre de 2026)
 
 - Actualizar pasa del botón superpuesto a un UIBarButtonItem con icono y etiqueta de accesibilidad traducida. UIKit gestiona la posición con el título grande/compacto; se conserva NWActions.refresh y la misma condición de habilitación durante escaneo/bloqueo. No cambia el código del escáner, el bloqueo, el idioma ni la copia de datos.
 - Paleta adaptativa: fondo azul noche en oscuro y azul muy claro en claro; paneles y bordes suaves en Info/ajustes, acentos cian/azules y barras de navegación/pestañas. Se conserva el rojo de la acción destructiva original.
 - Compilación y navegación automática correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36758253973), fuente `0293034`. Captura final revisada: título grande conservado e icono de Actualizar dentro de la barra. La fixture no reproduce el scroll de la lista nativa del iPhone ni todos los modos de apariencia.
 - SHA-256: `a078e05c36ecdff2556ec63623847c314ccc6d949e13f8df2d7d407738483b00`.
-- Instalación SSH completada, código dpkg 0 y estado `install ok installed 1.0.25+rh25.5~dev13`. Se conserva `/var/mobile/NukeWireless-dev12.deb` como respaldo. Pendiente confirmación física del scroll por el usuario.
+- Instalación SSH completada, código dpkg 0 y estado `install ok installed 1.0.25+rh25.5~dev13`. Se conserva `/var/mobile/NukeWireless-dev12.deb` como respaldo. El usuario confirmó que todo funciona bien.
 
 ## Candidata dev12 (30 de septiembre de 2026)
 
