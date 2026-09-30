@@ -13,7 +13,7 @@
 #include <math.h>
 #include <syslog.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev9";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev10";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -241,7 +241,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title")];
         UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev9", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev10", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -290,30 +290,60 @@ static void updateWiFi(void);
 - (void)changed:(NSNotification *)notification { (void)notification; updateWiFi(); }
 @end
 static NWActions *actions;
+static void (*originalNavigationTitle)(UINavigationItem *, SEL, NSString *);
+static NSString *displayAppTitle(NSString *title) {
+    if (!title) return nil;
+    for (NSString *old in @[@"Harpy", @"Harpy Reloaded", @"Harpy-Reloaded", @"HarpyReloaded"])
+        if ([title caseInsensitiveCompare:old] == NSOrderedSame) return @"NukeWireless";
+    return title;
+}
+static void navigationTitle(UINavigationItem *item, SEL sel, NSString *title) {
+    originalNavigationTitle(item, sel, displayAppTitle(title));
+}
+static void normalizeNavigationTitles(UIView *view) {
+    if ([view isKindOfClass:UINavigationBar.class]) {
+        for (UINavigationItem *item in ((UINavigationBar *)view).items) {
+            NSString *title = displayAppTitle(item.title);
+            if (![title isEqualToString:item.title] && title) item.title = title;
+        }
+    }
+    for (UIView *child in view.subviews) normalizeNavigationTitles(child);
+}
 static UITabBarController *tabForController(UIViewController *controller) {
     if ([controller isKindOfClass:UITabBarController.class]) return (UITabBarController *)controller;
     return controller.tabBarController;
 }
 static void prepareInfoTab(UITabBarController *tab) {
-    if (!tab || installingUI || tab.viewControllers.count < 3) return;
-    UIViewController *oldInfo = tab.viewControllers[2];
-    if (objc_getAssociatedObject(oldInfo, &infoOverlayKey)) return;
+    if (!tab || installingUI || tab.selectedIndex != 2 || !tab.selectedViewController) return;
+    UIViewController *host = tab.selectedViewController;
     installingUI = YES;
-    UINavigationController *info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
-    info.tabBarItem = oldInfo.tabBarItem;
-    info.tabBarItem.title = NWText(@"info.title");
-    UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
-    [appearance configureWithOpaqueBackground];
-    appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
-    info.navigationBar.standardAppearance = appearance;
-    info.navigationBar.scrollEdgeAppearance = appearance;
-    objc_setAssociatedObject(info, &infoOverlayKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NSMutableArray *controllers = [tab.viewControllers mutableCopy];
-    controllers[2] = info;
-    // Replace the legacy host before tab transitions; it cannot render its banner.
-    [tab setViewControllers:controllers animated:NO];
+    UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
+    if (!info) {
+        info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
+        UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
+        [appearance configureWithOpaqueBackground];
+        appearance.backgroundColor = UIColor.systemGroupedBackgroundColor;
+        info.navigationBar.standardAppearance = appearance;
+        info.navigationBar.scrollEdgeAppearance = appearance;
+        // SwiftUI owns the tab hosts and force-casts them during selection.
+        // Keep the host identity and attach opaque content before its appearance.
+        [host addChildViewController:info];
+        info.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+        info.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [host.view addSubview:info.view];
+        [NSLayoutConstraint activateConstraints:@[
+            [info.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
+            [info.view.bottomAnchor constraintEqualToAnchor:host.view.bottomAnchor],
+            [info.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
+            [info.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor]
+        ]];
+        [info didMoveToParentViewController:host];
+        objc_setAssociatedObject(host, &infoOverlayKey, info, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UIView *child in host.view.subviews) if (child != info.view) child.hidden = YES;
+    [host.view bringSubviewToFront:info.view];
+    host.tabBarItem.title = NWText(@"info.title");
     installingUI = NO;
-    syslog(LOG_NOTICE, "NukeWireless: Info tab ready before appearance");
 }
 static UIScrollView *largestScroll(UIView *view) {
     UIScrollView *best = [view isKindOfClass:UIScrollView.class] ? (UIScrollView *)view : nil;
@@ -332,6 +362,7 @@ static void updateWiFi(void) {
     if (layingOut || !tab.isViewLoaded || tab.selectedIndex != 0) return;
     layingOut = YES;
     UIView *root = tab.selectedViewController.view;
+    normalizeNavigationTitles(root);
     UIButton *refresh = (UIButton *)[root viewWithTag:refreshTag];
     BOOL refreshEnabled = !NWScanBusy() && !NWBulkBusy();
     if (refresh.enabled != refreshEnabled) refresh.enabled = refreshEnabled;
@@ -410,11 +441,12 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
 static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
+    prepareInfoTab(tabForController(controller));
     originalViewWillAppear(controller, sel, animated);
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev9 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev10 loaded");
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -424,6 +456,8 @@ __attribute__((constructor)) static void installExtension(void) {
         originalViewDidAppear = (void *)method_setImplementation(method,(IMP)appeared);
         method = class_getInstanceMethod(UIViewController.class,@selector(viewWillAppear:));
         originalViewWillAppear = (void *)method_setImplementation(method,(IMP)willAppear);
+        method = class_getInstanceMethod(UINavigationItem.class,@selector(setTitle:));
+        originalNavigationTitle = (void *)method_setImplementation(method,(IMP)navigationTitle);
         NWInstallPacketIntervalHook();
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
@@ -438,3 +472,35 @@ __attribute__((constructor)) static void installExtension(void) {
         }
     });
 }
+
+#ifdef NW_UI_TESTING
+// Only linked into the SwiftUI simulator fixture, never the device package.
+int NWUIRegressionCheck(int phase) {
+    static NSArray<UIViewController *> *hosts;
+    UITabBarController *tab = activeTab;
+    if (!tab || tab.viewControllers.count != 3) return 1;
+    if (phase == 0) {
+        hosts = [tab.viewControllers copy];
+        UINavigationItem *item = [UINavigationItem new];
+        item.title = @"Harpy";
+        if (![item.title isEqualToString:@"NukeWireless"]) return 2;
+        item.title = @"Current network";
+        if (![item.title isEqualToString:@"Current network"]) return 3;
+        return 0;
+    }
+    for (NSUInteger i = 0; i < hosts.count; i++) if (hosts[i] != tab.viewControllers[i]) return 4;
+    if (phase == 1) {
+        if (tab.selectedIndex != 2) return 5;
+        UIViewController *host = tab.selectedViewController;
+        UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
+        if (!info || info.parentViewController != host || !info.view.window) return 6;
+        if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
+        NWInfoController *content = (NWInfoController *)info.topViewController;
+        if ([content tableView:content.tableView numberOfRowsInSection:1] != 3) return 8;
+        for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
+        [host.view layoutIfNeeded];
+        if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;
+    } else if (phase == 2 && tab.selectedIndex != 0) return 11;
+    return 0;
+}
+#endif
