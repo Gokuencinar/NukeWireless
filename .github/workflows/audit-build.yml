@@ -19,6 +19,7 @@ jobs:
           path: |
             build/audit/NukeWirelessInfo_ios.dylib
             build/audit/build-manifest.json
+            build/audit/NukeLaunch.storyboardc/
             build/ui/*-wifi.png
             build/ui/*-info.png
           retention-days: 7

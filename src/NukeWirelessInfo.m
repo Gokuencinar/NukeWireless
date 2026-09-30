@@ -15,7 +15,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev13";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev14";
 // Semantic colors keep the restrained blue theme legible in both appearances.
 static UIColor *canvasColor(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
@@ -55,6 +55,81 @@ static void styleNavigationBar(UINavigationBar *bar) {
             [UIFont systemFontOfSize:34 weight:UIFontWeightBold]]};
     bar.standardAppearance = appearance; bar.scrollEdgeAppearance = appearance;
     bar.compactAppearance = appearance; bar.tintColor = accentColor();
+}
+@interface NWGridBackground : UIView
+@end
+@implementation NWGridBackground
+- (instancetype)initWithFrame:(CGRect)frame {
+    if ((self = [super initWithFrame:frame])) {
+        self.userInteractionEnabled = NO; self.accessibilityElementsHidden = YES;
+        self.opaque = YES; self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    }
+    return self;
+}
+- (void)traitCollectionDidChange:(UITraitCollection *)previous {
+    [super traitCollectionDidChange:previous]; [self setNeedsDisplay];
+}
+- (void)drawRect:(CGRect)rect {
+    [canvasColor() setFill]; UIRectFill(rect);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetStrokeColorWithColor(context, [accentColor() colorWithAlphaComponent:0.055].CGColor);
+    CGContextSetLineWidth(context, 0.5);
+    for (CGFloat x = 0; x < self.bounds.size.width; x += 32) {
+        CGContextMoveToPoint(context, x, 0); CGContextAddLineToPoint(context, x, self.bounds.size.height);
+    }
+    for (CGFloat y = 0; y < self.bounds.size.height; y += 32) {
+        CGContextMoveToPoint(context, 0, y); CGContextAddLineToPoint(context, self.bounds.size.width, y);
+    }
+    CGContextStrokePath(context);
+}
+@end
+static char splashCoverKey;
+static UIView *brandCover(CGRect frame) {
+    UIView *cover = [[UIView alloc] initWithFrame:frame];
+    cover.backgroundColor = [UIColor colorWithRed:0.01 green:0.02 blue:0.075 alpha:1];
+    cover.userInteractionEnabled = NO; cover.accessibilityElementsHidden = YES;
+    cover.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    UIImage *logo = [UIImage imageWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"NukeWirelessIcon.png"]];
+    UIImageView *image = [[UIImageView alloc] initWithImage:logo];
+    image.contentMode = UIViewContentModeScaleAspectFit; image.translatesAutoresizingMaskIntoConstraints = NO;
+    [cover addSubview:image];
+    [NSLayoutConstraint activateConstraints:@[
+        [image.centerXAnchor constraintEqualToAnchor:cover.centerXAnchor],
+        [image.centerYAnchor constraintEqualToAnchor:cover.centerYAnchor],
+        [image.widthAnchor constraintEqualToConstant:220], [image.heightAnchor constraintEqualToConstant:220]
+    ]];
+    return cover;
+}
+static void prepareSplash(UIViewController *controller) {
+    // Only the preserved SplashView host; never covers onboarding or the tabs.
+    if (![NSStringFromClass(controller.class) containsString:@"SplashView"]) return;
+    UIView *cover = objc_getAssociatedObject(controller, &splashCoverKey);
+    if (!cover) {
+        cover = brandCover(controller.view.bounds); [controller.view addSubview:cover];
+        objc_setAssociatedObject(controller, &splashCoverKey, cover, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    [controller.view bringSubviewToFront:cover];
+}
+static void styleWiFiCell(UIView *cell) {
+    cell.layer.cornerRadius = 12;
+    cell.layer.borderWidth = 0.6;
+    cell.layer.borderColor = [accentColor() colorWithAlphaComponent:0.24].CGColor;
+    cell.tintColor = accentColor();
+}
+static void styleWiFiLists(UIView *view) {
+    if ([view isKindOfClass:UITableView.class]) {
+        UITableView *table = (UITableView *)view;
+        if (![table.backgroundView isKindOfClass:NWGridBackground.class]) table.backgroundView = [[NWGridBackground alloc] initWithFrame:table.bounds];
+        table.backgroundColor = canvasColor(); table.tintColor = accentColor();
+        table.separatorColor = [accentColor() colorWithAlphaComponent:0.15];
+        for (UITableViewCell *cell in table.visibleCells) styleWiFiCell(cell);
+    } else if ([view isKindOfClass:UICollectionView.class]) {
+        UICollectionView *list = (UICollectionView *)view;
+        if (![list.backgroundView isKindOfClass:NWGridBackground.class]) list.backgroundView = [[NWGridBackground alloc] initWithFrame:list.bounds];
+        list.backgroundColor = canvasColor(); list.tintColor = accentColor();
+        for (UICollectionViewCell *cell in list.visibleCells) styleWiFiCell(cell);
+    }
+    for (UIView *child in view.subviews) styleWiFiLists(child);
 }
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
@@ -314,7 +389,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev13", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev14", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -502,6 +577,7 @@ static void updateWiFi(void) {
     UIView *root = tab.selectedViewController.view;
     normalizeNavigationTitles(root);
     updateRefreshItem(root);
+    styleWiFiLists(root);
     UIView *bulkPanel = [tab.view viewWithTag:90122];
     UIButton *bulkButton = [bulkPanel isKindOfClass:UIButton.class] ? (UIButton *)bulkPanel : nil;
     if (!bulkButton) {
@@ -512,12 +588,20 @@ static void updateWiFi(void) {
         }
     }
     if (bulkButton && !bulkPanel.hidden && !bulkButton.hidden) {
+        if (bulkPanel != bulkButton) {
+            bulkPanel.backgroundColor = panelColor(); bulkPanel.layer.cornerRadius = 18;
+            bulkPanel.layer.borderWidth = 0.7;
+            bulkPanel.layer.borderColor = [accentColor() colorWithAlphaComponent:0.3].CGColor;
+        }
+        bulkButton.layer.cornerRadius = 12;
         for (UIView *child in bulkPanel.subviews) {
             if ([child isKindOfClass:UILabel.class]) {
                 NSString *summary = [NSString stringWithFormat:@"%@\n%@", NWScanSummary(), NWText(@"scan.pullHint")];
                 if (![((UILabel *)child).text isEqualToString:summary]) ((UILabel *)child).text = summary;
             } else if ([child isKindOfClass:UIButton.class] && child != bulkButton) {
                 UIButton *names = (UIButton *)child;
+                names.layer.cornerRadius = 12; names.layer.borderWidth = 0.7;
+                names.layer.borderColor = [accentColor() colorWithAlphaComponent:0.35].CGColor;
                 if (![names.currentTitle isEqualToString:NWText(@"device.names")]) [names setTitle:NWText(@"device.names") forState:UIControlStateNormal];
             }
         }
@@ -584,10 +668,11 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
 static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
     originalViewWillAppear(controller, sel, animated);
+    prepareSplash(controller);
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev13 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev14 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.

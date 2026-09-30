@@ -17,7 +17,7 @@ from language_catalog import native_strings
 from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, tar_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.25+rh25.5~dev13"
+VERSION = "1.0.25+rh25.5~dev14"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
@@ -51,7 +51,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text())
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev13" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev14" not in library:
         raise ValueError("wrong development library version")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
@@ -64,8 +64,10 @@ def build(source, artifact, output):
         raise ValueError("incompatible native Swift refresh ABI")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.13",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.14",
                     CFBundleDevelopmentRegion="en", CFBundleLocalizations=["en", "es"])
+    metadata.pop("UILaunchScreen", None)
+    metadata["UILaunchStoryboardName"] = "NukeLaunch"
     metadata["CFBundleIcons~ipad"] = metadata["CFBundleIcons"]
     replacement = {
         INFO_LIBRARY: library,
@@ -76,6 +78,14 @@ def build(source, artifact, output):
         name = member.name.lstrip("./")
         if name in replacement:
             data = replacement[name]; member.size = len(data); entries[i] = (member,data)
+    launch = artifact / "NukeLaunch.storyboardc"
+    launch_files = {p.relative_to(launch).as_posix(): sha(p.read_bytes()) for p in sorted(launch.rglob("*")) if p.is_file()}
+    if not launch_files or launch_files != manifest.get("launch_files"):
+        raise ValueError("missing or mismatched launch storyboard")
+    entries.append(directory(APP + "NukeLaunch.storyboardc/"))
+    for path in sorted(launch.rglob("*")):
+        name = APP + "NukeLaunch.storyboardc/" + path.relative_to(launch).as_posix()
+        entries.append(directory(name + "/") if path.is_dir() else regular(name, path.read_bytes()))
     bundle = APP + "NukeWirelessResources.bundle/"
     entries += [directory(bundle), directory(bundle + "en.lproj/"),
                 directory(bundle + "es.lproj/"),
