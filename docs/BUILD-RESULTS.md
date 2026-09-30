@@ -1,5 +1,13 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev13 (30 de septiembre de 2026)
+
+- Actualizar pasa del botón superpuesto a un UIBarButtonItem con icono y etiqueta de accesibilidad traducida. UIKit gestiona la posición con el título grande/compacto; se conserva NWActions.refresh y la misma condición de habilitación durante escaneo/bloqueo. No cambia el código del escáner, el bloqueo, el idioma ni la copia de datos.
+- Paleta adaptativa: fondo azul noche en oscuro y azul muy claro en claro; paneles y bordes suaves en Info/ajustes, acentos cian/azules y barras de navegación/pestañas. Se conserva el rojo de la acción destructiva original.
+- Compilación y navegación automática correctas en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36758253973), fuente `0293034`. Captura final revisada: título grande conservado e icono de Actualizar dentro de la barra. La fixture no reproduce el scroll de la lista nativa del iPhone ni todos los modos de apariencia.
+- SHA-256: `a078e05c36ecdff2556ec63623847c314ccc6d949e13f8df2d7d407738483b00`.
+- Instalación SSH completada, código dpkg 0 y estado `install ok installed 1.0.25+rh25.5~dev13`. Se conserva `/var/mobile/NukeWireless-dev12.deb` como respaldo. Pendiente confirmación física del scroll por el usuario.
+
 ## Candidata dev12 (30 de septiembre de 2026)
 
 - Mejora visual: iconos de Info, etiquetas de red compactas, valores con tipografía monoespaciada y un icono en Actualizar. Mantiene las acciones de las filas y el botón, así como el código de escaneo, bloqueo, preferencias e idioma de dev11.
