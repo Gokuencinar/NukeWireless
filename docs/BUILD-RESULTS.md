@@ -1,5 +1,13 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev9 (30 de septiembre de 2026)
+
+- Compilación iOS arm64 correcta en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36732810306); siete pruebas de estructura, textos, firma y procedencia del paquete superadas.
+- Paquete: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev9_iphoneos-arm64e.deb`; SHA-256: `d1a76a99e2064ff8054a574e483b2d1359304f96174cec331226f4f074b88a84`.
+- Nombre visible, metadatos y mensajes de bienvenida/licencia: NukeWireless. Los identificadores de clases Swift, rutas y ejecutable heredados se conservan porque forman parte de la ABI del binario original.
+- Info sustituye el tercer controlador de pestaña en `viewWillAppear`, antes de dibujar la pantalla antigua; elimina la capa superpuesta que se añadía después de `viewDidAppear`. Se retiran la fila, el controlador y las traducciones de Acknowledgements; el archivo de licencias sigue incluido en el paquete.
+- No instalada en el iPhone durante esta revisión. Pendiente: comprobar la transición visual y la navegación de Info en el dispositivo.
+
 ## Candidata dev8 (instalada en el iPhone)
 
 - Versión: `1.0.25+rh25.5~dev8`; compilación iOS arm64 desde fuente en [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/36467454122), correcta.
