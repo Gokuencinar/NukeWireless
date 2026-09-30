@@ -15,7 +15,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev14";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev15";
 // Semantic colors keep the restrained blue theme legible in both appearances.
 static UIColor *canvasColor(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
@@ -83,7 +83,8 @@ static void styleNavigationBar(UINavigationBar *bar) {
     CGContextStrokePath(context);
 }
 @end
-static char splashCoverKey;
+static BOOL startupFinished;
+static __weak UIView *startupCover;
 static UIView *brandCover(CGRect frame) {
     UIView *cover = [[UIView alloc] initWithFrame:frame];
     cover.backgroundColor = [UIColor colorWithRed:0.01 green:0.02 blue:0.075 alpha:1];
@@ -100,21 +101,19 @@ static UIView *brandCover(CGRect frame) {
     ]];
     return cover;
 }
-static void prepareSplash(UIViewController *controller) {
-    // Only the preserved SplashView host; never covers onboarding or the tabs.
-    if (![NSStringFromClass(controller.class) containsString:@"SplashView"]) return;
-    UIView *cover = objc_getAssociatedObject(controller, &splashCoverKey);
-    if (!cover) {
-        cover = brandCover(controller.view.bounds); [controller.view addSubview:cover];
-        objc_setAssociatedObject(controller, &splashCoverKey, cover, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // A SwiftUI host may survive the transition to the tabs. Never leave a
-        // launch decoration covering the interface, even if no tab is observed.
-        __weak UIView *weakCover = cover;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            [weakCover removeFromSuperview];
-        });
-    }
-    [controller.view bringSubviewToFront:cover];
+static void prepareStartupWindow(UIWindow *window) {
+    if (startupFinished || startupCover || !window.rootViewController || window.windowLevel != UIWindowLevelNormal) return;
+    // The original splash is drawn inside a generic SwiftUI host, rather than
+    // a UIViewController named SplashView. Cover the initial window instead.
+    UIView *cover = brandCover(window.bounds); [window addSubview:cover];
+    startupCover = cover;
+    // Decoration must never hold the app on its launch screen.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        [startupCover removeFromSuperview]; startupCover = nil; startupFinished = YES;
+    });
+}
+static void finishStartup(void) {
+    [startupCover removeFromSuperview]; startupCover = nil; startupFinished = YES;
 }
 static void styleWiFiCell(UIView *cell) {
     cell.layer.cornerRadius = 12;
@@ -395,7 +394,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev14", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev15", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -422,6 +421,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         if (value.length && ![value isEqualToString:NWText(@"unavailable")]) {
             UIPasteboard.generalPasteboard.string = value;
             UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"network.copied"));
+            showMessage(self, NWText(@"network.copied"));
         }
     }
 }
@@ -653,7 +653,7 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
-    [[tab.view.window viewWithTag:90731] removeFromSuperview];
+    finishStartup();
     prepareInfoTab(tab);
     activeTab = tab; installingUI = YES;
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
@@ -675,11 +675,11 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
 static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
     originalViewWillAppear(controller, sel, animated);
-    prepareSplash(controller);
+    prepareStartupWindow(controller.view.window);
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev14 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev15 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
@@ -702,7 +702,9 @@ __attribute__((constructor)) static void installExtension(void) {
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class]) continue;
-            for (UIWindow *window in ((UIWindowScene *)scene).windows) installUI(window.rootViewController);
+            for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+                prepareStartupWindow(window); installUI(window.rootViewController);
+            }
         }
     });
 }
