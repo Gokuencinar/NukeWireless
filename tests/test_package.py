@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 import build_nuke_info_deb as package
 from package_utils import read_ar, get_tar_member
 from build_manifest import sha, source_hashes
+from language_catalog import native_strings
 
 BASE = ROOT / 'dist/com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb'
 RESULT = ROOT / f'dist/com.gokuencinar.nukewireless_{package.VERSION}_iphoneos-arm64e.deb'
@@ -48,6 +49,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
+        self.assertEqual(info['CFBundleLocalizations'],['en','es'])
         self.assertFalse(any('LocationUsage' in key for key in info))
         bundle = package.APP+'NukeWirelessResources.bundle/'
         vendors = plistlib.loads(self.after[bundle+'oui_vendors.plist'][1])
@@ -61,6 +63,10 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(len(keys),len(set(keys)))
             languages.append(set(keys))
         self.assertEqual(languages[0],languages[1])
+        for lang in ['en','es']:
+            native=self.after[bundle+lang+'.lproj/Native.strings'][1]
+            self.assertEqual(native,native_strings(lang))
+            self.assertEqual(self.after[package.APP+lang+'.lproj/Localizable.strings'][1],native)
         source = '\n'.join(p.read_text(encoding='utf8') for p in (ROOT/'src').glob('NW*.m'))
         self.assertTrue(set(re.findall(r'NWText\(@"([^"]+)"\)',source)) <= languages[0])
         acknowledgements = plistlib.loads(self.after[package.APP+'Acknowledgements.plist'][1])
@@ -95,7 +101,8 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
-        self.assertIn(b'NWBuild-rh25.5-dev10',binary)
+        self.assertIn(b'NWBuild-rh25.5-dev11',binary)
+        self.assertNotIn(b'NWUIRegressionCheck',binary)
         for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
             self.assertNotIn(token,binary)
 

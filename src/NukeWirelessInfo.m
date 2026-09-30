@@ -3,6 +3,7 @@
 #import <SystemConfiguration/SystemConfiguration.h>
 #import "NWScanBridge.h"
 #import "NWResources.h"
+#import "NWLanguage.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <arpa/inet.h>
@@ -12,8 +13,9 @@
 #include <dlfcn.h>
 #include <math.h>
 #include <syslog.h>
+#include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev10";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev11";
 static NSString *available(NSString *value) {
     return value.length ? value : NWText(@"unavailable");
 }
@@ -193,6 +195,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
 @interface NWInfoController : UITableViewController
 @property (nonatomic, strong) NSDictionary *values;
 @property (nonatomic) NSUInteger requestID;
+- (void)chooseLanguage;
 @end
 @implementation NWInfoController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
@@ -221,7 +224,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     });
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 3 : (section == 2 ? 6 : 1)); }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 4 : (section == 2 ? 6 : 1)); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
@@ -238,10 +241,11 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · Gokuencinar", @"Buy Me a Coffee", NWText(@"advanced.title")];
-        UITableViewCell *cell = textCell(labels[index.row], nil, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
+        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title")];
+        NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") : nil;
+        UITableViewCell *cell = textCell(labels[index.row], detail, YES); cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
-    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev10", NO);
+    if (index.section == 3) return textCell(NWText(@"version"), @"1.0.25+rh25.5~dev11", NO);
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
@@ -253,8 +257,10 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
         if (index.row < 2) {
             NSURL *url = [NSURL URLWithString:index.row == 0 ? @"https://github.com/Gokuencinar" : @"https://buymeacoffee.com/gokuen"];
             [UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];
-        } else {
+        } else if (index.row == 2) {
             [self.navigationController pushViewController:[NWAdvancedController new] animated:YES];
+        } else {
+            [self chooseLanguage];
         }
     } else if (index.section == 2) {
         NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -264,6 +270,35 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
             UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"network.copied"));
         }
     }
+}
+- (void)chooseLanguage {
+    if (!NWCanRestartForLanguage()) { showMessage(self, NWText(@"language.busy")); return; }
+    UIAlertController *picker = [UIAlertController alertControllerWithTitle:NWText(@"language.title")
+        message:NWText(@"language.restartHint") preferredStyle:UIAlertControllerStyleAlert];
+    for (NSString *code in @[@"es", @"en"]) {
+        NSString *name = [code isEqualToString:@"es"] ? @"Español" : @"English";
+        if ([code isEqualToString:NWLanguageCode()]) name = [name stringByAppendingString:@" ✓"];
+        [picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            (void)action;
+            if ([code isEqualToString:NWLanguageCode()]) return;
+            // Recheck immediately before saving; a scan or block may have started.
+            if (!NWCanRestartForLanguage()) { showMessage(self, NWText(@"language.busy")); return; }
+            NSString *title = NWText(@"language.restartTitle"), *message = NWText(@"language.restartMessage");
+            UIAlertController *confirm = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
+            [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+            [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"language.apply") style:UIAlertActionStyleDefault handler:^(UIAlertAction *apply) {
+                (void)apply;
+                if (!NWCanRestartForLanguage()) { showMessage(self, NWText(@"language.busy")); return; }
+                if (NWSetLanguage(code)) dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{ exit(0); });
+            }]];
+            // UIAlertAction dismisses the picker itself; wait for that transition.
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+                if (self.view.window && !self.presentedViewController) [self presentViewController:confirm animated:YES completion:nil];
+            });
+        }]];
+    }
+    [picker addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:picker animated:YES completion:nil];
 }
 @end
 
@@ -298,12 +333,12 @@ static NSString *displayAppTitle(NSString *title) {
     return title;
 }
 static void navigationTitle(UINavigationItem *item, SEL sel, NSString *title) {
-    originalNavigationTitle(item, sel, displayAppTitle(title));
+    originalNavigationTitle(item, sel, NWNativeText(displayAppTitle(title)));
 }
 static void normalizeNavigationTitles(UIView *view) {
     if ([view isKindOfClass:UINavigationBar.class]) {
         for (UINavigationItem *item in ((UINavigationBar *)view).items) {
-            NSString *title = displayAppTitle(item.title);
+            NSString *title = NWNativeText(displayAppTitle(item.title));
             if (![title isEqualToString:item.title] && title) item.title = title;
         }
     }
@@ -379,6 +414,15 @@ static void updateWiFi(void) {
         }
     }
     if (bulkButton && !bulkPanel.hidden && !bulkButton.hidden) {
+        for (UIView *child in bulkPanel.subviews) {
+            if ([child isKindOfClass:UILabel.class]) {
+                NSString *summary = [NSString stringWithFormat:@"%@\n%@", NWScanSummary(), NWText(@"scan.pullHint")];
+                if (![((UILabel *)child).text isEqualToString:summary]) ((UILabel *)child).text = summary;
+            } else if ([child isKindOfClass:UIButton.class] && child != bulkButton) {
+                UIButton *names = (UIButton *)child;
+                if (![names.currentTitle isEqualToString:NWText(@"device.names")]) [names setTitle:NWText(@"device.names") forState:UIControlStateNormal];
+            }
+        }
         if (bulkPanel == bulkButton) {
             CGRect bar = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
             CGFloat width = MIN(186, MAX(0, tab.view.bounds.size.width - 24));
@@ -446,7 +490,8 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev10 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev11 loaded");
+    NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -475,6 +520,7 @@ __attribute__((constructor)) static void installExtension(void) {
 
 #ifdef NW_UI_TESTING
 // Only linked into the SwiftUI simulator fixture, never the device package.
+void NWUIRegressionSetLanguage(int spanish) { NWSetLanguage(spanish ? @"es" : @"en"); }
 int NWUIRegressionCheck(int phase) {
     static NSArray<UIViewController *> *hosts;
     UITabBarController *tab = activeTab;
@@ -486,6 +532,16 @@ int NWUIRegressionCheck(int phase) {
         if (![item.title isEqualToString:@"NukeWireless"]) return 2;
         item.title = @"Current network";
         if (![item.title isEqualToString:@"Current network"]) return 3;
+        BOOL spanish = [NWLanguageCode() isEqualToString:@"es"];
+        NSString *expected = spanish ? @"Bloquear equipo" : @"Block device";
+        if (![[NSBundle.mainBundle localizedStringForKey:@"Block Device" value:nil table:nil] isEqualToString:expected]) return 12;
+        UIAlertAction *action = [UIAlertAction actionWithTitle:@"Block Device" style:UIAlertActionStyleDefault handler:nil];
+        if (![action.title isEqualToString:expected]) return 13;
+        UITextField *field = [UITextField new]; field.placeholder = @"Enter new name";
+        if (![field.placeholder isEqualToString:(spanish ? @"Introduce un nombre nuevo" : @"Enter a new name")]) return 14;
+        UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem]; [button setTitle:@"Nombres" forState:UIControlStateNormal];
+        if (![button.currentTitle isEqualToString:(spanish ? @"Nombres" : @"Names")]) return 15;
+        if (![NWNativeText(@"192.168.1.1") isEqualToString:@"192.168.1.1"]) return 16;
         return 0;
     }
     for (NSUInteger i = 0; i < hosts.count; i++) if (hosts[i] != tab.viewControllers[i]) return 4;
@@ -496,10 +552,13 @@ int NWUIRegressionCheck(int phase) {
         if (!info || info.parentViewController != host || !info.view.window) return 6;
         if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
         NWInfoController *content = (NWInfoController *)info.topViewController;
-        if ([content tableView:content.tableView numberOfRowsInSection:1] != 3) return 8;
+        if ([content tableView:content.tableView numberOfRowsInSection:1] != 4) return 8;
         for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
         [host.view layoutIfNeeded];
         if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;
+        UITableViewCell *language = [content tableView:content.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:3 inSection:1]];
+        UIListContentConfiguration *config = (UIListContentConfiguration *)language.contentConfiguration;
+        if (![config.text isEqualToString:NWText(@"language.title")]) return 17;
     } else if (phase == 2 && tab.selectedIndex != 0) return 11;
     return 0;
 }

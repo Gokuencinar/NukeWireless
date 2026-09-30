@@ -132,20 +132,29 @@ static void armWatchdog(uint64_t generation) {
 static void foundDevice(id adapter, SEL sel, id device) {
     oldFound(adapter, sel, device);
     onMain(^{
-        if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
-        state.progress = CACurrentMediaTime();
         NSString *ip = readObject(device, @"ipAddress");
         if (!ipv4(ip)) return;
         NSString *name = readObject(device, @"hostname");
-        uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
-        if (ipv4(ip) == local && (!name.length || [name isEqualToString:@"Unknown Host"])) return;
         NSString *vendor = NWVendorForMAC(readObject(device, @"macAddress"));
         if (vendor.length) setObject(device, @"setBrand:", vendor);
+        NSString *suffix = ip.pathExtension;
+        NSString *nickname = readObject(device, @"nickName");
+        if (!nickname.length && [name isEqualToString:[@"Equipo ." stringByAppendingString:suffix]])
+            setObject(device, @"setHostname:", [NSString stringWithFormat:NWText(@"device.fallback"), suffix]);
+        NSString *brand = readObject(device, @"brand");
+        if ([brand isEqualToString:@"Unknown"] || [brand isEqualToString:@"Unknown Brand"])
+            setObject(device, @"setBrand:", NWText(@"device.unknownVendor"));
+        // Display placeholders apply to both WiFi and Hotspot; scan ownership does not.
+        if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
+        state.progress = CACurrentMediaTime();
+        uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+        if (ipv4(ip) == local && (!name.length || [name isEqualToString:@"Unknown Host"])) return;
         id existing = devices[ip];
         if (existing) {
             for (NSString *property in @[@"hostname", @"macAddress", @"brand", @"subnetMask"]) {
                 NSString *value = readObject(device, property);
-                if (![value isKindOfClass:NSString.class] || !value.length || [value hasPrefix:@"Unknown"]) continue;
+                if (![value isKindOfClass:NSString.class] || !value.length || [value hasPrefix:@"Unknown"] ||
+                    [value isEqualToString:NWText(@"device.unknownVendor")]) continue;
                 NSString *setter = [NSString stringWithFormat:@"set%@%@:", [[property substringToIndex:1] uppercaseString], [property substringFromIndex:1]];
                 setObject(existing, setter, value);
             }
@@ -250,6 +259,11 @@ static NSArray<NSString *> *activeIPs(void) {
     NSMutableArray *result = [NSMutableArray new];
     for (NSString *ip in all) if (isBlocked(ip)) [result addObject:ip];
     return [result sortedArrayUsingSelector:@selector(compare:)];
+}
+BOOL NWCanRestartForLanguage(void) {
+    id registered = readObject(commands(), @"runningBlocksForArp");
+    return NSThread.isMainThread && !NWScanBusy() && !bulkBusy &&
+        (![registered isKindOfClass:NSArray.class] || [registered count] == 0) && !activeIPs().count;
 }
 NSString *NWBulkTitle(void) {
     if (bulkBusy) return NWText(@"bulk.working");

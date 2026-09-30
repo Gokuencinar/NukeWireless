@@ -1,6 +1,17 @@
 "info.title" = "Info";
 "advanced.title" = "Advanced Settings";
 "version" = "Version";
+"coffee.title" = "Buy Me a Coffee";
+"language.title" = "Language";
+"language.restartHint" = "Choose the language for the whole app. Applying it requires restarting the app.";
+"language.restartTitle" = "Change language";
+"language.restartMessage" = "The app will close to apply the language to all screens. Open NukeWireless again afterwards.";
+"language.apply" = "Apply and close";
+"language.busy" = "Wait for the scan to finish and unblock all devices before changing the language.";
+"device.fallback" = "Device .%@";
+"device.unknownVendor" = "Unknown vendor";
+"device.names" = "Names";
+"scan.pullHint" = "Pull down to refresh";
 "unavailable" = "Unavailable";
 "ok" = "OK";
 "cancel" = "Cancel";

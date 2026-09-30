@@ -1,5 +1,6 @@
 #import "NWResources.h"
 #import "NWPolicy.h"
+#import "NWLanguage.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -11,7 +12,7 @@ NSBundle *NWResourceBundle(void) {
     dispatch_once(&once, ^{ bundle = [NSBundle bundleWithPath:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"NukeWirelessResources.bundle"]]; });
     return bundle ?: NSBundle.mainBundle;
 }
-NSString *NWText(NSString *key) { return [NWResourceBundle() localizedStringForKey:key value:key table:nil]; }
+NSString *NWText(NSString *key) { return NWLocalizedText(key); }
 static NSURL *vendorURL(void) {
     NSURL *root = [[NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask] firstObject];
     return [[root URLByAppendingPathComponent:@"NukeWireless" isDirectory:YES] URLByAppendingPathComponent:@"vendors.plist"];
