@@ -12,7 +12,7 @@ xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   src/NukeWirelessInfo.m src/NWScanBridge.m src/NWResources.m src/NWPolicy.c tests/UIRegressionStub.c
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios16.3-simulator" -sdk "$sdk" -parse-as-library \
-  tests/UIRegression.swift -L "$out/UIRegression.app/Frameworks" -lNukeWirelessInfo \
+  tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
 python3 - "$out/UIRegression.app/Info.plist" <<'PY'
 import plistlib,sys
