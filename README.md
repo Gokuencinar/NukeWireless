@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata:** `1.0.25+rh25.5~dev10`, instalada por SSH. Compilación, prueba de navegación con SwiftUI en simulador y siete pruebas del paquete correctas. Conserva el controlador de Info que SwiftUI necesita y monta la pantalla nueva antes de su aparición; elimina el acceso a Acknowledgements. Corrige también el título «Harpy» de la navegación WiFi a «NukeWireless». Pendiente: confirmación visual en el iPhone.
+**Última candidata:** `1.0.25+rh25.5~dev10`, instalada por SSH. Compilación, prueba de navegación con SwiftUI en simulador y siete pruebas del paquete correctas. Conserva el controlador de Info que SwiftUI necesita y monta la pantalla nueva antes de su aparición; elimina el acceso a Acknowledgements. Corrige también el título «Harpy» de la navegación WiFi a «NukeWireless». El usuario confirmó en el iPhone que Info ya no cierra la app y que el título «Harpy» ha desaparecido.
 
 `dev9` quedó retirada de la release pública: reemplazar el controlador de pestaña provocó una conversión de tipo fallida en SwiftUI al entrar en Info, confirmada en el registro de cierre del dispositivo.
 

@@ -6,7 +6,7 @@
 - Siete pruebas del paquete superadas; instalado por SSH como `1.0.25+rh25.5~dev10`.
 - SHA-256 del `.deb`: `6274311722abd8b315e8d8de4828c492e257b05f015894c2a6f666ec15d6ff03`.
 - Corrige el cierre de Info conservando el host SwiftUI original. La pantalla nueva se monta de forma síncrona en `viewWillAppear`, cubre el host y oculta sus subviews antiguas. El título de navegación WiFi se normaliza mediante `UINavigationItem.setTitle:` y también se revisan los items existentes.
-- El código de comprobación de interfaz solo se compila en la fixture del simulador; no forma parte de la biblioteca para el iPhone. Pendiente: confirmación visual del usuario en el dispositivo.
+- El código de comprobación de interfaz solo se compila en la fixture del simulador; no forma parte de la biblioteca para el iPhone. El usuario confirmó que Info ya no cierra la app y que el título «Harpy» ha desaparecido. SSH también encontró el proceso activo y ningún nuevo reporte de cierre tras instalar dev10. El usuario no ha confirmado por separado el destello del banner ni el contenido de cada fila de Info.
 
 ## Candidata dev9 (retirada el 30 de septiembre de 2026)
 
