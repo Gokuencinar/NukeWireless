@@ -1,19 +1,13 @@
-"""Replace only the pinned SplashView's resource names and add its own color.
+"""Replace the pinned SplashView's image and use SwiftUI's existing black getter.
 
-SplashView's body at 0x2adf0 builds Color("AccentColor", bundle: nil),
-then at 0x2ae1c builds Image("iconImage", bundle: nil). These are inline
-Swift small strings, not C strings. Preserve their length, register usage,
-discriminator, function calls and every other instruction.
-
-The original BOM catalog has single-leaf FACETKEYS and RENDITIONS trees.
-Clone its named-color rendition under a fresh identifier, retaining every
-original catalog key/value. No original AccentColor or image is replaced.
+Image("iconImage", bundle: nil) is an inline Swift small string at 0x2ae1c.
+Preserve its length, register usage and discriminator. Redirect only the color
+call at 0x2ae10 to the Color.black getter already imported by this executable.
+No catalog edits, hooks, new function ABI or timing changes are required.
 """
 from pathlib import Path
 import struct
 
-APP = "Applications/HarpyReloaded.app/"
-COLOR = b"NWBootColor"
 IMAGE = b"NWBootPic"
 
 
@@ -42,110 +36,19 @@ def patch_name(binary, start, original, replacement):
     return bytes(result)
 
 
-def patch_splash_names(binary):
-    return patch_name(patch_name(binary, 0x2adf0, b"AccentColor", COLOR),
-                      0x2ae1c, b"iconImage", IMAGE)
-
-
-def add_startup_color(catalog):
-    if catalog[:8] != b"BOMStore":
-        raise ValueError("not a BOM catalog")
-    index_offset, _, variables_offset, _ = struct.unpack_from(">4I", catalog, 16)
-    count = struct.unpack_from(">I", catalog, index_offset)[0]
-    locations = [struct.unpack_from(">II", catalog, index_offset + 4 + i*8) for i in range(count)]
-    blocks = [catalog[p:p+n] for p, n in locations]
-    variables = {}
-    cursor = variables_offset + 4
-    for _ in range(struct.unpack_from(">I", catalog, variables_offset)[0]):
-        block, length = struct.unpack_from(">IB", catalog, cursor)
-        cursor += 5
-        variables[catalog[cursor:cursor+length]] = block
-        cursor += length
-
-    def leaf(name):
-        root = blocks[variables[name]]
-        if root[:4] != b"tree":
-            raise ValueError("unexpected catalog tree")
-        index = struct.unpack_from(">I", root, 8)[0]
-        node = blocks[index]
-        flag, entries, forward, backward = struct.unpack_from(">HHII", node)
-        if (flag, forward, backward) != (1, 0, 0):
-            raise ValueError("only the pinned single-leaf catalog is supported")
-        return index, [struct.unpack_from(">II", node, 12 + i*8) for i in range(entries)]
-
-    facet_index, facets = leaf(b"FACETKEYS")
-    rendition_index, renditions = leaf(b"RENDITIONS")
-    old_facet = next(value for value, key in facets if blocks[key] == b"AccentColor")
-    if any(blocks[key] == COLOR for _, key in facets):
-        raise ValueError("startup color already exists")
-    facet = bytearray(blocks[old_facet])
-    if len(facet) != 18 or facet[:16] != bytes.fromhex("000000000300010055000200d9001100"):
-        raise ValueError("unexpected named-color facet")
-    identifier = struct.unpack_from("<H", facet, 16)[0]
-    used = {struct.unpack_from("<H", blocks[value], 16)[0] for value, _ in facets}
-    new_identifier = next(i for i in range(1, 65536) if i not in used)
-    struct.pack_into("<H", facet, 16, new_identifier)
-    old_rendition = [(value, key) for value, key in renditions
-                     if struct.unpack_from("<H", blocks[key], 10)[0] == identifier]
-    if len(old_rendition) != 1:
-        raise ValueError("unexpected color variants")
-    value, key = old_rendition[0]
-    color = bytearray(blocks[value])
-    if len(color) != 260 or color[40:51] != b"AccentColor" or color[-48:-44] != b"RLOC":
-        raise ValueError("unexpected color rendition")
-    color[40:51] = COLOR
-    struct.pack_into("<4d", color, len(color)-32, 0.01, 0.02, 0.075, 1.0)
-    rendition_key = bytearray(blocks[key])
-    struct.pack_into("<H", rendition_key, 10, new_identifier)
-
-    def insert(data):
-        index = next(i for i in range(1, len(blocks)) if not blocks[i])
-        blocks[index] = bytes(data)
-        return index
-
-    facets.append((insert(facet), insert(COLOR)))
-    renditions.append((insert(color), insert(rendition_key)))
-    facets.sort(key=lambda pair: blocks[pair[1]])
-    # The pinned tree compares the encoded attribute bytes, not decoded IDs.
-    key_order = lambda pair: blocks[pair[1]]
-    if renditions[:-1] != sorted(renditions[:-1], key=key_order):
-        raise ValueError("unexpected rendition comparator")
-    renditions.sort(key=key_order)
-    changed = {facet_index, rendition_index, variables[b"FACETKEYS"],
-               variables[b"RENDITIONS"], variables[b"CARHEADER"]}
-    for index, pairs, root_name in [(facet_index, facets, b"FACETKEYS"),
-                                    (rendition_index, renditions, b"RENDITIONS")]:
-        node = struct.pack(">HHII", 1, len(pairs), 0, 0) + b"".join(struct.pack(">II", *pair) for pair in pairs)
-        if len(node) > len(blocks[index]):
-            raise ValueError("catalog leaf has no space for the additional color")
-        # CoreUI reads a full allocated leaf page, including its reserved space.
-        blocks[index] = node.ljust(len(blocks[index]), b"\0")
-        root = bytearray(blocks[variables[root_name]])
-        struct.pack_into(">I", root, 16, len(pairs))
-        blocks[variables[root_name]] = bytes(root)
-    header = bytearray(blocks[variables[b"CARHEADER"]])
-    if header[:4] != b"RATC" or struct.unpack_from("<I", header, 16)[0] != len(renditions)-1:
-        raise ValueError("unexpected CARHEADER")
-    struct.pack_into("<I", header, 16, len(renditions))
-    blocks[variables[b"CARHEADER"]] = bytes(header)
-
-    result = bytearray(catalog)
-    for index, data in enumerate(blocks):
-        if not data:
-            continue
-        position, length = locations[index]
-        if length:
-            if index in changed:
-                if len(data) != length:
-                    raise ValueError("original catalog block size changed")
-                result[position:position+length] = data
-            continue
-        result.extend(b"\0" * (-len(result) % 16))
-        locations[index] = (len(result), len(data))
-        result.extend(data)
-        struct.pack_into(">II", result, index_offset+4+index*8, *locations[index])
-    # Retain the original index/free-space tables and every original file offset.
-    struct.pack_into(">I", result, 12, sum(bool(length) for _, length in locations))
+def patch_splash_resources(binary):
+    # Both imported functions return SwiftUI.Color in x0. Color.black takes no
+    # arguments, so the existing x0/x1/x2 name/bundle values are simply unused.
+    # The original executable already imports and calls this getter at 0x17090.
+    call = 0x2ae10
+    old_target = 0x1150c8  # Color.init(_:bundle:)
+    new_target = 0x11508c  # Color.black.getter
+    before = 0x94000000 | ((old_target - call) // 4 & 0x3ffffff)
+    after = 0x94000000 | ((new_target - call) // 4 & 0x3ffffff)
+    if struct.unpack_from("<I", binary, call)[0] != before:
+        raise ValueError("unexpected SplashView color call")
+    result = bytearray(patch_name(binary, 0x2ae1c, b"iconImage", IMAGE))
+    struct.pack_into("<I", result, call, after)
     return bytes(result)
 
 
@@ -153,8 +56,4 @@ if __name__ == "__main__":
     root = Path(__file__).resolve().parents[1]
     out = root / "build/audit"
     out.mkdir(parents=True, exist_ok=True)
-    # CI uses only the original resources, rather than distributing the base app
-    # executable/package. Packaging still checks them against the pinned .deb.
-    resources = root / "resources/startup"
-    (out / "StartupAssets.car").write_bytes(add_startup_color((resources / "OriginalAssets.car").read_bytes()))
-    (out / "NWBootPic.png").write_bytes((resources / "NukeWirelessIcon.png").read_bytes())
+    (out / "NWBootPic.png").write_bytes((root / "resources/startup/NukeWirelessIcon.png").read_bytes())

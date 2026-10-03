@@ -1,8 +1,8 @@
 """Build the private development package from the pinned current baseline.
 
 Archive scripts are data, never executed. The two stable path libraries and
-network helpers remain byte-identical. SplashView's inline resource names change
-without changing their lengths, call ABI, control flow or Swift layouts.
+network helpers remain byte-identical. SplashView loads the current logo and uses the already imported black color
+getter. String lengths, stack/register layouts and scanner code are preserved.
 """
 from __future__ import annotations
 import argparse
@@ -15,7 +15,7 @@ import tarfile
 from build_manifest import source_hashes, sha
 from language_catalog import native_strings
 from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, tar_bytes
-from startup_resources import add_startup_color, patch_splash_names
+from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = "1.0.25+rh25.5~dev18"
@@ -63,13 +63,12 @@ def build(source, artifact, output):
     executable = original[APP + "HarpyReloaded"]
     if sha(executable) != EXPECTED_APP_SHA256 or executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
         raise ValueError("incompatible native Swift refresh ABI")
-    startup_catalog = add_startup_color(original[APP + "Assets.car"])
     startup_image = original[APP + "NukeWirelessIcon.png"]
-    expected_startup = {"StartupAssets.car": sha(startup_catalog), "NWBootPic.png": sha(startup_image)}
+    expected_startup = {"NWBootPic.png": sha(startup_image)}
     if manifest.get("startup_files") != expected_startup or any(
         sha((artifact / name).read_bytes()) != digest for name, digest in expected_startup.items()
     ):
-        raise ValueError("missing or mismatched Apple-inspected startup resources")
+        raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
                     CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.18",
@@ -79,8 +78,7 @@ def build(source, artifact, output):
     metadata["CFBundleIcons~ipad"] = metadata["CFBundleIcons"]
     replacement = {
         INFO_LIBRARY: library,
-        APP + "HarpyReloaded": patch_splash_names(patch_visible_text(executable)),
-        APP + "Assets.car": startup_catalog,
+        APP + "HarpyReloaded": patch_splash_resources(patch_visible_text(executable)),
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
     }
     for i,(member,data) in enumerate(entries):
