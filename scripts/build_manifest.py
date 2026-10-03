@@ -8,11 +8,13 @@ SOURCES = ['src/NukeWirelessInfo.m', 'src/NWScanBridge.m', 'src/NWScanBridge.h',
            'src/NWResources.m', 'src/NWResources.h', 'src/NWPolicy.c', 'src/NWPolicy.h',
            'src/NWLanguage.m', 'src/NWLanguage.h',
            'src/NWRefreshThunk.S', 'scripts/build_extension.sh', 'resources/NukeLaunch.storyboard',
-           'scripts/startup_resources.py']
+           'scripts/startup_resources.py', 'resources/startup/OriginalAssets.car',
+           'resources/startup/NukeWirelessIcon.png']
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 def source_hashes():
-    return {name: sha((ROOT / name).read_bytes().replace(b'\r\n', b'\n')) for name in SOURCES}
+    return {name: sha((ROOT / name).read_bytes() if name.endswith(('.car', '.png')) else
+                      (ROOT / name).read_bytes().replace(b'\r\n', b'\n')) for name in SOURCES}
 if __name__ == '__main__':
     out = ROOT / 'build/audit'
     (out / 'build-manifest.json').write_text(json.dumps({

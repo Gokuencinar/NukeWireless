@@ -9,12 +9,8 @@ The original BOM catalog has single-leaf FACETKEYS and RENDITIONS trees.
 Clone its named-color rendition under a fresh identifier, retaining every
 original catalog key/value. No original AccentColor or image is replaced.
 """
-import io
 from pathlib import Path
 import struct
-import tarfile
-
-from package_utils import get_tar_member, read_ar
 
 APP = "Applications/HarpyReloaded.app/"
 COLOR = b"NWBootColor"
@@ -146,11 +142,11 @@ def add_startup_color(catalog):
 
 
 if __name__ == "__main__":
-    baseline = Path(__file__).resolve().parents[1] / "dist/com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb"
-    out = baseline.parents[1] / "build/audit"
+    root = Path(__file__).resolve().parents[1]
+    out = root / "build/audit"
     out.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(get_tar_member(read_ar(baseline.read_bytes()), "data.tar"))) as archive:
-        entries = {m.name.lstrip("./"): archive.extractfile(m).read() for m in archive if m.isfile()}
-    (out / "StartupAssets.car").write_bytes(add_startup_color(entries[APP+"Assets.car"]))
-    (out / "NWBootPic.png").write_bytes(entries[APP+"NukeWirelessIcon.png"])
-    patch_splash_names(entries[APP+"HarpyReloaded"])
+    # CI uses only the original resources, rather than distributing the base app
+    # executable/package. Packaging still checks them against the pinned .deb.
+    resources = root / "resources/startup"
+    (out / "StartupAssets.car").write_bytes(add_startup_color((resources / "OriginalAssets.car").read_bytes()))
+    (out / "NWBootPic.png").write_bytes((resources / "NukeWirelessIcon.png").read_bytes())
