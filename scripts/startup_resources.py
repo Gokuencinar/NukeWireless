@@ -115,7 +115,11 @@ def add_startup_color(catalog):
                variables[b"RENDITIONS"], variables[b"CARHEADER"]}
     for index, pairs, root_name in [(facet_index, facets, b"FACETKEYS"),
                                     (rendition_index, renditions, b"RENDITIONS")]:
-        blocks[index] = struct.pack(">HHII", 1, len(pairs), 0, 0) + b"".join(struct.pack(">II", *pair) for pair in pairs)
+        node = struct.pack(">HHII", 1, len(pairs), 0, 0) + b"".join(struct.pack(">II", *pair) for pair in pairs)
+        if len(node) > len(blocks[index]):
+            raise ValueError("catalog leaf has no space for the additional color")
+        # CoreUI reads a full allocated leaf page, including its reserved space.
+        blocks[index] = node.ljust(len(blocks[index]), b"\0")
         root = bytearray(blocks[variables[root_name]])
         struct.pack_into(">I", root, 16, len(pairs))
         blocks[variables[root_name]] = bytes(root)
