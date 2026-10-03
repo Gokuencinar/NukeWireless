@@ -1,5 +1,23 @@
 # Resultado de la compilación de desarrollo
 
+## Candidata dev18 (4 de octubre de 2026)
+
+- Se localizó `SplashView` en el ejecutable original: carga `AccentColor` y `iconImage`, además de la pantalla de inicio de iOS. Cambiar el storyboard o añadir una cobertura no modificaba esos recursos internos.
+- Corrección directa y acotada: la llamada de color usa el getter `Color.black` ya importado; la imagen pasa a `NWBootPic.png`, copia exacta del logotipo actual. Se comprueban los bytes esperados y la base completa por SHA-256. `Assets.car` permanece idéntico; no se cambian la pila, las estructuras Swift ni las funciones de escaneo/bloqueo.
+- Se retiran las coberturas, hooks de visibilidad de UIWindow y registro de arranque de dev16/dev17. Permanecen la UI gamer de WiFi, las traducciones y el mensaje al copiar datos de red.
+- Un intento previo de añadir un color al catálogo no superó la inspección de Apple assetutil y se descartó antes de crear/instalar un paquete. Los recursos finales no modifican el catálogo.
+- Fuente: `37375a6`; [Actions](https://github.com/Gokuencinar/NukeWireless/actions/runs/37162067121). Compilación iOS, lectura del PNG y comprobaciones de navegación existentes correctas. Se generó el paquete tras validar los hashes de fuente/artefacto y los cambios limitados a los tres archivos existentes previstos.
+- SHA-256 del paquete dev18: `9668a05d7ad06c009a4bcc55d105dbed2c410641ea7b1cb80b36854f5304c404`.
+- Instalación SSH correcta: `dpkg` terminó con código 0 y `install ok installed 1.0.25+rh25.5~dev18`. Se leyeron los bytes del BL y los operandos de la imagen dentro de la instalación real: coinciden con el paquete. El PNG instalado tiene 1.161.676 bytes. Dev17 sigue disponible como respaldo. Se solicitó confirmación visual; todavía no se afirma que el destello haya desaparecido.
+- Análisis y límites: [STARTUP-RESOURCES.md](STARTUP-RESOURCES.md). El simulador de navegación no reproduce el ejecutable original ni demuestra que haya desaparecido el destello del iPhone.
+
+## Candidatas dev16 y dev17 (no resolvieron el destello)
+
+- Ambas se compilaron e instalaron. Dev16 colocaba una vista sobre la ventana tras hacerla visible; dev17 también la añadía antes. El usuario indicó que el destello azul persistía.
+- El registro real de dev16 muestra la creación de la cobertura en un host genérico SwiftUI (`AnyView`) y su retirada al detectar las pestañas. No identifica qué fotograma veía el usuario.
+- Se apartaron de forma recuperable cachés SplashBoard de este bundle en el contenedor antiguo y en el HOME real de RootHide; se volvió a registrar la app. El usuario confirmó que esos pasos tampoco solucionaban el destello. Dev17 queda conservada en el iPhone como respaldo.
+- El usuario confirmó que el aviso de copia de dev15 funciona y que el resto de la interfaz sigue correcto.
+
 ## Candidata dev15 (30 de septiembre de 2026)
 
 - El usuario confirmó la UI de dev14, pero continuaba viendo la carga azul. El plist y el storyboard nuevos estaban presentes en el paquete instalado. Se apartó la caché SplashBoard de este bundle dentro de su contenedor, conservándola en Caches como respaldo; el usuario confirmó que el problema persistía.

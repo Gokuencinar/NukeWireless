@@ -31,25 +31,25 @@
 payload de la imagen antes de sustituir `iconImage` por `NWBootPic`, manteniendo
 su longitud de nueve bytes y el discriminador de Swift.String.
 
-La única instrucción BL modificada es la de `0x2ae10`: pasa de la inicialización
+La Ãºnica instrucciÃ³n BL modificada es la de `0x2ae10`: pasa de la inicializaciÃ³n
 por nombre al getter `Color.black` ya importado por el propio ejecutable.
-El getter también se llama en `0x17090`, donde su resultado se recoge de `x0`.
+El getter tambiÃ©n se llama en `0x17090`, donde su resultado se recoge de `x0`.
 Ambas funciones devuelven el valor de SwiftUI.Color en `x0`; el getter no recibe
 argumentos, por lo que ignora los valores existentes de nombre/bundle en
-`x0/x1/x2`. No se cambia el tamaño del ejecutable, la pila, la estructura Swift
+`x0/x1/x2`. No se cambia el tamaÃ±o del ejecutable, la pila, la estructura Swift
 ni el resto del flujo de control. El empaquetador rechaza una base diferente.
 
 El PNG `NWBootPic.png` es una copia exacta del `NukeWirelessIcon.png` de la base.
-`Assets.car` permanece idéntico. Se descartó un intento de añadir un color al
-catálogo porque la lectura con Apple assetutil no lo validó; no se instaló
-ningún paquete de ese intento. La solución final usa el negro nativo y no modifica
-el catálogo, ni añade hooks o dependencias.
+`Assets.car` permanece idÃ©ntico. Se descartÃ³ un intento de aÃ±adir un color al
+catÃ¡logo porque la lectura con Apple assetutil no lo validÃ³; no se instalÃ³
+ningÃºn paquete de ese intento. La soluciÃ³n final usa el negro nativo y no modifica
+el catÃ¡logo, ni aÃ±ade hooks o dependencias.
 
 El build inspecciona el PNG con sips; el empaquetador compara su hash con la base
 y el artefacto de CI. El storyboard oscuro para la pantalla de inicio de iOS sigue
 incluido. Se retiran las coberturas, hooks de visibilidad de UIWindow, temporizador
 de arranque y registro C de dev16/dev17.
 
-La inspección del paquete y el estado de instalación se registran en
-`BUILD-RESULTS.md`. La eliminación visual del destello requiere observación en
-el iPhone; el simulador de navegación existente no ejecuta este binario original.
+La inspecciÃ³n del paquete y el estado de instalaciÃ³n se registran en
+`BUILD-RESULTS.md`. La eliminaciÃ³n visual del destello requiere observaciÃ³n en
+el iPhone; el simulador de navegaciÃ³n existente no ejecuta este binario original.
