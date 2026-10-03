@@ -29,7 +29,7 @@ class PackageTests(unittest.TestCase):
         cls.after = members(RESULT, 'data.tar')
 
     def test_only_expected_existing_files_changed(self):
-        allowed = {package.INFO_LIBRARY, package.APP+'Info.plist', package.APP+'HarpyReloaded'}
+        allowed = {package.INFO_LIBRARY, package.APP+'Info.plist', package.APP+'HarpyReloaded', package.APP+'Assets.car'}
         changed = {n for n,(_,b) in self.before.items() if b != self.after[n][1]}
         self.assertEqual(changed, allowed)
         for name,(m,_) in self.before.items():
@@ -39,7 +39,7 @@ class PackageTests(unittest.TestCase):
     def test_app_only_length_preserving_text(self):
         old = self.before[package.APP+'HarpyReloaded'][1]
         new = self.after[package.APP+'HarpyReloaded'][1]
-        self.assertEqual(new,package.patch_visible_text(old))
+        self.assertEqual(new,package.patch_splash_names(package.patch_visible_text(old)))
         self.assertEqual(len(new),len(old))
         self.assertEqual(old[0xc5a8:0xc5b8],new[0xc5a8:0xc5b8])
         for text in package.TEXT_EDITS: self.assertNotIn(text+b'\0',new)
@@ -101,7 +101,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
-        self.assertIn(b'NWBuild-rh25.5-dev17',binary)
+        self.assertIn(b'NWBuild-rh25.5-dev18',binary)
         self.assertNotIn(b'NWUIRegressionCheck',binary)
         for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
             self.assertNotIn(token,binary)

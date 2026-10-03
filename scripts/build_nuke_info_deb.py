@@ -1,8 +1,8 @@
 """Build the private development package from the pinned current baseline.
 
 Archive scripts are data, never executed. The two stable path libraries and
-network helpers remain byte-identical. The app receives only two length-preserving
-visible text substitutions; no instructions, identifiers or Swift layouts change.
+network helpers remain byte-identical. SplashView's inline resource names change
+without changing their lengths, call ABI, control flow or Swift layouts.
 """
 from __future__ import annotations
 import argparse
@@ -15,9 +15,10 @@ import tarfile
 from build_manifest import source_hashes, sha
 from language_catalog import native_strings
 from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, tar_bytes
+from startup_resources import add_startup_color, patch_splash_names
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.25+rh25.5~dev17"
+VERSION = "1.0.25+rh25.5~dev18"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
@@ -51,7 +52,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text())
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev17" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev18" not in library:
         raise ValueError("wrong development library version")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
@@ -62,22 +63,31 @@ def build(source, artifact, output):
     executable = original[APP + "HarpyReloaded"]
     if sha(executable) != EXPECTED_APP_SHA256 or executable[0xc5a8:0xc5b8] != bytes.fromhex("ffc301d1fa6702a9f85f03a9f65704a9"):
         raise ValueError("incompatible native Swift refresh ABI")
+    startup_catalog = add_startup_color(original[APP + "Assets.car"])
+    startup_image = original[APP + "NukeWirelessIcon.png"]
+    expected_startup = {"StartupAssets.car": sha(startup_catalog), "NWBootPic.png": sha(startup_image)}
+    if manifest.get("startup_files") != expected_startup or any(
+        sha((artifact / name).read_bytes()) != digest for name, digest in expected_startup.items()
+    ):
+        raise ValueError("missing or mismatched Apple-inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.17",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.18",
                     CFBundleDevelopmentRegion="en", CFBundleLocalizations=["en", "es"])
     metadata.pop("UILaunchScreen", None)
     metadata["UILaunchStoryboardName"] = "NukeLaunch"
     metadata["CFBundleIcons~ipad"] = metadata["CFBundleIcons"]
     replacement = {
         INFO_LIBRARY: library,
-        APP + "HarpyReloaded": patch_visible_text(executable),
+        APP + "HarpyReloaded": patch_splash_names(patch_visible_text(executable)),
+        APP + "Assets.car": startup_catalog,
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
     }
     for i,(member,data) in enumerate(entries):
         name = member.name.lstrip("./")
         if name in replacement:
             data = replacement[name]; member.size = len(data); entries[i] = (member,data)
+    entries.append(regular(APP + "NWBootPic.png", startup_image))
     launch = artifact / "NukeLaunch.storyboardc"
     launch_files = {p.relative_to(launch).as_posix(): sha(p.read_bytes()) for p in sorted(launch.rglob("*")) if p.is_file()}
     if not launch_files or launch_files != manifest.get("launch_files"):

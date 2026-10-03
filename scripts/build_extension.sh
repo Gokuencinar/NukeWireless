@@ -17,4 +17,14 @@ xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=16.3 -isysroot "$s
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target 16.3 --target-device iphone --target-device ipad
+python3 scripts/startup_resources.py
+xcrun --sdk iphoneos assetutil --info build/audit/StartupAssets.car > build/audit/startup-assets.json
+python3 - <<'PY'
+import json
+from pathlib import Path
+assets = json.loads(Path('build/audit/startup-assets.json').read_text())
+assert any(a.get('Name') == 'NWBootColor' and a.get('AssetType') == 'Color' for a in assets), assets
+assert any(a.get('Name') == 'AccentColor' for a in assets), assets
+print('Apple assetutil reads the new splash color and the preserved original catalog.')
+PY
 python3 scripts/build_manifest.py
