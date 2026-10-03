@@ -23,6 +23,7 @@ jobs:
             build/audit/StartupAssets.car
             build/audit/NWBootPic.png
             build/audit/startup-assets.json
+            build/audit/original-assets.json
             build/ui/*-wifi.png
             build/ui/*-info.png
           retention-days: 7

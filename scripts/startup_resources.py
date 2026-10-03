@@ -131,17 +131,21 @@ def add_startup_color(catalog):
 
     result = bytearray(catalog)
     for index, data in enumerate(blocks):
-        if not data or (index not in changed and locations[index][1]):
+        if not data:
+            continue
+        position, length = locations[index]
+        if length:
+            if index in changed:
+                if len(data) != length:
+                    raise ValueError("original catalog block size changed")
+                result[position:position+length] = data
             continue
         result.extend(b"\0" * (-len(result) % 16))
         locations[index] = (len(result), len(data))
         result.extend(data)
-    result.extend(b"\0" * (-len(result) % 16))
-    new_index = len(result)
-    table = struct.pack(">I", count) + b"".join(struct.pack(">II", *item) for item in locations) + struct.pack(">II", 0, 0)
-    result.extend(table)
+        struct.pack_into(">II", result, index_offset+4+index*8, *locations[index])
+    # Retain the original index/free-space tables and every original file offset.
     struct.pack_into(">I", result, 12, sum(bool(length) for _, length in locations))
-    struct.pack_into(">II", result, 16, new_index, len(table))
     return bytes(result)
 
 
