@@ -53,3 +53,7 @@ de arranque y registro C de dev16/dev17.
 La inspección del paquete y el estado de instalación se registran en
 `BUILD-RESULTS.md`. La eliminación visual del destello requiere observación en
 el iPhone; el simulador de navegación existente no ejecuta este binario original.
+
+## Resultado observado
+
+Dev18 terminó de instalarse por SSH con código 0. El usuario indicó «no aparece ya ningún fondo». La pantalla azul antigua deja de mostrarse según esa confirmación; no se afirma que el logotipo sea perceptible en una transición tan breve. El proceso permaneció activo y no apareció un reporte de cierre nuevo al revisarlo.
