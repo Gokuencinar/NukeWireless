@@ -6,6 +6,10 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <time.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
 
 // Reconstructed from the user's iOS 16.3.1 (20D67) transport code and
 // bluetoothd callsites/block signatures. No ABI fallback on other builds.
@@ -84,20 +88,23 @@ NSDictionary<NSString *, id> *NWBTReadControllerInfo(void) {
         void (^stateBlock)(int, void *, void *) = ^(int status, void *argument1, void *argument2) {
             (void)status; (void)argument1; (void)argument2;
         };
-        uint64_t bti = 0, hci = 0;
+        uint64_t hci = 0;
         NSDictionary *result = nil;
         @try {
             NWACTParameters parameters;
             initialize(&parameters);
             if (parameters.qos != 0x15) return failure(@"parameters", @"Unexpected initialized transport parameters.");
-            parameters.type = 1; parameters.queue = (__bridge void *)queue;
+            // The actual XS registry exposes hci/sco/acl through OLYBT RTI
+            // Skywalk. It has no CBTI device; opening legacy BTI first fails.
+            parameters.type = 2; parameters.queue = (__bridge void *)queue;
             parameters.stateBlock = (__bridge void *)stateBlock; parameters.timeoutMs = 1000;
-            if (!create(&parameters, &bti) || !bti) result = failure(@"bti_open", @"The controller management transport could not be opened.");
-            if (!result) {
-                initialize(&parameters); parameters.type = 2; parameters.queue = (__bridge void *)queue;
-                parameters.stateBlock = (__bridge void *)stateBlock; parameters.timeoutMs = 1000;
-                parameters.flags = 8; // Queue-backed HCI, synchronous transfer (bit 2 clear).
-                if (!create(&parameters, &hci) || !hci) result = failure(@"hci_open", @"The HCI transport could not be opened.");
+            parameters.flags = 8; // Queue-backed HCI, synchronous transfer (bit 2 clear).
+            errno = 0;
+            if (!create(&parameters, &hci) || !hci) {
+                int savedErrno = errno;
+                NSMutableDictionary *details = [failure(@"hci_open", @"The HCI transport could not be opened.") mutableCopy];
+                details[@"system_errno"] = @(savedErrno);
+                result = details;
             }
             if (!result) {
                 // Standard HCI Read Local Version Information. It addresses
@@ -135,7 +142,6 @@ NSDictionary<NSString *, id> *NWBTReadControllerInfo(void) {
             }
         } @finally {
             if (hci) release(&hci);
-            if (bti) release(&bti);
         }
         return result;
     }
