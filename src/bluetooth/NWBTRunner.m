@@ -17,6 +17,7 @@
 
 static const char *service = "user/501/com.apple.bluetoothd";
 static NSString *bootstrapRoot;
+static BOOL recordAppRun;
 static char *const cleanEnvironment[] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", NULL};
 static double uptime(void) { return NSProcessInfo.processInfo.systemUptime; }
 static void cancelRun(int number) {
@@ -30,6 +31,23 @@ static NSDictionary *errorReport(NSString *code) {
 static int printReport(NSDictionary *report) {
     NSData *json = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingSortedKeys error:NULL];
     if (!json) return 1;
+    // Only an admitted app ping writes this bounded, root-owned diagnostic.
+    // No target address is included; status queries and recovery leave it intact.
+    if (recordAppRun && bootstrapRoot && json.length <= 65536) {
+        NSString *path = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth-app.json"];
+        int descriptor = open(path.fileSystemRepresentation, O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+        struct stat info;
+        if (descriptor >= 0 && !fstat(descriptor, &info) && S_ISREG(info.st_mode) &&
+            info.st_uid == 0 && !(info.st_mode & 0077) && !ftruncate(descriptor, 0)) {
+            const uint8_t *bytes = json.bytes; NSUInteger offset = 0;
+            while (offset < json.length) {
+                ssize_t count = write(descriptor, bytes + offset, json.length - offset);
+                if (count < 0 && errno == EINTR) continue;
+                if (count <= 0) break; offset += (NSUInteger)count;
+            }
+        }
+        if (descriptor >= 0) close(descriptor);
+    }
     fwrite(json.bytes, 1, json.length, stdout); fputc('\n', stdout);
     return report[@"error"] || report[@"error_code"] ? 1 : 0;
 }
@@ -256,6 +274,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
 
 int main(int argc, char **argv) {
     @autoreleasepool {
+        recordAppRun = getuid() == 501 && argc == 3 && !strcmp(argv[1], "--ping");
         BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
         char ownPath[PATH_MAX] = {0};
