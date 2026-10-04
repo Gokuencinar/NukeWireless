@@ -139,6 +139,11 @@
 "ble.diagnostic_details" = "Bluetooth state: %ld\nAuthorization: %ld\nScan active: %@\nAdvertisements received: %lu\nDevices: %lu\n\nState 5: Bluetooth powered on. Authorization 3: allowed. Only accessories advertising BLE are detected; pairing or a classic Bluetooth connection does not guarantee BLE advertising.";
 "bt.lab.title" = "BLE advertising test (10 s)";
 "bt.lab.manufacturer_title" = "Manufacturer advertisement (10 s)";
+"bt.lab.rotation_title" = "BT Disruptor: advertisements (10 s)";
+"bt.lab.rotation_menu" = "Lab test: ten advertisements with a counter, one per second. Turn Bluetooth off in Settings.";
+"bt.lab.rotation_accepted" = "The controller accepted all ten advertisement values.";
+"bt.lab.rotation_count" = "Counter values accepted: %lu of 10.";
+"bt.lab.rotation_receiver" = "To verify payload rotation over the air, a receiver must detect at least two distinct counters: service 7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C22, manufacturer 0xFFFF, data 4E57526F01 and counter 00–09. The iPhone address stays unchanged. This test does not guarantee accessory disconnection.";
 "bt.lab.manufacturer_menu" = "Turn Bluetooth off in Settings. Broadcast our test data with manufacturer 0xFFFF once per second for 10 s.";
 "bt.lab.manufacturer_receiver" = "Look for service 7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21 and manufacturer 0xFFFF with data 4E574C616201 in another BLE receiver. This advertisement has no local name.";
 "bt.lab.menu" = "Turn Bluetooth off in Settings. Advertise NWLab every second for 10 s to check with another BLE receiver.";

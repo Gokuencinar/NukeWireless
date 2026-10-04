@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <string.h>
 #define NWBT_LAB_HANDLE 0xee
+#define NWBT_LAB_ROTATION_COUNT 10
 static inline size_t NWBTLabReplySize(uint16_t opcode) {
     switch (opcode) {
         case 0x2036: return 2;
@@ -35,6 +36,14 @@ static inline size_t NWBTLabManufacturerData(uint8_t p[35]) {
     const uint8_t manufacturer[] = {9, 0xff, 0xff, 0xff, 'N','W','L','a','b', 1};
     memcpy(p + 25, manufacturer, sizeof manufacturer);
     p[3] = 31;
+    return 35;
+}
+static inline size_t NWBTLabRotatingData(uint8_t p[35], unsigned sequence) {
+    if (sequence >= NWBT_LAB_ROTATION_COUNT) return 0;
+    NWBTLabManufacturerData(p);
+    p[9] = 0x22; // Separate lab service: 7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C22.
+    const uint8_t marker[] = {'N', 'W', 'R', 'o', 1, (uint8_t)sequence};
+    memcpy(p + 29, marker, sizeof marker);
     return 35;
 }
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {

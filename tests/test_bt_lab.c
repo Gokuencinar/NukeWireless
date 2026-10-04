@@ -22,6 +22,19 @@ int main(void) {
         offset+=data[offset]+1;
     }
     assert(manufacturers==1 && names==0);
+    for (unsigned sequence=0; sequence<NWBT_LAB_ROTATION_COUNT; ++sequence) {
+        n=NWBTLabRotatingData(data,sequence);
+        assert(n==35 && data[3]==31 && data[9]==0x22);
+        assert(data[25]==9 && data[26]==0xff && data[27]==0xff && data[28]==0xff);
+        assert(!memcmp(data+29,"NWRo\1",5) && data[34]==sequence);
+        for (size_t offset=4; offset<n;) {
+            assert(data[offset]>0 && offset+data[offset]+1<=n);
+            offset+=data[offset]+1;
+        }
+    }
+    uint8_t original[35];memcpy(original,data,sizeof data);
+    assert(NWBTLabRotatingData(data,NWBT_LAB_ROTATION_COUNT)==0);
+    assert(NWBTLabRotatingData(data,~0u)==0 && !memcmp(data,original,sizeof data));
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
     assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);

@@ -236,7 +236,7 @@ NSDictionary *NWBTReadLECapabilities(void) {
 }
 @end
 
-static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
+static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating) {
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
@@ -244,14 +244,21 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
         @"queries": session.queries, @"advertisement_name": manufacturer ? @"" : @"NWLab",
-        @"advertisement_variant": manufacturer ? @"manufacturer" : @"service_name",
-        @"service_uuid": @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
+        @"advertisement_variant": rotating ? @"rotating_manufacturer" : manufacturer ? @"manufacturer" : @"service_name",
+        @"service_uuid": rotating ? @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C22" : @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"connection_commands_submitted": @0,
         @"duration_seconds": @10, @"interval_ms": @1000} mutableCopy];
     if (manufacturer) {
         report[@"manufacturer_company_id"] = @65535;
-        report[@"manufacturer_data_hex"] = @"4e574c616201";
+        report[@"manufacturer_data_hex"] = rotating ? @"4e57526f0100" : @"4e574c616201";
+    }
+    NSMutableArray *sequences = [NSMutableArray new];
+    if (rotating) {
+        report[@"acknowledged_sequences"] = sequences;
+        report[@"requested_sequence_count"] = @NWBT_LAB_ROTATION_COUNT;
+        report[@"payload_update_interval_ms"] = @1000;
+        report[@"address_rotation"] = @NO;
     }
     BOOL configured = NO, enableSubmitted = NO;
     @try {
@@ -264,18 +271,31 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
         if (session.ring.error) session.error = session.ring.error;
         uint8_t parameters[25], data[35], enable[6];
         NWBTLabParameters(parameters);
-        NSUInteger size = manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
+        NSUInteger size = rotating ? NWBTLabRotatingData(data, 0) : manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
         NWBTLabEnable(enable, 1);
         if (!session.error && !NWBTCancelled)
             configured = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO] != nil;
-        if (configured && !session.error && !NWBTCancelled)
-            [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
+        if (configured && !session.error && !NWBTCancelled) {
+            NSData *initial = [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
+            if (initial && rotating) [sequences addObject:@0];
+        }
         if (configured && !session.error && !NWBTCancelled) {
             enableSubmitted = YES;
             NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
             report[@"controller_advertising_acknowledged"] = @(reply != nil);
-            double deadline = now() + 10.0;
-            while (reply && now() < deadline && !NWBTCancelled) usleep(20000);
+            double deadline = now() + 10.0, nextUpdate = now() + 1.0;
+            unsigned sequence = 1;
+            while (reply && !session.error && now() < deadline && !NWBTCancelled) {
+                if (rotating && sequence < NWBT_LAB_ROTATION_COUNT && now() >= nextUpdate) {
+                    size = NWBTLabRotatingData(data, sequence);
+                    NSString *phase = [NSString stringWithFormat:@"data_sequence_%u", sequence];
+                    if ([session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:phase cleanup:NO])
+                        [sequences addObject:@(sequence++)];
+                    // Schedule from completion: a slow controller never causes a burst.
+                    nextUpdate = now() + 1.0;
+                }
+                usleep(20000);
+            }
         }
     } @finally {
         // The controller duration stops this announcement even if the worker
@@ -294,6 +314,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
                 @([session command:0x203c parameters:[NSData dataWithBytes:&handle length:1] phase:@"remove" cleanup:YES] != nil);
         }
         report[@"local_hci_commands_submitted"] = @(session.commands);
+        if (rotating) report[@"acknowledged_sequence_count"] = @(sequences.count);
         if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
         else if (originalError || session.error) report[@"error"] = originalError ?: session.error;
         else if (![report[@"controller_advertising_acknowledged"] boolValue]) report[@"error"] = @"Lab advertisement was not enabled.";
@@ -302,8 +323,9 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
     return report;
 }
 
-NSDictionary *NWBTAdvertiseLab(void) { return NWBTAdvertiseLabVariant(NO); }
-NSDictionary *NWBTAdvertiseManufacturerLab(void) { return NWBTAdvertiseLabVariant(YES); }
+NSDictionary *NWBTAdvertiseLab(void) { return NWBTAdvertiseLabVariant(NO, NO); }
+NSDictionary *NWBTAdvertiseManufacturerLab(void) { return NWBTAdvertiseLabVariant(YES, NO); }
+NSDictionary *NWBTAdvertiseRotatingLab(void) { return NWBTAdvertiseLabVariant(YES, YES); }
 
 @interface NWBTPingSession : NSObject
 @property(nonatomic, strong) NWBTRing *hci, *acl;
