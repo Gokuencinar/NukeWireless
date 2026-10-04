@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app11"
+#define NWBT_VERSION @"0.0.3~app12"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
@@ -13,6 +13,9 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadControllerInfo(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTOpenSkywalk(void);
 // Submits one standard local version query through the inspected HCI Skywalk ring.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadSkywalkController(void);
+// Five allowlisted local HCI reads, bounded to twelve seconds. Requires the
+// runner's exclusive ownership and recovery; does not enable radio operations.
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadLECapabilities(void);
 // Experimental, bounded echo diagnostic on the exact inspected device.
 // Requires exclusive HCI/ACL ownership; never stops system services itself.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination);

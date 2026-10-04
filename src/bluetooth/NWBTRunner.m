@@ -207,9 +207,9 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runPing(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS) {
+static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS) {
     // Reject invalid options before guard, lock acquisition or service changes.
-    if (!NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
+    if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
     NSDictionary *guard = NWBTNativeGuard();
     if (guard) { NSMutableDictionary *report = [guard mutableCopy]; report[@"error_code"] = codeForReport(guard); return report; }
     NSString *lockPath = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth.lock"];
@@ -260,7 +260,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath, NSUInteger 
                 report[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
-            else report = [NWBTL2PingWithMilliseconds(address, count, intervalMS) mutableCopy];
+            else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : NWBTReadLECapabilities()) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -303,6 +303,9 @@ int main(int argc, char **argv) {
         BOOL milliseconds = argc == 5 && !strcmp(argv[1], "--ping-ms");
         recordAppRun = milliseconds || ((argc == 3 || argc == 5) && !strcmp(argv[1], "--ping"));
         BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
+        BOOL capabilities = argc == 2 && !strcmp(argv[1], "--le-capabilities");
+        // This first capability probe is reserved for the explicit root operator.
+        if (capabilities && invokingUID != 0) return printReport(errorReport(@"permissions"));
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
         char ownPath[PATH_MAX] = {0};
         if (!callerAllowed(ownPath) || geteuid() || setgroups(0, NULL) || setgid(0) || setuid(0))
@@ -314,11 +317,18 @@ int main(int argc, char **argv) {
         signal(SIGPIPE, SIG_IGN);
         signal(SIGCHLD, SIG_DFL);
         if (recovery) return recover();
+        if (capabilities) {
+            signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
+            alarm(60);
+            NSDictionary *report = runExclusive(nil, ownPath, 0, 0);
+            alarm(0); return printReport(report);
+        }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
             NSDictionary *information = NWBTInspectTransport();
             BOOL supported = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
-                @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES});
+                @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
+                @"supports_le_capability_reads": @YES});
         }
         if (!milliseconds && ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping"))) return printReport(errorReport(@"arguments"));
         NSUInteger count = NWBT_DEFAULT_COUNT, intervalMS = milliseconds ? NWBT_DEFAULT_INTERVAL_MS : NWBT_DEFAULT_INTERVAL;
@@ -337,7 +347,7 @@ int main(int argc, char **argv) {
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
         unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
         alarm(timeout > 60 ? timeout : 60);
-        NSDictionary *report = runPing(address.uppercaseString, ownPath, count, intervalMS);
+        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS);
         alarm(0); return printReport(report);
     }
 }

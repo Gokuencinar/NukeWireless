@@ -1,5 +1,6 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
+#include "NWBTHCIRead.h"
 #include <dlfcn.h>
 #include <poll.h>
 #include <errno.h>
@@ -86,6 +87,101 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
     return data;
 }
 @end
+
+// The runner obtains exclusive ownership and arranges independent recovery.
+// This operation never opens ACL, connects, scans, advertises or resets firmware.
+NSDictionary *NWBTReadLECapabilities(void) {
+    NSDictionary *error = NWBTNativeGuard(); if (error) return error;
+    uint64_t capacity = 0;
+    void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    if (!channel) return error;
+    NSMutableArray *queries = [NSMutableArray new];
+    NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_capabilities",
+        @"queries": queries, @"advertising_commands_submitted": @0,
+        @"connection_commands_submitted": @0, @"capabilities_verified": @NO} mutableCopy];
+    @try {
+        NWBTRing *ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
+        if (!ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
+        // Retire queued responses before sending the first query.
+        for (NSUInteger i = 0; i < 32; ++i) {
+            if (![ring read]) break;
+            if (i == 31) report[@"error"] = @"Pre-existing RX traffic exceeded its bound.";
+        }
+        if (ring.error) report[@"error"] = ring.error;
+        uint8_t credits = 1;
+        NSMutableData *stream = [NSMutableData new];
+        const uint16_t opcodes[] = {0x1001, 0x1002, 0x1003, 0x2003, 0x201c};
+        NSArray *names = @[@"read_local_version", @"read_supported_commands", @"read_local_features",
+                           @"le_read_local_features", @"le_read_supported_states"];
+        double overallDeadline = now() + 12.0;
+        NSUInteger submitted = 0;
+        for (NSUInteger index = 0; index < 5 && !report[@"error"] && !NWBTCancelled; ++index) {
+            uint16_t opcode = opcodes[index];
+            if (!NWBTReadReplySize(opcode)) { report[@"error"] = @"Query outside read-only allowlist."; break; }
+            NSMutableDictionary *query = [@{@"name": names[index], @"opcode": @(opcode)} mutableCopy];
+            [queries addObject:query];
+            BOOL sent = NO, completed = NO;
+            double deadline = MIN(now() + 2.0, overallDeadline);
+            NSUInteger events = 0, receivedBytes = 0;
+            while (now() < deadline && !NWBTCancelled && !report[@"error"]) {
+                if (!sent && credits) {
+                    uint8_t command[] = {(uint8_t)opcode, (uint8_t)(opcode >> 8), 0};
+                    if (![ring send:[NSData dataWithBytes:command length:3]]) { report[@"error"] = ring.error; break; }
+                    credits--; submitted++; sent = YES;
+                }
+                NSData *chunk = [ring read];
+                if (ring.error) { report[@"error"] = ring.error; break; }
+                if (chunk) {
+                    receivedBytes += chunk.length;
+                    [stream appendData:chunk];
+                    if (stream.length > 4096 || receivedBytes > 65536) { report[@"error"] = @"HCI stream exceeded its bound."; break; }
+                }
+                while (stream.length >= 2 && !report[@"error"]) {
+                    const uint8_t *p = stream.bytes; NSUInteger size = (NSUInteger)p[1] + 2;
+                    if (stream.length < size) break;
+                    uint8_t status = 0;
+                    int match = NWBTMatchReadReply(p, size, opcode, &credits, &status);
+                    if (++events > 256) { report[@"error"] = @"HCI event count exceeded its bound."; break; }
+                    if (match < 0) report[@"error"] = @"Malformed controller read response.";
+                    else if (match && sent) {
+                        query[@"hci_status"] = @(status);
+                        query[@"response_event"] = @(p[0]);
+                        if (match == 1 && !status) {
+                            NSMutableString *hex = [NSMutableString new];
+                            for (NSUInteger byte = 6; byte < size; ++byte) [hex appendFormat:@"%02x", p[byte]];
+                            query[@"return_data_hex"] = hex;
+                            if (opcode == 0x1001) {
+                                query[@"hci_version"] = @(p[6]); query[@"hci_revision"] = @(u16(p + 7));
+                                query[@"lmp_version"] = @(p[9]); query[@"manufacturer_id"] = @(u16(p + 10));
+                                query[@"lmp_subversion"] = @(u16(p + 12));
+                            }
+                        }
+                        completed = YES;
+                    }
+                    [stream replaceBytesInRange:NSMakeRange(0, size) withBytes:NULL length:0];
+                    if (completed) break;
+                }
+                if (completed) break;
+                struct pollfd descriptor = {[ring descriptor], POLLIN, 0};
+                int result = poll(&descriptor, 1, 20);
+                if ((result < 0 && errno != EINTR) || (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)))
+                    report[@"error"] = @"HCI channel polling failed.";
+            }
+            if (!completed && !report[@"error"] && !NWBTCancelled) {
+                query[@"timed_out"] = @YES;
+                report[@"error"] = @"Controller read completion deadline expired.";
+            }
+            // Preserve rejected queries as evidence; an unsupported LE read is
+            // a controller result, never evidence that advertising works.
+        }
+        report[@"local_hci_commands_submitted"] = @(submitted);
+        if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
+        BOOL verified = queries.count == 5 && !report[@"error"];
+        for (NSDictionary *query in queries) verified = verified && query[@"return_data_hex"] != nil;
+        report[@"capabilities_verified"] = @(verified);
+        return report;
+    } @finally { NWBTCloseNativeChannel(channel); }
+}
 
 @interface NWBTPingSession : NSObject
 @property(nonatomic, strong) NWBTRing *hci, *acl;
