@@ -6,6 +6,8 @@
 #include <dlfcn.h>
 #include <sys/sysctl.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(void) {
     @autoreleasepool {
