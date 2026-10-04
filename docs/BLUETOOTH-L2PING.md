@@ -1,8 +1,8 @@
 # Bluetooth nativo: biblioteca de investigación
 
-**Estado: diagnóstico local del controlador compilado e instalado; pendiente
-de ejecución con Bluetooth apagado en Ajustes. El ping L2CAP todavía no está
-implementado.** La app continúa en dev19, cuyas funciones
+**Estado: la apertura de AppleConvergedTransport falla con operación no
+soportada en el dispositivo. Se investiga su ruta nativa HCI Skywalk; el ping
+L2CAP todavía no está implementado.** La app continúa en dev19, cuyas funciones
 el usuario confirmó. Este paquete independiente no es una nueva versión de la
 app ni añade un botón de ping.
 
@@ -14,7 +14,7 @@ respuesta, plazo total y cancelación. No se ejecutó ningún ping.
 ## Paquete separado
 
 - ID: `com.gokuencinar.nukewireless.bluetooth`.
-- Versión instalada: `0.0.2~probe1`.
+- Versión instalada: `0.0.2~probe5`.
 - Esquema de esta candidata: RootHide; binarios arm64, deployment target iOS 15.
 - Biblioteca: `/usr/lib/NukeBluetoothBridge.dylib`.
 - Inspector: `/usr/bin/nwbt-inspect --inspect`.
@@ -22,14 +22,18 @@ respuesta, plazo total y cancelación. No se ejecutó ningún ping.
   [NWBTInspector.m](../src/bluetooth/NWBTInspector.m).
 - No tiene daemon, filtro de inyección ni constructor con efectos sobre Bluetooth.
   La inspección pasiva carga bibliotecas del sistema, busca símbolos y enumera
-  metadatos Objective-C. `--transport-code` copia exclusivamente una sección
-  de código de AppleConvergedTransport para análisis local de su ABI.
-- `nwbt-inspect --controller-info --exclusive` intenta abrir BTI/HCI y enviar
+  metadatos Objective-C. `--transport-code` copia secciones acotadas de código
+  y constantes de AppleConvergedTransport para análisis local de su ABI.
+- `nwbt-inspect --controller-info --exclusive` intenta abrir HCI y enviar
   únicamente **Read Local Version Information** al controlador local. Comprueba
   UID root, modelo/iOS, SHA-256 de la sección de código y estado apagado de
   Bluetooth antes de llamar al transporte. No conecta dispositivos remotos.
   Tiene timeout de lectura, liberación de handles y watchdog de 20 segundos
   que termina exclusivamente el helper si una llamada privada queda atascada.
+- `nwbt-inspect --skywalk-open --exclusive` es una comprobación separada de
+  apertura/cierre del canal HCI real, localizado por IORegistry. No consume ni
+  escribe slots. Tiene las mismas guardas de ABI, root, Bluetooth apagado y
+  watchdog. No enciende el controlador ni llama selectores de configuración.
 - El JSON declara `l2ping_implemented: false`,
   `bluetooth_packets_sent: 0` y `signatures_verified: false`.
 
@@ -53,8 +57,25 @@ de NVRAM, task_for_pid, DriverKit ni la firma completa del daemon.
   compiló `probe1` (`16706cf`). El `.deb` instalado tiene SHA-256
   `0f94755f31e7df5042aa8f93e8dbad2a93e48011e4c3e67021394b18a9b1fc17`.
   Su inspección pasiva terminó con código 0; la app conserva dev19.
-- No se ejecutó todavía el diagnóstico exclusivo. Se solicitó al usuario
-  apagar Bluetooth en Ajustes; se espera esa preparación antes de abrir handles.
+- Con Bluetooth apagado en Ajustes, `probe1` terminó con `bti_open`; no llegó
+  a enviar comandos HCI. La apertura directa de HCI en `probe2` también falló.
+- `probe3` incorpora la API pública OSLogStore, con alcance exclusivo al
+  proceso del helper. Su registro muestra `failed to open 0xe00002c7`.
+  Apple define este valor como `kIOReturnUnsupported` en
+  [IOReturn.h](https://github.com/apple-oss-distributions/xnu/blob/main/iokit/IOKit/IOReturn.h).
+  No prueba denegación de permisos ni que el canal esté ocupado.
+- IORegistry muestra AppleConvergedIPCOLYBTControl, interfaces RTI hci/sco/acl
+  con transporte Skywalk y debug con userclient. No hay un dispositivo CBTI.
+  Los identificadores de nexus se conservan solo localmente y se consultan
+  dinámicamente; no se incluyen identificadores del dispositivo en el código.
+- `probe4` compiló en
+  [Actions 37173561387](https://github.com/Gokuencinar/NukeWireless/actions/runs/37173561387),
+  se instaló y ejecutó sin error. Su paquete tiene SHA-256
+  `87f912061bbc9c438c936cfae9f2c0cff1ed164c469bdd609cd14963b8b1eea3`.
+  Capturó además 1445 bytes de constantes y 1085 bytes de cadenas del transporte.
+  El código y sus cadenas describen una implementación PCI diferente de la
+  ruta Skywalk que BlueTool implementa directamente. Esto justifica investigar
+  esa ruta; no demuestra todavía una apertura funcional.
 - El usuario dispone de unos Mi True Wireless EBs Basic 2 como posible destino.
   Su dirección se localizó en los dispositivos emparejados de Windows y se
   conserva exclusivamente en el entorno de trabajo local.
@@ -79,6 +100,31 @@ Las cabeceras del protocolo HCI de
 [BlueZ](https://github.com/bluez/bluez/blob/master/lib/bluetooth/hci.h)
 se consultaron para el opcode y formato de Read Local Version Information.
 No se portó su transporte Linux ni se utilizó su backend de sockets.
+
+### Ruta Skywalk contrastada
+
+En BlueTool de 20D67, `0x100003fac` llama `os_channel_create(uuid, 0)` y los
+callsites siguientes consultan el tamaño de buffer y los slots TX/RX. Las
+firmas se contrastan con el código de Apple
+[XNU 8792.61.2, os_channel.h](https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/bsd/skywalk/channel/os_channel.h)
+y [IOKitLib.h](https://github.com/apple-oss-distributions/IOKitUser/blob/main/IOKitLib.h).
+`probe5` consulta hci/skywalk bajo AppleConvergedIPCRTIInterface y busca el
+IOSkywalkNexusUUID de sus hijos. Abre puerto 0, lee atributos y cierra el canal.
+No llama los selectores 3/5 de AppleBluetoothModule observados en BlueTool:
+su efecto sobre alimentación/configuración no está verificado.
+
+La candidata `probe5` compiló en
+[Actions 37173878281](https://github.com/Gokuencinar/NukeWireless/actions/runs/37173878281)
+desde `5728732`. SHA-256 del paquete instalado:
+`3c4d72a57a336284e791bca988c38c083d4accbc8922648ee440f6f65ad1cd71`.
+La inspección y captura pasivas terminaron con código 0. La apertura Skywalk
+terminó con código 1 y `errno=16`, `Resource busy`, sin crash ni paquetes.
+El canal se localiza correctamente pero no se ha abierto. No se llegó a leer
+atributos ni a consumir slots. `bluetoothd` sigue ejecutándose en
+`user/501/com.apple.bluetoothd` aun con Bluetooth apagado en Ajustes.
+Esto permite proponer una prueba de exclusividad con recuperación acotada,
+pero no demuestra por sí solo que bluetoothd sea el propietario que bloquea
+la apertura. No se detuvo, deshabilitó ni reinició ese servicio en estas pruebas.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 
@@ -156,7 +202,7 @@ se inspeccionó mediante `/rootfs`, como documenta
 Los frameworks están en la caché compartida de dyld; que no exista un archivo
 individual en SFTP no significa que el framework no esté disponible.
 
-Para completar el backend nativo falta verificar en este iOS el ABI de
+Para completar el backend nativo falta verificar en este iOS la ruta Skywalk de
 creación/lectura/escritura/liberación, el canal de recepción y el acceso al
 controlador compatible con el servicio Bluetooth del sistema. Después harán
 falta resultados de ecos reales en un dispositivo objetivo. No se sustituyen
