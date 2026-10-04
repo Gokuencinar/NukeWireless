@@ -16,6 +16,7 @@
 #include <grp.h>
 
 static const char *service = "user/501/com.apple.bluetoothd";
+static NSString *bootstrapRoot;
 static char *const cleanEnvironment[] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", NULL};
 static double uptime(void) { return NSProcessInfo.processInfo.systemUptime; }
 static void cancelRun(int number) {
@@ -70,14 +71,15 @@ static int control(const char *verb, const char *argument, NSString **output) {
     posix_spawn_file_actions_adddup2(&actions, descriptors[1], STDERR_FILENO);
     posix_spawn_file_actions_addclose(&actions, descriptors[0]);
     posix_spawn_file_actions_addclose(&actions, descriptors[1]);
-    char *arguments[] = {"/bin/launchctl", (char *)verb, (char *)argument, NULL, NULL};
+    NSString *executable = [bootstrapRoot stringByAppendingPathComponent:@"bin/launchctl"];
+    char *arguments[] = {(char *)executable.fileSystemRepresentation, (char *)verb, (char *)argument, NULL, NULL};
     if (!strcmp(verb, "bootstrap")) {
         arguments[2] = "user/501"; arguments[3] = (char *)argument;
     }
     pid_t child = 0;
-    int result = posix_spawn(&child, "/bin/launchctl", &actions, NULL, arguments, cleanEnvironment);
+    int result = posix_spawn(&child, executable.fileSystemRepresentation, &actions, NULL, arguments, cleanEnvironment);
     posix_spawn_file_actions_destroy(&actions); close(descriptors[1]);
-    if (result) { close(descriptors[0]); return -1; }
+    if (result) { close(descriptors[0]); return -result; }
     NSMutableData *data = [NSMutableData new]; double deadline = uptime() + 3.0;
     BOOL exited = NO, overflow = NO; int status = 0;
     while (uptime() < deadline) {
@@ -99,7 +101,7 @@ static int control(const char *verb, const char *argument, NSString **output) {
         [data appendBytes:buffer length:(NSUInteger)count];
     close(descriptors[0]);
     if (output) *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
-    return exited && !overflow && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    return exited && !overflow && WIFEXITED(status) ? WEXITSTATUS(status) : -1000;
 }
 
 static BOOL running(void) {
@@ -185,7 +187,8 @@ static NSString *codeForReport(NSDictionary *report) {
 static NSDictionary *runPing(NSString *address, const char *ownPath) {
     NSDictionary *guard = NWBTNativeGuard();
     if (guard) { NSMutableDictionary *report = [guard mutableCopy]; report[@"error_code"] = codeForReport(guard); return report; }
-    int lock = open("/var/run/nukewireless-bluetooth.lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+    NSString *lockPath = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth.lock"];
+    int lock = open(lockPath.fileSystemRepresentation, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
     struct stat info;
     if (lock < 0 || fstat(lock, &info) || !S_ISREG(info.st_mode) || info.st_uid || (info.st_mode & 0077) || flock(lock, LOCK_EX | LOCK_NB)) {
         if (lock >= 0) close(lock); return errorReport(@"busy");
@@ -248,6 +251,10 @@ int main(int argc, char **argv) {
         char ownPath[PATH_MAX] = {0};
         if (!callerAllowed(ownPath) || geteuid() || setgroups(0, NULL) || setgid(0) || setuid(0))
             return printReport(errorReport(@"permissions"));
+        NSString *physical = [NSString stringWithUTF8String:ownPath];
+        NSString *suffix = @"/usr/bin/nwbt-run";
+        if (![physical hasSuffix:suffix]) return printReport(errorReport(@"permissions"));
+        bootstrapRoot = [physical substringToIndex:physical.length - suffix.length];
         signal(SIGPIPE, SIG_IGN);
         if (recovery) return recover();
         if (argc == 2 && !strcmp(argv[1], "--status")) {
