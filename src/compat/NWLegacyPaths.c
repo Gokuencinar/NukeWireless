@@ -81,7 +81,6 @@ static void (*original_scanner_start)(id, SEL);
 static void (*original_scanner_finished)(id, SEL, NSUInteger);
 static void (*original_scanner_failed)(id, SEL);
 static id oui_brands;
-static int ui_dump_count;
 static int info_overlay_added;
 struct cg_point { double x, y; };
 struct cg_size { double width, height; };
@@ -556,9 +555,16 @@ static id rewrite_argument(id argument) {
     };
     size_t length = strlen(value), prefix = strlen(root);
     if (length > 65536 || prefix > 4096) return argument;
-    // Every insertion consumes at least one input byte; this is a safe bound.
-    if (length > (SIZE_MAX - 1) / (prefix + 1)) return argument;
-    char *buffer = malloc(length * (prefix + 1) + 1);
+    size_t insertions = 0;
+    for (size_t i = 0; i < length; ++i) {
+        if (i == 0 || strchr(" \t\n\"'=;|(&", value[i - 1])) {
+            for (size_t j = 0; j < sizeof(paths) / sizeof(paths[0]); ++j) {
+                if (starts_with(value + i, paths[j])) { ++insertions; break; }
+            }
+        }
+    }
+    if (!insertions || insertions > (SIZE_MAX - length - 1) / prefix) return argument;
+    char *buffer = malloc(length + insertions * prefix + 1);
     if (!buffer) return argument;
     size_t used = 0;
     for (size_t i = 0; i < length; ++i) {
@@ -1460,60 +1466,6 @@ static void attach_bulk_button(id view) {
     debug_line("bulk-panel", "attached");
 }
 
-static void dump_view_tree(id view, int depth, int *remaining) {
-    if (!view || depth > 20 || !*remaining) return;
-    --*remaining;
-    const char *class_name = class_getName(object_getClass(view));
-    id label = ((id (*)(id, SEL))objc_msgSend)(view,
-        sel_registerName("accessibilityLabel"));
-    char line[512];
-    snprintf(line, sizeof(line), "%d %s | %s", depth,
-        class_name ? class_name : "?", utf8(label) ? utf8(label) : "");
-    debug_line("view", line);
-    if (contains(class_name, "HostingScrollView")) {
-        struct cg_rect frame = ((struct cg_rect (*)(id, SEL))objc_msgSend)(
-            view, sel_registerName("frame"));
-        snprintf(line, sizeof(line), "x=%g y=%g w=%g h=%g",
-            frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
-        debug_line("scroll-frame", line);
-        id elements = ((id (*)(id, SEL))objc_msgSend)(view,
-            sel_registerName("accessibilityElements"));
-        NSUInteger element_count = elements ? ((NSUInteger (*)(id, SEL))objc_msgSend)(
-            elements, sel_registerName("count")) : 0;
-        for (NSUInteger i = 0; i < element_count && i < 80; ++i) {
-            id element = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-                elements, sel_registerName("objectAtIndex:"), i);
-            id element_label = ((id (*)(id, SEL))objc_msgSend)(element,
-                sel_registerName("accessibilityLabel"));
-            debug_line("scroll-accessibility", utf8(element_label));
-        }
-    }
-    if (contains(class_name, "TableView")) {
-        id data_source = ((id (*)(id, SEL))objc_msgSend)(view,
-            sel_registerName("dataSource"));
-        debug_line("table-data-source", data_source ? class_getName(object_getClass(data_source)) : "nil");
-        NSUInteger sections = ((NSUInteger (*)(id, SEL))objc_msgSend)(view,
-            sel_registerName("numberOfSections"));
-        char count_text[40];
-        snprintf(count_text, sizeof(count_text), "%lu", sections);
-        debug_line("table-sections", count_text);
-        for (NSUInteger i = 0; i < sections && i < 12; ++i) {
-            NSUInteger rows = ((NSUInteger (*)(id, SEL, NSUInteger))objc_msgSend)(
-                view, sel_registerName("numberOfRowsInSection:"), i);
-            snprintf(count_text, sizeof(count_text), "%lu:%lu", i, rows);
-            debug_line("table-rows", count_text);
-        }
-    }
-    id children = ((id (*)(id, SEL))objc_msgSend)(view,
-        sel_registerName("subviews"));
-    NSUInteger count = children ? ((NSUInteger (*)(id, SEL))objc_msgSend)(
-        children, sel_registerName("count")) : 0;
-    for (NSUInteger i = 0; i < count && *remaining; ++i) {
-        id child = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-            children, sel_registerName("objectAtIndex:"), i);
-        dump_view_tree(child, depth + 1, remaining);
-    }
-}
 
 static id find_info_scroll(id view, int depth) {
     if (!view || depth > 16) return 0;
