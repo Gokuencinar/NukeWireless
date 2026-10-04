@@ -91,7 +91,8 @@ class PackageTests(unittest.TestCase):
 
     def test_control_and_signing(self):
         before = members(BASE,'control.tar'); after = members(RESULT,'control.tar')
-        self.assertEqual(before['postinst'][1],after['postinst'][1])
+        self.assertEqual(package.patch_app_signing_identity(before['postinst'][1]),after['postinst'][1])
+        self.assertIn(b'ldid -Hsha256 -M -Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"',after['postinst'][1])
         self.assertIn(b'ldid -S /usr/lib/TweakInject/NukeWirelessInfo.dylib',after['postinst'][1])
         self.assertIn(f'Version: {package.VERSION}\n'.encode(),after['control'][1])
         self.assertIn(b'firmware (>= 16.3)',after['control'][1])

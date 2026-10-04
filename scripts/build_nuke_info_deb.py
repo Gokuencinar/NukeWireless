@@ -18,7 +18,7 @@ from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, 
 from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.25+rh25.5~dev29"
+VERSION = "1.0.25+rh25.5~dev30"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
@@ -44,6 +44,19 @@ def patch_visible_text(binary):
         binary = binary.replace(old + b"\0", new.ljust(len(old), b" ") + b"\0", 1)
     return binary
 
+
+def patch_app_signing_identity(script):
+    original = b'''for executable in "$APP" "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
+    ldid -Hsha256 -M "-S$ENT" "$executable"
+done'''
+    corrected = b'''ldid -Hsha256 -M -Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"
+for executable in "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
+    ldid -Hsha256 -M "-S$ENT" "$executable"
+done'''
+    if script.count(original) != 1:
+        raise ValueError("unexpected baseline signing script")
+    return script.replace(original, corrected, 1)
+
 def build(source, artifact, output):
     raw = source.read_bytes()
     if sha(raw) != EXPECTED_SOURCE_SHA256:
@@ -52,7 +65,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text())
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev29" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev30" not in library:
         raise ValueError("wrong development library version")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
@@ -71,7 +84,7 @@ def build(source, artifact, output):
         raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.29",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.30",
                     CFBundleDevelopmentRegion="en", CFBundleLocalizations=["en", "es"],
                     NSBluetoothAlwaysUsageDescription="Scan nearby BLE devices / Escanear dispositivos BLE cercanos.")
     metadata.pop("UILaunchScreen", None)
@@ -112,6 +125,9 @@ def build(source, artifact, output):
         entries.append(regular(main + "Localizable.strings", native))
     entries.append(regular(bundle + "CreditsAvatar.png", (ROOT / "resources/CreditsAvatar.png").read_bytes()))
     for i,(member,data) in enumerate(control):
+        if member.name.lstrip("./") == "postinst":
+            data = patch_app_signing_identity(data)
+            member.size = len(data); control[i] = (member,data)
         if member.name.lstrip("./") == "control":
             before = b"Version: 1.0.25+rh25.3\n"
             if data.count(before) != 1: raise ValueError("unexpected baseline control")
@@ -127,7 +143,8 @@ def build(source, artifact, output):
         ("control.tar.gz",tar_bytes(control)),("data.tar.gz",tar_bytes(entries))]))
     report = {"version":VERSION,"baseline_sha256":sha(raw),"package_sha256":sha(output.read_bytes()),
               "extension":manifest, "app_before":sha(executable),"app_after":sha(replacement[APP+"HarpyReloaded"]),
-              "changed_existing_files": sorted(replacement), "release_published":False}
+              "changed_existing_files": sorted(replacement), "changed_control_files": ["control", "postinst"],
+              "app_signing_identifier": "me.midnightchips.harpy-reloaded", "release_published":False}
     output.with_suffix(".manifest.json").write_text(json.dumps(report,indent=2)+"\n")
     print(output); print("sha256",report["package_sha256"])
     return report

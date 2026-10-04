@@ -1,4 +1,13 @@
-# Escaneo y prueba de publicidad BLE (dev29 / app14)
+# Escaneo y prueba de publicidad BLE (dev30 / app14)
+
+En el iPhone XS con iOS 16.3.1 y RootHide, el ejecutable instalado estaba firmado
+con identifier HarpyReloaded mientras LaunchServices registraba
+me.midnightchips.harpy-reloaded. CoreBluetooth iniciaba la solicitud, pero
+authorization permanecía en 0 y no había aviso ni resultados. Al corregir solo
+el identifier de firma con ldid -I (conservando entitlements), apareció el aviso
+de autorización. El usuario confirmó recepción y el diagnóstico registró
+authorization=3, 709 callbacks y 27 dispositivos. Dev30 conserva esta corrección
+en postinst para reinstalaciones; los otros helpers conservan su firma anterior.
 
 El escáner retoma la solicitud pendiente al volver a estado activo. Antes podía
 perder el comienzo del escaneo cuando el callback PoweredOn llegaba mientras el

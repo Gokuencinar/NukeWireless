@@ -18,7 +18,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev29";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev30";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -328,7 +328,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev29", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev30", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -656,7 +656,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev29 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev30 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
