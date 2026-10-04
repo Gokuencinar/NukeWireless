@@ -4,7 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev19`, por SSH el 4 de octubre; `dpkg` confirma la instalación. Sus funciones nuevas siguen pendientes de comprobación de uso. La anterior `dev18` fue confirmada por el usuario: desapareció la antigua pantalla azul inicial. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
+**Última candidata instalada:** `1.0.25+rh25.5~dev19`, por SSH el 4 de octubre; `dpkg` confirma la instalación y el usuario confirmó que sus funciones funcionan. La anterior `dev18` fue confirmada por el usuario: desapareció la antigua pantalla azul inicial. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
+
+**Bluetooth nativo en investigación:** se ha compilado e instalado una biblioteca
+independiente de inspección en el iPhone XS con iOS 16.3.1 y Dopamine RootHide.
+Su inspector carga y recoge interfaces del sistema; **l2ping todavía no está
+implementado**. La app continúa en dev19. Véase [evidencias, fuentes y transporte
+pendiente](docs/BLUETOOTH-L2PING.md).
 
 **Nueva interfaz candidata dev19 / compat2:** panel **Equipos** desde la lupa de Wi-Fi,
 con búsqueda, filtros y ordenación de los resultados existentes. **Información →
