@@ -239,6 +239,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
         close(lock);
     }
     if (!report) report = [errorReport(@"transport") mutableCopy];
+    if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);
     if (armed && ![report[@"service_restored"] boolValue]) report[@"error_code"] = @"recovery";
     return report;

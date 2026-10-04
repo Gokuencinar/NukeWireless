@@ -279,7 +279,7 @@ NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
             fputs("NWBT phase: bounded connection attempt submitted\n", stderr);
             double deadline = now() + 6.0;
             while (!session.connected && !session.error && !NWBTCancelled && now() < deadline) [session pump];
-            if (!session.connected && !session.error) session.error = @"Target connection timed out after six seconds.";
+            if (!session.connected && !session.error && !NWBTCancelled) session.error = @"Target connection timed out after six seconds.";
         }
         for (uint8_t identifier = 1; identifier <= 5 && session.connected && !session.error && !NWBTCancelled; ++identifier) {
             double creditDeadline = now() + 1.0;
@@ -305,8 +305,8 @@ NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
         report[@"disconnect_confirmed"] = @(session.disconnectConfirmed); report[@"connection_cancel_confirmed"] = @(session.cancelConfirmed);
         NSUInteger replies = 0; for (NSDictionary *sample in session.samples) if ([sample[@"reply"] boolValue]) replies++;
         report[@"echo_replies_verified"] = @(replies); report[@"l2ping_verified"] = @(replies > 0);
-        if (originalError) report[@"error"] = originalError;
-        else if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
+        if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
+        else if (originalError) report[@"error"] = originalError;
         else if (!replies) report[@"error"] = @"No matching L2CAP Echo Response received.";
         if (session.connected || (session.pending && !session.cancelConfirmed)) report[@"cleanup_warning"] = @"Link cleanup was not acknowledged before its deadline; restore the Bluetooth service.";
         return report;

@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app3"
+#define NWBT_VERSION @"0.0.3~app4"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTInspectTransport(void);
