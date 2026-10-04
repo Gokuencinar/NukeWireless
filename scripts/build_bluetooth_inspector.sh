@@ -6,6 +6,9 @@ mkdir -p "$out"
 clang -std=c11 -Wall -Wextra -Werror tests/test_hci_read.c -o "$out/test-hci-read"
 "$out/test-hci-read"
 rm "$out/test-hci-read"
+clang -std=c11 -Wall -Wextra -Werror tests/test_bt_lab.c -o "$out/test-bt-lab"
+"$out/test-bt-lab"
+rm "$out/test-bt-lab"
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 -fPIC -dynamiclib \

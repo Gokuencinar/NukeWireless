@@ -207,7 +207,7 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS) {
+static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab) {
     // Reject invalid options before guard, lock acquisition or service changes.
     if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
     NSDictionary *guard = NWBTNativeGuard();
@@ -260,7 +260,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
                 report[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
-            else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : NWBTReadLECapabilities()) mutableCopy];
+            else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : lab ? NWBTAdvertiseLab() : NWBTReadLECapabilities()) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -304,8 +304,9 @@ int main(int argc, char **argv) {
         recordAppRun = milliseconds || ((argc == 3 || argc == 5) && !strcmp(argv[1], "--ping"));
         BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
         BOOL capabilities = argc == 2 && !strcmp(argv[1], "--le-capabilities");
+        BOOL lab = argc == 2 && !strcmp(argv[1], "--le-advertise-test");
         // callerAllowed below admits only root or the exact installed app parent.
-        recordAppRun = recordAppRun || capabilities;
+        recordAppRun = recordAppRun || capabilities || lab;
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
         char ownPath[PATH_MAX] = {0};
         if (!callerAllowed(ownPath) || geteuid() || setgroups(0, NULL) || setgid(0) || setuid(0))
@@ -317,10 +318,10 @@ int main(int argc, char **argv) {
         signal(SIGPIPE, SIG_IGN);
         signal(SIGCHLD, SIG_DFL);
         if (recovery) return recover();
-        if (capabilities) {
+        if (capabilities || lab) {
             signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
             alarm(60);
-            NSDictionary *report = runExclusive(nil, ownPath, 0, 0);
+            NSDictionary *report = runExclusive(nil, ownPath, 0, 0, lab);
             alarm(0); return printReport(report);
         }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
@@ -328,7 +329,8 @@ int main(int argc, char **argv) {
             BOOL supported = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
-                @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES});
+                @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
+                @"supports_le_advertising_test": @YES});
         }
         if (!milliseconds && ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping"))) return printReport(errorReport(@"arguments"));
         NSUInteger count = NWBT_DEFAULT_COUNT, intervalMS = milliseconds ? NWBT_DEFAULT_INTERVAL_MS : NWBT_DEFAULT_INTERVAL;
@@ -347,7 +349,7 @@ int main(int argc, char **argv) {
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
         unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
         alarm(timeout > 60 ? timeout : 60);
-        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS);
+        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO);
         alarm(0); return printReport(report);
     }
 }

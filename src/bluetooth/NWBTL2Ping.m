@@ -1,6 +1,7 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
 #include "NWBTHCIRead.h"
+#include "NWBTLab.h"
 #include <dlfcn.h>
 #include <poll.h>
 #include <errno.h>
@@ -8,6 +9,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <unistd.h>
 
 volatile sig_atomic_t NWBTCancelled = 0;
 static double now(void) { return NSProcessInfo.processInfo.systemUptime; }
@@ -181,6 +183,116 @@ NSDictionary *NWBTReadLECapabilities(void) {
         report[@"capabilities_verified"] = @(verified);
         return report;
     } @finally { NWBTCloseNativeChannel(channel); }
+}
+
+@interface NWBTLabSession : NSObject
+@property(nonatomic, strong) NWBTRing *ring;
+@property(nonatomic, strong) NSMutableData *stream;
+@property(nonatomic, strong) NSMutableArray *queries;
+@property(nonatomic, copy) NSString *error;
+@property(nonatomic) uint8_t credits;
+@property(nonatomic) NSUInteger events, bytes, commands;
+@end
+@implementation NWBTLabSession
+- (NSData *)command:(uint16_t)opcode parameters:(NSData *)parameters phase:(NSString *)phase cleanup:(BOOL)cleanup {
+    if (!NWBTLabReplySize(opcode) || parameters.length > 255) { self.error = @"Command outside lab allowlist."; return nil; }
+    NSMutableDictionary *query = [@{@"opcode": @(opcode), @"phase": phase} mutableCopy];
+    [self.queries addObject:query];
+    BOOL sent = NO; double deadline = now() + 2.0;
+    while (now() < deadline && (cleanup || !NWBTCancelled) && !self.error) {
+        if (!sent && self.credits) {
+            uint8_t header[] = {(uint8_t)opcode, (uint8_t)(opcode >> 8), (uint8_t)parameters.length};
+            NSMutableData *packet = [NSMutableData dataWithBytes:header length:3]; [packet appendData:parameters];
+            if (![self.ring send:packet]) { self.error = self.ring.error; break; }
+            self.credits--; self.commands++; sent = YES; query[@"submitted"] = @YES;
+        }
+        NSData *chunk = [self.ring read];
+        if (self.ring.error) { self.error = self.ring.error; break; }
+        if (chunk) { self.bytes += chunk.length; [self.stream appendData:chunk]; }
+        if (self.stream.length > 4096 || self.bytes > 65536) { self.error = @"Lab HCI stream exceeded its bound."; break; }
+        while (self.stream.length >= 2 && !self.error) {
+            const uint8_t *p = self.stream.bytes; NSUInteger size = (NSUInteger)p[1] + 2;
+            if (self.stream.length < size) break;
+            uint8_t status = 0;
+            int match = NWBTMatchSizedReply(p, size, opcode, NWBTLabReplySize(opcode), &_credits, &status);
+            if (++self.events > 256) { self.error = @"Lab HCI events exceeded their bound."; break; }
+            NSData *reply = [self.stream subdataWithRange:NSMakeRange(0, size)];
+            [self.stream replaceBytesInRange:NSMakeRange(0, size) withBytes:NULL length:0];
+            if (match < 0) { self.error = @"Malformed lab command completion."; break; }
+            if (match && sent) {
+                query[@"hci_status"] = @(status); query[@"response_event"] = @(((const uint8_t *)reply.bytes)[0]);
+                if (match == 1 && !status) { query[@"acknowledged"] = @YES; return reply; }
+                self.error = [NSString stringWithFormat:@"Lab command 0x%04x rejected: HCI 0x%02x.", opcode, status];
+                return nil;
+            }
+        }
+        struct pollfd descriptor = {[self.ring descriptor], POLLIN, 0};
+        int result = poll(&descriptor, 1, 20);
+        if ((result < 0 && errno != EINTR) || (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)))
+            self.error = @"Lab HCI channel polling failed.";
+    }
+    if (!self.error) self.error = NWBTCancelled && !cleanup ? @"Diagnostic cancelled." : @"Lab command deadline expired.";
+    return nil;
+}
+@end
+
+NSDictionary *NWBTAdvertiseLab(void) {
+    NSDictionary *error = NWBTNativeGuard(); if (error) return error;
+    uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    if (!channel) return error;
+    NWBTLabSession *session = [NWBTLabSession new];
+    session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
+    NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
+        @"queries": session.queries, @"advertisement_name": @"NWLab",
+        @"service_uuid": @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
+        @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
+        @"advertising_stopped_acknowledged": @NO, @"connection_commands_submitted": @0,
+        @"duration_seconds": @10, @"interval_ms": @1000} mutableCopy];
+    BOOL configured = NO, enableSubmitted = NO;
+    @try {
+        session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
+        if (!session.ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
+        for (NSUInteger i = 0; i < 32; ++i) {
+            if (![session.ring read]) break;
+            if (i == 31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
+        }
+        if (session.ring.error) session.error = session.ring.error;
+        uint8_t parameters[25], data[35], enable[6];
+        NWBTLabParameters(parameters); NSUInteger size = NWBTLabData(data); NWBTLabEnable(enable, 1);
+        if (!session.error && !NWBTCancelled)
+            configured = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO] != nil;
+        if (configured && !session.error && !NWBTCancelled)
+            [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
+        if (configured && !session.error && !NWBTCancelled) {
+            enableSubmitted = YES;
+            NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
+            report[@"controller_advertising_acknowledged"] = @(reply != nil);
+            double deadline = now() + 10.0;
+            while (reply && now() < deadline && !NWBTCancelled) usleep(20000);
+        }
+    } @finally {
+        // The controller duration stops this announcement even if the worker
+        // dies. Normal/cancelled cleanup additionally disables our dedicated
+        // handle and removes it before the independent daemon recovery.
+        NSString *originalError = session.error;
+        session.error = nil;
+        if (enableSubmitted) {
+            uint8_t stop[6]; NWBTLabEnable(stop, 0);
+            report[@"advertising_stopped_acknowledged"] =
+                @([session command:0x2039 parameters:[NSData dataWithBytes:stop length:6] phase:@"disable" cleanup:YES] != nil);
+        }
+        if (configured && !session.error) {
+            uint8_t handle = NWBT_LAB_HANDLE;
+            report[@"advertising_set_removed"] =
+                @([session command:0x203c parameters:[NSData dataWithBytes:&handle length:1] phase:@"remove" cleanup:YES] != nil);
+        }
+        report[@"local_hci_commands_submitted"] = @(session.commands);
+        if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
+        else if (originalError || session.error) report[@"error"] = originalError ?: session.error;
+        else if (![report[@"controller_advertising_acknowledged"] boolValue]) report[@"error"] = @"Lab advertisement was not enabled.";
+        NWBTCloseNativeChannel(channel);
+    }
+    return report;
 }
 
 @interface NWBTPingSession : NSObject
