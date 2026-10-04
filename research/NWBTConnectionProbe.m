@@ -44,13 +44,27 @@ static NSArray *methods(Class cls) {
     }
     return records;
 }
+static NSString *normalizedAddress(id value) {
+    if (![value isKindOfClass:NSString.class]) return nil;
+    NSString *hex=[[[value stringByReplacingOccurrencesOfString:@":" withString:@""]
+        stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
+    if (hex.length!=12 || [hex rangeOfCharacterFromSet:
+            [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdef"] invertedSet]].location!=NSNotFound)
+        return nil;
+    return hex;
+}
 int main(int argc,char **argv) {
     @autoreleasepool {
-        BOOL connect=argc==2 && !strcmp(argv[1],"--connect-once");
-        if (argc!=1 && !connect) return 2;
-        NSMutableDictionary *report=[@{@"tool":@"NWBTConnectionProbe-2",@"request_submitted":@NO,
+        BOOL connect=argc>1 && !strcmp(argv[1],"--connect-once");
+        int next=connect ? 2 : 1;
+        NSString *targetAddress=nil;
+        if (argc==next+2 && !strcmp(argv[next],"--target-address")) {
+            targetAddress=normalizedAddress([NSString stringWithUTF8String:argv[next+1]]);
+            if (!targetAddress) return 2;
+        } else if (argc!=next) return 2;
+        NSMutableDictionary *report=[@{@"tool":@"NWBTConnectionProbe-3",@"request_submitted":@NO,
             @"connection_requests":@0,@"radio_state_modified":@NO,@"raw_hci_commands":@0,
-            @"laptop_disconnection_verified":@NO} mutableCopy];
+            @"laptop_disconnection_verified":@NO,@"target_match_method":targetAddress ? @"paired_address" : @"paired_name"} mutableCopy];
         @try {
             char machine[128]={0};size_t size=sizeof machine;
             sysctlbyname("hw.machine",machine,&size,NULL,0);
@@ -88,7 +102,9 @@ int main(int argc,char **argv) {
             NSMutableArray *matches=[NSMutableArray new];
             for (id device in devices) {
                 id name=objectValue(device,@"name");
-                if ([name isKindOfClass:NSString.class] && [name caseInsensitiveCompare:@"Mi True Wireless EBs Basic 2"]==NSOrderedSame)
+                BOOL matchesTarget=targetAddress ? [normalizedAddress(objectValue(device,@"address")) isEqual:targetAddress] :
+                    ([name isKindOfClass:NSString.class] && [name caseInsensitiveCompare:@"Mi True Wireless EBs Basic 2"]==NSOrderedSame);
+                if (matchesTarget)
                     [matches addObject:device];
             }
             report[@"matching_paired_devices"]=@(matches.count);
