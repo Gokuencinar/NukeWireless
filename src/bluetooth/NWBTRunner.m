@@ -216,6 +216,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
         if (lock >= 0) close(lock); return errorReport(@"busy");
     }
     int writer = -1; pid_t recovery = -1; BOOL armed = NO;
+    NSString *preflightStage = nil;
     NSMutableDictionary *report = nil;
     @try {
         NSString *disabled = nil, *state = nil;
@@ -229,7 +230,13 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
         NSDictionary *preflight = NWBTOpenSkywalk();
-        if (![preflight[@"stage"] isEqual:@"skywalk_open"] || [preflight[@"system_errno"] intValue] != EBUSY) {
+        preflightStage = preflight[@"stage"];
+        // The app can open/close this validated channel while bluetoothd is
+        // running; SSH sees EBUSY instead. Both observed outcomes permit the
+        // guarded retirement below. No frames are consumed in this preflight.
+        BOOL opened = [preflightStage isEqual:@"skywalk_opened"];
+        BOOL occupied = [preflightStage isEqual:@"skywalk_open"] && [preflight[@"system_errno"] intValue] == EBUSY;
+        if (!opened && !occupied) {
             NSMutableDictionary *details = [errorReport(@"exclusive") mutableCopy];
             details[@"exclusive_phase"] = @"preflight";
             details[@"preflight"] = preflight;
@@ -270,6 +277,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
         close(lock);
     }
     if (!report) report = [errorReport(@"transport") mutableCopy];
+    if (preflightStage) report[@"preflight_stage"] = preflightStage;
     if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);
     if (armed && ![report[@"service_restored"] boolValue]) report[@"error_code"] = @"recovery";
