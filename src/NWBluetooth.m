@@ -15,13 +15,25 @@ static NSString *const changed = @"NWBluetoothChanged";
 static NSString *const reportKey = @"NukeWirelessBluetoothLastReport";
 static NSString *const invocationKey = @"NukeWirelessBluetoothLastInvocation";
 static NSString *const countKey = @"NukeWirelessBluetoothPingCount";
-static NSString *const intervalKey = @"NukeWirelessBluetoothPingInterval";
+static NSString *const intervalKey = @"NukeWirelessBluetoothPingIntervalMS";
 static BOOL busy, cancelling;
 static pid_t worker;
 static NSObject *workerLock;
 static NSDictionary *lastReport;
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
+
+static BOOL numericValue(NSString *text, NSUInteger *result) {
+    NSString *value = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!value.length || value.length > 4) return NO;
+    NSUInteger number = 0;
+    for (NSUInteger i = 0; i < value.length; ++i) {
+        unichar digit = [value characterAtIndex:i];
+        if (digit < '0' || digit > '9') return NO;
+        number = number * 10 + (NSUInteger)(digit - '0');
+    }
+    *result = number; return YES;
+}
 
 static void saveInvocation(NSDictionary *details, BOOL cancellable) {
     if (!cancellable) return;
@@ -134,13 +146,26 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 
 @interface NWBluetoothViewController : UITableViewController <UITextFieldDelegate>
 @property(nonatomic, strong) UITextField *address;
+@property(nonatomic, strong) UITextField *countField, *intervalField;
 @property(nonatomic, strong) NSDictionary *capabilities;
 @property(nonatomic) BOOL checking;
-@property(nonatomic) NSUInteger pingCount, intervalSeconds;
+@property(nonatomic) NSUInteger pingCount, intervalMS;
 @end
 
 @implementation NWBluetoothViewController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
+- (UITextField *)numericField:(NSString *)label value:(NSUInteger)value {
+    UITextField *field = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 90, 44)];
+    field.keyboardType = UIKeyboardTypeNumberPad; field.delegate = self;
+    field.textAlignment = NSTextAlignmentRight; field.textColor = NWAccentColor();
+    field.font = [UIFont monospacedSystemFontOfSize:17 weight:UIFontWeightMedium];
+    field.text = [NSString stringWithFormat:@"%lu", value]; field.accessibilityLabel = label;
+    UIToolbar *toolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, 320, 44)];
+    toolbar.tintColor = NWAccentColor();
+    toolbar.items = @[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil],
+        [[UIBarButtonItem alloc] initWithTitle:NWText(@"bt.done") style:UIBarButtonItemStyleDone target:self action:@selector(finishEditing)]];
+    field.inputAccessoryView = toolbar; return field;
+}
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = NWText(@"bt.title");
     if (!lastReport && !busy) {
@@ -150,6 +175,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     }
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
+    self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     self.address = [UITextField new]; self.address.placeholder = @"AA:BB:CC:DD:EE:FF";
     self.address.keyboardType = UIKeyboardTypeASCIICapable; self.address.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
     self.address.autocorrectionType = UITextAutocorrectionTypeNo; self.address.spellCheckingType = UITextSpellCheckingTypeNo;
@@ -159,8 +185,16 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     self.address.text = [NSUserDefaults.standardUserDefaults stringForKey:@"NukeWirelessBluetoothTarget"];
     NSUInteger savedCount = [NSUserDefaults.standardUserDefaults integerForKey:countKey];
     NSUInteger savedInterval = [NSUserDefaults.standardUserDefaults integerForKey:intervalKey];
-    self.pingCount = NWBTPingOptionsValid(savedCount, savedInterval) ? savedCount : NWBT_DEFAULT_COUNT;
-    self.intervalSeconds = NWBTPingOptionsValid(savedCount, savedInterval) ? savedInterval : NWBT_DEFAULT_INTERVAL;
+    // Migrate only the former seconds preference, never reinterpret new values.
+    if (![NSUserDefaults.standardUserDefaults objectForKey:intervalKey]) {
+        NSUInteger seconds = [NSUserDefaults.standardUserDefaults integerForKey:@"NukeWirelessBluetoothPingInterval"];
+        if (NWBTPingOptionsValid(savedCount, seconds)) savedInterval = seconds * 1000;
+    }
+    BOOL valid = NWBTPingMillisecondsValid(savedCount, savedInterval);
+    self.pingCount = valid ? savedCount : NWBT_DEFAULT_COUNT;
+    self.intervalMS = valid ? savedInterval : NWBT_DEFAULT_INTERVAL_MS;
+    self.countField = [self numericField:NWText(@"bt.count") value:self.pingCount];
+    self.intervalField = [self numericField:NWText(@"bt.interval_ms") value:self.intervalMS];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:changed object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(backgrounded:) name:UIApplicationDidEnterBackgroundNotification object:nil];
 }
@@ -179,12 +213,41 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     });
 }
 - (void)refresh:(NSNotification *)notification {
-    (void)notification; self.address.enabled = !busy; [self.tableView reloadData];
+    (void)notification; self.address.enabled = !busy;
+    self.countField.enabled = !busy; self.intervalField.enabled = !busy;
+    // Passive capability refresh must not dismiss the active keyboard.
+    if (!busy && (self.address.isFirstResponder || self.countField.isFirstResponder || self.intervalField.isFirstResponder))
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationNone];
+    else [self.tableView reloadData];
     self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
     self.navigationItem.hidesBackButton = busy;
 }
 - (void)backgrounded:(NSNotification *)notification { (void)notification; if (busy) cancelWorker(); }
 - (BOOL)textFieldShouldReturn:(UITextField *)field { [field resignFirstResponder]; return YES; }
+- (void)finishEditing { [self.view endEditing:YES]; }
+- (BOOL)readOptions {
+    NSUInteger count = 0, interval = 0;
+    if (!numericValue(self.countField.text, &count) || !numericValue(self.intervalField.text, &interval) ||
+        !NWBTPingMillisecondsValid(count, interval)) return NO;
+    self.pingCount = count; self.intervalMS = interval; return YES;
+}
+- (void)saveOptions {
+    [NSUserDefaults.standardUserDefaults setInteger:self.pingCount forKey:countKey];
+    [NSUserDefaults.standardUserDefaults setInteger:self.intervalMS forKey:intervalKey];
+}
+- (void)textFieldDidEndEditing:(UITextField *)field {
+    if (field == self.address || busy) return;
+    if ([self readOptions]) [self saveOptions];
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:3] withRowAnimation:UITableViewRowAnimationNone];
+}
+- (BOOL)textField:(UITextField *)field shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
+    if (field == self.address) return YES;
+    NSString *value = [field.text stringByReplacingCharactersInRange:range withString:string];
+    if (value.length > (field == self.countField ? 2 : 4)) return NO;
+    for (NSUInteger i = 0; i < value.length; ++i)
+        if ([value characterAtIndex:i] < '0' || [value characterAtIndex:i] > '9') return NO;
+    return YES;
+}
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     (void)table; if (section == 2) return 2;
@@ -217,20 +280,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [self.address.bottomAnchor constraintEqualToAnchor:guide.bottomAnchor], [self.address.heightAnchor constraintGreaterThanOrEqualToConstant:30]]]; return cell;
     } else if (index.section == 2) {
         BOOL interval = index.row == 1;
-        content.text = NWText(interval ? @"bt.interval" : @"bt.count");
-        content.secondaryText = [NSString stringWithFormat:NWText(interval ? @"bt.seconds" : @"bt.count_value"),
-            interval ? self.intervalSeconds : self.pingCount];
-        UIStepper *stepper = [UIStepper new]; stepper.tag = index.row;
-        stepper.minimumValue = 1; stepper.maximumValue = interval ? NWBT_MAX_INTERVAL : NWBT_MAX_PING_SECONDS / self.intervalSeconds;
-        stepper.stepValue = 1; stepper.autorepeat = NO;
-        stepper.value = interval ? self.intervalSeconds : self.pingCount;
-        stepper.enabled = !busy; stepper.tintColor = NWAccentColor();
-        stepper.accessibilityLabel = content.text; stepper.accessibilityValue = content.secondaryText;
-        [stepper addTarget:self action:@selector(optionsChanged:) forControlEvents:UIControlEventValueChanged];
-        cell.accessoryView = stepper;
+        content.text = NWText(interval ? @"bt.interval_ms" : @"bt.count");
+        cell.accessoryView = interval ? self.intervalField : self.countField;
     } else if (index.section == 3) {
         content.text = index.row || busy ? NWText(index.row ? @"bt.cancel" : @"bt.running") :
-            [NSString stringWithFormat:NWText(@"bt.start_count"), self.pingCount];
+            NWText(@"bt.start");
         content.image = [UIImage systemImageNamed:index.row ? @"stop.circle" : @"waveform.path"];
         cell.selectionStyle = index.row || (!busy && [self.capabilities[@"supported"] boolValue]) ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         content.textProperties.color = index.row ? UIColor.systemRedColor : NWAccentColor();
@@ -239,9 +293,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         NSString *code = lastReport[@"error_code"];
         content.text = reportText(lastReport);
         NSMutableArray<NSString *> *details = [NSMutableArray new];
-        if (lastReport[@"requested_count"] && lastReport[@"interval_seconds"])
+        NSNumber *interval = lastReport[@"interval_ms"];
+        if (!interval && lastReport[@"interval_seconds"]) interval = @([lastReport[@"interval_seconds"] doubleValue] * 1000);
+        if (lastReport[@"requested_count"] && interval)
             [details addObject:[NSString stringWithFormat:NWText(@"bt.result_options"),
-                [lastReport[@"requested_count"] unsignedIntegerValue], [lastReport[@"interval_seconds"] unsignedIntegerValue]]];
+                [lastReport[@"requested_count"] unsignedIntegerValue], interval.unsignedIntegerValue]];
         if ([lastReport[@"service_restored"] boolValue]) [details addObject:NWText(@"bt.restored")];
         content.secondaryText = [details componentsJoinedByString:@"\n"];
         content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
@@ -258,8 +314,18 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [table deselectRowAtIndexPath:index animated:YES]; if (index.section != 3) return;
     if (index.row && busy) { cancelWorker(); return; }
     if (busy || ![self.capabilities[@"supported"] boolValue]) return;
-    if (![self.capabilities[@"supports_ping_options"] boolValue] &&
-        (self.pingCount != NWBT_DEFAULT_COUNT || self.intervalSeconds != NWBT_DEFAULT_INTERVAL)) {
+    [self.view endEditing:YES];
+    if (![self readOptions]) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.values")
+            message:NWText(@"bt.options_limits") preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil]; return;
+    }
+    [self saveOptions];
+    BOOL milliseconds = [self.capabilities[@"supports_ping_milliseconds"] boolValue];
+    BOOL seconds = [self.capabilities[@"supports_ping_options"] boolValue] && self.intervalMS % 1000 == 0;
+    BOOL defaults = self.pingCount == NWBT_DEFAULT_COUNT && self.intervalMS == NWBT_DEFAULT_INTERVAL_MS;
+    if (!milliseconds && !seconds && !defaults) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.options") message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil]; return;
@@ -269,7 +335,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     BOOL valid = [pattern firstMatchInString:address ?: @"" options:0 range:NSMakeRange(0, address.length)] != nil &&
         ![address isEqual:@"00:00:00:00:00:00"] && ![address isEqual:@"FF:FF:FF:FF:FF:FF"];
     UIAlertController *confirm = [UIAlertController alertControllerWithTitle:NWText(valid ? @"bt.start" : @"bt.error.address")
-        message:valid ? [NSString stringWithFormat:NWText(@"bt.confirm_options"), self.pingCount, self.intervalSeconds] : nil preferredStyle:UIAlertControllerStyleAlert];
+        message:valid ? [NSString stringWithFormat:NWText(@"bt.confirm_options"), self.pingCount, self.intervalMS] : nil preferredStyle:UIAlertControllerStyleAlert];
     if (valid) {
         [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
         [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"bt.start") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -278,16 +344,6 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     } else [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
-- (void)optionsChanged:(UIStepper *)stepper {
-    if (busy) return;
-    if (stepper.tag == 1) {
-        self.intervalSeconds = (NSUInteger)stepper.value;
-        self.pingCount = MIN(self.pingCount, NWBT_MAX_PING_SECONDS / self.intervalSeconds);
-    } else self.pingCount = (NSUInteger)stepper.value;
-    [NSUserDefaults.standardUserDefaults setInteger:self.pingCount forKey:countKey];
-    [NSUserDefaults.standardUserDefaults setInteger:self.intervalSeconds forKey:intervalKey];
-    [self refresh:nil];
-}
 - (void)begin:(NSString *)address {
     if (busy || NWScanBusy() || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
@@ -295,11 +351,19 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         [self presentViewController:alert animated:YES completion:nil]; return;
     }
     if (!workerLock) workerLock = [NSObject new];
-    if (!NWBTPingOptionsValid(self.pingCount, self.intervalSeconds)) return;
+    if (!NWBTPingMillisecondsValid(self.pingCount, self.intervalMS)) return;
     // Snapshot the selected options before dispatch; controls are locked while busy.
-    NSArray<NSString *> *arguments = [self.capabilities[@"supports_ping_options"] boolValue] ?
+    NSArray<NSString *> *arguments;
+    if ([self.capabilities[@"supports_ping_milliseconds"] boolValue])
+        arguments = @[@"--ping-ms", address, [NSString stringWithFormat:@"%lu", self.pingCount],
+            [NSString stringWithFormat:@"%lu", self.intervalMS]];
+    else if ([self.capabilities[@"supports_ping_options"] boolValue] && self.intervalMS % 1000 == 0)
+        arguments =
         @[@"--ping", address, [NSString stringWithFormat:@"%lu", self.pingCount],
-            [NSString stringWithFormat:@"%lu", self.intervalSeconds]] : @[@"--ping", address];
+            [NSString stringWithFormat:@"%lu", self.intervalMS / 1000]];
+    else if (self.pingCount == NWBT_DEFAULT_COUNT && self.intervalMS == NWBT_DEFAULT_INTERVAL_MS)
+        arguments = @[@"--ping", address];
+    else return;
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];

@@ -1,5 +1,36 @@
 # Bluetooth nativo: biblioteca de investigación
 
+## Milisegundos y entrada manual: candidata dev25 / app10
+
+Dos campos numéricos sustituyen a los controles de incremento: **Número de
+pings** e **Intervalo (ms)**. El teclado incluye **Hecho** para cerrarlo; también
+se cierra al deslizar la lista. Al pulsar **Enviar pings** se valida toda la
+combinación antes de mostrar la confirmación o modificar el servicio.
+
+- Cantidad: enteros de 1 a 20. Intervalo: enteros de 1000 a 5000 ms.
+- Se conserva `cantidad × intervalo <= 20000 ms`. Una combinación inválida
+  muestra un aviso y conserva lo escrito para corregirlo; no se ajusta la
+  cantidad automáticamente. Por ejemplo, 5 pings con 1500 ms es válido.
+- Preferencias válidas persistentes; valores predeterminados de 5 y 1000 ms.
+  Si no existe la clave nueva de milisegundos, se migra la anterior en segundos
+  comprobando primero sus límites. Un valor inválido guardado usa los defaults.
+- Confirmación y resumen de resultados en ms. Los resultados históricos en
+  segundos se convierten a ms para mostrarlos.
+- `nwbt-run --ping-ms ADDRESS COUNT INTERVAL_MS` declara las unidades de forma
+  explícita. `--ping ADDRESS [COUNT INTERVAL_SECONDS]` conserva sus unidades
+  anteriores, al igual que los dos exports anteriores de la biblioteca.
+- Nueva capacidad pasiva `supports_ping_milliseconds`. Con módulos anteriores,
+  la app permite intervalos equivalentes a segundos enteros cuando hay soporte
+  configurable, o el diagnóstico predeterminado si no lo hay; para otros
+  valores pide actualizar el módulo. No redondea un intervalo silenciosamente.
+- El transporte convierte ms a segundos de reloj monotónico al esperar, sin
+  cambiar tamaño de los ecos, plazo por respuesta, cancelación ni recuperación.
+  La planificación de iOS y el bombeo de eventos pueden añadir retraso; no se
+  promete precisión de un milisegundo en el envío físico.
+
+Estado: cambios implementados; pendiente de compilación y empaquetado. Sin
+instalación ni prueba funcional en el iPhone para estas nuevas opciones.
+
 ## Opciones de ping: candidata dev24 / app9
 
 La pantalla **Información → Bluetooth** incorpora dos controles de incremento:

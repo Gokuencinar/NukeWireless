@@ -4,7 +4,15 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Nueva candidata dev24 / app9:** en **Información → Bluetooth** permite elegir
+**Nueva candidata dev25 / app10:** en **Información → Bluetooth** la cantidad
+y el intervalo se escriben en campos numéricos, con teclado y botón **Hecho**.
+Intervalo en milisegundos enteros (1000–5000 ms), incluido por ejemplo 1500 ms;
+de 1 a 20 pings y `cantidad × intervalo <= 20000 ms`. Una combinación inválida
+muestra un aviso sin comenzar el diagnóstico. Se migran los ajustes anteriores
+en segundos. Confirmación y resultados muestran ms. Candidata sin instalación
+ni prueba funcional en el dispositivo.
+
+**Candidata anterior dev24 / app9:** en **Información → Bluetooth** permite elegir
 el número de pings (1–20) y el intervalo (1–5 segundos). La combinación se limita
 a una ventana de 20 segundos; al aumentar el intervalo se ajusta el máximo de
 pings. Preferencias persistentes, confirmación con las opciones elegidas y

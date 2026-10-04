@@ -240,8 +240,14 @@ NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
 NSDictionary<NSString *, id> *NWBTL2PingWithOptions(NSString *destination, NSUInteger count, NSUInteger intervalSeconds) {
     if (!NWBTPingOptionsValid(count, intervalSeconds))
         return @{@"version": NWBT_VERSION, @"stage": @"arguments", @"error_code": @"arguments", @"error": @"Invalid bounded ping options."};
+    return NWBTL2PingWithMilliseconds(destination, count, intervalSeconds * 1000);
+}
+
+NSDictionary<NSString *, id> *NWBTL2PingWithMilliseconds(NSString *destination, NSUInteger count, NSUInteger intervalMS) {
+    if (!NWBTPingMillisecondsValid(count, intervalMS))
+        return @{@"version": NWBT_VERSION, @"stage": @"arguments", @"error_code": @"arguments", @"error": @"Invalid bounded millisecond ping options."};
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"l2ping", @"l2ping_verified": @NO,
-        @"requested_count": @(count), @"interval_seconds": @(intervalSeconds)} mutableCopy];
+        @"requested_count": @(count), @"interval_ms": @(intervalMS), @"interval_seconds": @(intervalMS / 1000.0)} mutableCopy];
     NSArray *parts = [destination componentsSeparatedByString:@":"]; uint8_t address[6];
     NSCharacterSet *hex = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"];
     if (parts.count != 6) { report[@"error"] = @"Expected a colon-separated Bluetooth address."; return report; }
@@ -310,7 +316,7 @@ NSDictionary<NSString *, id> *NWBTL2PingWithOptions(NSString *destination, NSUIn
             [session.samples addObject:sample];
             // Keep a one-second response deadline independent of spacing.
             // Pump during the gap so cancellation and remote link events work.
-            double nextSend = MIN(session.sentAt + intervalSeconds, pingDeadline);
+            double nextSend = MIN(session.sentAt + intervalMS / 1000.0, pingDeadline);
             if (identifier < count)
                 while (now() < nextSend && session.connected && !session.error && !NWBTCancelled) [session pump];
         }

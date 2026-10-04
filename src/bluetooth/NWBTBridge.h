@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app9"
+#define NWBT_VERSION @"0.0.3~app10"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
@@ -17,3 +17,5 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadSkywalkController(void);
 // Requires exclusive HCI/ACL ownership; never stops system services itself.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2PingWithOptions(NSString *destination, NSUInteger count, NSUInteger intervalSeconds);
+// Millisecond spacing; legacy exports above retain their seconds-based ABI.
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2PingWithMilliseconds(NSString *destination, NSUInteger count, NSUInteger intervalMS);

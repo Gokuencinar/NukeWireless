@@ -8,7 +8,7 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.3~app9'
+VERSION = '0.0.3~app10'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -65,7 +65,7 @@ Section: Development
 Maintainer: Gokuencinar
 Author: Gokuencinar
 Depends: firmware (>= 16.3), firmware (<< 16.4), rootless-compat, ldid
-Description: Experimental native Bluetooth diagnostics for NukeWireless. Finite configurable echoes, cancellation and independent service recovery. Restricted to the inspected iPhone XS / iOS 16.3.1. Configurable options require app dev24 or later.
+Description: Experimental native Bluetooth diagnostics for NukeWireless. Finite configurable echoes, cancellation and independent service recovery. Restricted to the inspected iPhone XS / iOS 16.3.1. Configurable options in milliseconds require app dev25 or later.
 '''.encode()
     postinst = b'''#!/bin/sh
 set -e
@@ -81,7 +81,7 @@ exit 0
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'NukeWireless Info > Bluetooth uses nwbt-run --ping ADDRESS COUNT INTERVAL_SECONDS. Defaults: 5 and 1. Count: 1-20, interval: 1-5 seconds, count * interval <= 20. One-second response deadline per echo and a bounded 20-second ping window; delays may leave partial results. Bluetooth must be off in Settings and the target in pairing mode. Only iPhone XS / iOS 16.3.1 / RootHide is admitted. The runner verifies its app caller and uses an independent recovery child before exclusive service access. No firmware modification, pairing-key storage, audio channel, or flooding. Raw nwbt-inspect diagnostics still require operator-managed recovery. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'NukeWireless Info > Bluetooth uses nwbt-run --ping-ms ADDRESS COUNT INTERVAL_MS. Defaults: 5 and 1000 ms. Count: 1-20, interval: 1000-5000 ms, count * interval <= 20000. The legacy --ping ADDRESS [COUNT INTERVAL_SECONDS] keeps its seconds semantics. One-second response deadline per echo and a bounded 20-second ping window; delays may leave partial results. Bluetooth must be off in Settings and the target in pairing mode. Only iPhone XS / iOS 16.3.1 / RootHide is admitted. The runner verifies its app caller and uses an independent recovery child before exclusive service access. No firmware modification, pairing-key storage, audio channel, or flooding. Raw nwbt-inspect diagnostics still require operator-managed recovery. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pack_ar([('debian-binary', b'2.0\n'),
         ('control.tar.gz', tar_bytes([regular('control', control), regular('postinst', postinst, 0o755)])),
