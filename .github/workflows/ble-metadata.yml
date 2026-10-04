@@ -1,0 +1,26 @@
+name: Passive BLE metadata research
+on:
+  push:
+    branches: [audit-rh25.5]
+    paths:
+      - 'research/NWBLEMetadata.m'
+      - '.github/workflows/ble-metadata.yml'
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile passive metadata helper
+        run: |
+          mkdir -p build/research
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
+            -Wall -Wextra -Werror -fobjc-arc -fblocks -O2 -framework Foundation \
+            research/NWBLEMetadata.m -o build/research/nwble-metadata
+          shasum -a 256 build/research/nwble-metadata > build/research/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: passive-ble-metadata
+          path: build/research/
+          retention-days: 7
