@@ -28,6 +28,15 @@ static inline size_t NWBTLabData(uint8_t p[35]) {
     memcpy(p + 4, advertisement, sizeof advertisement);
     return sizeof advertisement + 4;
 }
+static inline size_t NWBTLabManufacturerData(uint8_t p[35]) {
+    // Keep flags and our 128-bit service. Replace the name with a test-only
+    // manufacturer field so the legacy advertisement remains within 31 bytes.
+    NWBTLabData(p);
+    const uint8_t manufacturer[] = {9, 0xff, 0xff, 0xff, 'N','W','L','a','b', 1};
+    memcpy(p + 25, manufacturer, sizeof manufacturer);
+    p[3] = 31;
+    return 35;
+}
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {
     memset(p, 0, 6); p[0] = enable ? 1 : 0; p[1] = 1; p[2] = NWBT_LAB_HANDLE;
     if (enable) { p[3] = 0xe8; p[4] = 3; } // Controller stops after 10 seconds.

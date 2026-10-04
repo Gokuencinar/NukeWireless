@@ -138,6 +138,9 @@
 "ble.scan_counts" = "%lu anuncios recibidos · %lu dispositivos";
 "ble.diagnostic_details" = "Estado de Bluetooth: %ld\nPermiso: %ld\nEscaneo activo: %@\nAnuncios recibidos: %lu\nDispositivos: %lu\n\nEstado 5: Bluetooth activo. Permiso 3: autorizado. Solo se detectan accesorios que están anunciando BLE; estar emparejado o conectado por Bluetooth clásico no garantiza que anuncien BLE.";
 "bt.lab.title" = "Prueba de emisión BLE (10 s)";
+"bt.lab.manufacturer_title" = "Anuncio de fabricante (10 s)";
+"bt.lab.manufacturer_menu" = "Apaga Bluetooth en Ajustes. Emite datos propios de prueba con fabricante 0xFFFF cada segundo durante 10 s.";
+"bt.lab.manufacturer_receiver" = "Busca el servicio 7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21 y fabricante 0xFFFF con datos 4E574C616201 en otro receptor BLE. Este anuncio no incluye nombre local.";
 "bt.lab.menu" = "Apaga Bluetooth en Ajustes. Anuncia NWLab cada segundo durante 10 s para comprobarlo con otro receptor BLE.";
 "bt.lab.running" = "Prueba de emisión BLE en curso…";
 "bt.lab.accepted" = "El controlador aceptó el anuncio y confirmó su desactivación.";

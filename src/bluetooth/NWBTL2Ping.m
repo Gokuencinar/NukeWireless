@@ -236,18 +236,23 @@ NSDictionary *NWBTReadLECapabilities(void) {
 }
 @end
 
-NSDictionary *NWBTAdvertiseLab(void) {
+static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer) {
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
     NWBTLabSession *session = [NWBTLabSession new];
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
-        @"queries": session.queries, @"advertisement_name": @"NWLab",
+        @"queries": session.queries, @"advertisement_name": manufacturer ? @"" : @"NWLab",
+        @"advertisement_variant": manufacturer ? @"manufacturer" : @"service_name",
         @"service_uuid": @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"connection_commands_submitted": @0,
         @"duration_seconds": @10, @"interval_ms": @1000} mutableCopy];
+    if (manufacturer) {
+        report[@"manufacturer_company_id"] = @65535;
+        report[@"manufacturer_data_hex"] = @"4e574c616201";
+    }
     BOOL configured = NO, enableSubmitted = NO;
     @try {
         session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
@@ -258,7 +263,9 @@ NSDictionary *NWBTAdvertiseLab(void) {
         }
         if (session.ring.error) session.error = session.ring.error;
         uint8_t parameters[25], data[35], enable[6];
-        NWBTLabParameters(parameters); NSUInteger size = NWBTLabData(data); NWBTLabEnable(enable, 1);
+        NWBTLabParameters(parameters);
+        NSUInteger size = manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
+        NWBTLabEnable(enable, 1);
         if (!session.error && !NWBTCancelled)
             configured = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO] != nil;
         if (configured && !session.error && !NWBTCancelled)
@@ -294,6 +301,9 @@ NSDictionary *NWBTAdvertiseLab(void) {
     }
     return report;
 }
+
+NSDictionary *NWBTAdvertiseLab(void) { return NWBTAdvertiseLabVariant(NO); }
+NSDictionary *NWBTAdvertiseManufacturerLab(void) { return NWBTAdvertiseLabVariant(YES); }
 
 @interface NWBTPingSession : NSObject
 @property(nonatomic, strong) NWBTRing *hci, *acl;

@@ -1,4 +1,4 @@
-# Escaneo y prueba de publicidad BLE (dev30 / app14)
+# Escaneo y prueba de publicidad BLE (dev31 / app15)
 
 En el iPhone XS con iOS 16.3.1 y RootHide, el ejecutable instalado estaba firmado
 con identifier HarpyReloaded mientras LaunchServices registraba
@@ -6,7 +6,7 @@ me.midnightchips.harpy-reloaded. CoreBluetooth iniciaba la solicitud, pero
 authorization permanecía en 0 y no había aviso ni resultados. Al corregir solo
 el identifier de firma con ldid -I (conservando entitlements), apareció el aviso
 de autorización. El usuario confirmó recepción y el diagnóstico registró
-authorization=3, 709 callbacks y 27 dispositivos. Dev30 conserva esta corrección
+authorization=3, 709 callbacks y 27 dispositivos. Dev31 conserva esta corrección
 en postinst para reinstalaciones; los otros helpers conservan su firma anterior.
 
 El escáner retoma la solicitud pendiente al volver a estado activo. Antes podía
@@ -38,6 +38,21 @@ detectar NWLab durante la prueba. No etiquetar el build como BLE Spam o BT
 Disruptor funcional antes de comprobar la ruta de emisión y definir pruebas de
 laboratorio. Los modos de ESP32 Modern con esos nombres construyen anuncios;
 sus nombres no prueban conexiones, ecos L2CAP, desconexiones o captura de claves.
+
+La prueba NWLab de app14 se ejecutó desde la app (UID 501), con las cinco órdenes
+HCI completadas con status 0, set eliminado y service_restored=1. La laptop
+Windows recibió el servicio y el nombre NWLab a -52 dBm. Un callback posterior
+con RSSI -127 corresponde al valor inválido del receptor y no se cuenta como
+otra recepción de radio.
+
+El usuario eligió continuar con anuncios de fabricante en una prueba limitada.
+App15 añade --le-manufacturer-test y Dev31 lo muestra como «Anuncio de fabricante
+(10 s)». Conserva servicio UUID y flags; sustituye el nombre local por AD 0xFF,
+company ID 0xFFFF y datos 4E574C616201 (NWLab y versión 1). El anuncio completo
+ocupa exactamente 31 bytes. Conserva intervalo de 1000 ms, duración de 10 s,
+handle dedicado y recuperación independiente. No acepta payloads, fabricantes,
+direcciones, velocidades o duraciones externos. La recepción de esta nueva
+variante debe verificarse después de instalar app15.
 
 Fuentes de protocolo: Bluetooth Core HCI; tabla y decodificación primaria BlueZ:
 https://github.com/bluez/bluez/blob/master/monitor/packet.c

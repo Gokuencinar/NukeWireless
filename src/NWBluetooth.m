@@ -23,6 +23,9 @@ static NSObject *workerLock;
 static NSDictionary *lastReport;
 static BOOL readingLE;
 static BOOL labRunning;
+static BOOL labOperation(NSString *operation) {
+    return [operation isEqual:@"le_advertising_test"] || [operation isEqual:@"le_manufacturer_test"];
+}
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
 
@@ -48,7 +51,7 @@ static void saveInvocation(NSDictionary *details, BOOL cancellable) {
 }
 static NSString *reportText(NSDictionary *report) {
     NSString *code = report[@"error_code"];
-    if (!code && [report[@"operation"] isEqual:@"le_advertising_test"])
+    if (!code && labOperation(report[@"operation"]))
         return NWText([report[@"controller_advertising_acknowledged"] boolValue] &&
             [report[@"advertising_stopped_acknowledged"] boolValue] ? @"bt.lab.accepted" : @"bt.lab.incomplete");
     if (!code && [report[@"operation"] isEqual:@"le_capabilities"])
@@ -309,7 +312,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 0) return 4;
+    (void)table; if (section == 0) return 5;
     if (section == 2) return 2;
     if (section == 3) return busy ? 2 : 1;
     if (section == 4) return 1 + reportRows(lastReport).count;
@@ -326,11 +329,13 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (index.section == 0 && index.row == 3) {
-        content.text = NWText(@"bt.lab.title"); content.secondaryText = NWText(@"bt.lab.menu");
+    if (index.section == 0 && (index.row == 3 || index.row == 4)) {
+        BOOL manufacturer = index.row == 4;
+        content.text = NWText(manufacturer ? @"bt.lab.manufacturer_title" : @"bt.lab.title");
+        content.secondaryText = NWText(manufacturer ? @"bt.lab.manufacturer_menu" : @"bt.lab.menu");
         content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
         cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_advertising_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+            [self.capabilities[manufacturer ? @"supports_le_manufacturer_test" : @"supports_le_advertising_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         content.textProperties.color = NWAccentColor();
     } else if (index.section == 0 && index.row == 2) {
         content.text = NWText(@"bt.le.title");
@@ -377,6 +382,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [details addObject:NWText(@"bt.le.read_only")];
         }
         if ([lastReport[@"operation"] isEqual:@"le_advertising_test"]) [details addObject:NWText(@"bt.lab.receiver")];
+        if ([lastReport[@"operation"] isEqual:@"le_manufacturer_test"]) [details addObject:NWText(@"bt.lab.manufacturer_receiver")];
         NSNumber *interval = lastReport[@"interval_ms"];
         if (!interval && lastReport[@"interval_seconds"]) interval = @([lastReport[@"interval_seconds"] doubleValue] * 1000);
         if (lastReport[@"requested_count"] && interval)
@@ -415,6 +421,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     if (index.section == 0 && index.row == 3) {
         if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_advertising_test"] boolValue])
             [self runArguments:@[@"--le-advertise-test"] operation:@"le_advertising_test"];
+        return;
+    }
+    if (index.section == 0 && index.row == 4) {
+        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_manufacturer_test"] boolValue])
+            [self runArguments:@[@"--le-manufacturer-test"] operation:@"le_manufacturer_test"];
         return;
     }
     if (index.section != 3) return;
@@ -481,7 +492,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     }
     if (!workerLock) workerLock = [NSObject new];
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
-    readingLE = [operation isEqual:@"le_capabilities"]; labRunning = [operation isEqual:@"le_advertising_test"];
+    readingLE = [operation isEqual:@"le_capabilities"]; labRunning = labOperation(operation);
     [self.view endEditing:YES];
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
@@ -562,6 +573,19 @@ int NWBluetoothUIRegressionCheck(void) {
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:4]];
         content = (UIListContentConfiguration *)cell.contentConfiguration;
         if (![content.text isEqual:NWText(@"bt.lab.disable")] || ![content.secondaryText isEqual:NWText(@"bt.le.reply")]) return 11;
+        NSIndexPath *manufacturerButton = [NSIndexPath indexPathForRow:4 inSection:0];
+        controller.capabilities = @{@"supported": @YES, @"supports_le_advertising_test": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:manufacturerButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 12;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_manufacturer_test": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:manufacturerButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault) return 13;
+        lastReport = @{@"operation": @"le_manufacturer_test", @"controller_advertising_acknowledged": @YES,
+            @"advertising_stopped_acknowledged": @YES, @"service_restored": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]];
+        content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (![content.text isEqual:NWText(@"bt.lab.accepted")] ||
+            ![content.secondaryText containsString:NWText(@"bt.lab.manufacturer_receiver")]) return 14;
         return 0;
     } @finally { lastReport = previous; busy = previousBusy; readingLE = previousLE; labRunning = previousLab; }
 }

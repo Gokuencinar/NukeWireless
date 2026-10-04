@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app14"
+#define NWBT_VERSION @"0.0.3~app15"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
@@ -19,6 +19,7 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadLECapabilities(void);
 // Fixed nonconnectable NWLab announcement, 1 second interval, 10 second
 // controller duration. Runner owns exclusive transport and service recovery.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseLab(void);
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseManufacturerLab(void);
 // Experimental, bounded echo diagnostic on the exact inspected device.
 // Requires exclusive HCI/ACL ownership; never stops system services itself.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination);
