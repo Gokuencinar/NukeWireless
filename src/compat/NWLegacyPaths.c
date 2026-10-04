@@ -47,22 +47,13 @@ struct rt_msghdr {
 #include <errno.h>
 #include <netdb.h>
 
-typedef void *id;
-typedef void *Class;
-typedef void *SEL;
-typedef void *Method;
-typedef void *IMP;
+// Use the SDK's runtime types and dispatcher declaration, compiled as ObjC
+// without ARC to preserve this recovered adapter's explicit retain/release.
+#include <objc/runtime.h>
+#include <objc/message.h>
+#include <dispatch/dispatch.h>
 typedef unsigned long NSUInteger;
-typedef signed char BOOL;
 
-extern Class objc_getClass(const char *name);
-extern Class object_getClass(id object);
-extern const char *class_getName(Class cls);
-extern SEL sel_registerName(const char *name);
-extern Method class_getInstanceMethod(Class cls, SEL name);
-extern Method class_getClassMethod(Class cls, SEL name);
-extern IMP method_setImplementation(Method method, IMP imp);
-extern id objc_msgSend(id receiver, SEL selector, ...);
 extern void *popen(const char *, const char *);
 extern char *fgets(char *, int, void *);
 extern int pclose(void *);
@@ -74,12 +65,6 @@ extern void *dlopen(const char *, int);
 extern void *dlsym(void *, const char *);
 extern char *dlerror(void);
 extern void CFRelease(void *);
-extern void *dispatch_queue_create(const char *label, void *attr);
-extern void dispatch_async_f(void *queue, void *context, void (*work)(void *));
-extern void *dispatch_get_main_queue(void);
-extern Class objc_allocateClassPair(Class superclass, const char *name, unsigned long extraBytes);
-extern void objc_registerClassPair(Class cls);
-extern BOOL class_addMethod(Class cls, SEL name, IMP imp, const char *types);
 
 static BOOL (*original_exists)(id, SEL, id);
 static void (*original_launch_path)(id, SEL, id);

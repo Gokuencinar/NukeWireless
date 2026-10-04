@@ -12,7 +12,7 @@ xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$s
   -framework SystemConfiguration -o build/audit/NukeWirelessInfo_ios.dylib \
   src/NukeWirelessInfo.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
-  -Wall -Wextra -Werror -Wno-unused-parameter -fblocks -fPIC -O2 -dynamiclib -Wl,-fatal_warnings \
+  -Wall -Wextra -Werror -Wno-unused-parameter -x objective-c -fno-objc-arc -fblocks -fPIC -O2 -dynamiclib -Wl,-fatal_warnings \
   -Wl,-install_name,@rpath/NukeWirelessPaths.dylib \
   -framework Foundation -framework UIKit -framework SystemConfiguration \
   src/compat/NWLegacyPaths.c -o build/audit/NukeWirelessPaths_ios.dylib
