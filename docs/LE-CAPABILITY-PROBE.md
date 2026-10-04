@@ -1,6 +1,9 @@
-# Lecturas de capacidades LE (app12)
+# Lecturas de capacidades LE (app13 / dev28)
 
-`nwbt-run --le-capabilities` es un diagnóstico de operador root, limitado al
+`nwbt-run --le-capabilities` es un diagnóstico limitado al operador root o al
+proceso padre exacto de la app instalada (el mismo control de identidad del ping).
+Se encuentra en NukeWireless > Info > Bluetooth > Consultar capacidades BLE.
+No requiere rellenar la dirección ni las opciones del ping. Está limitado al
 iPhone XS con iOS 16.3.1 y al transporte cuyo código ya valida el módulo.
 Requiere Bluetooth apagado en Ajustes. Usa el bloqueo y el proceso independiente
 de recuperación del ping; retira temporalmente bluetoothd y lo restaura al acabar.
@@ -25,6 +28,13 @@ Command Status frente a Command Complete, rechazos y exclusión de comandos de e
 La CI compila las pruebas y los tres binarios. Una compilación correcta no verifica
 el transporte real: hace falta guardar el resultado del iPhone y comprobar
 `service_restored: true` antes de pasar a una prueba de publicidad BLE.
+
+La app guarda el último resultado, permite cancelar y cancela al pasar a segundo
+plano. Distingue respuestas verificadas, consultas rechazadas y soporte declarado
+de anuncios. El botón sólo se habilita con el nuevo indicador
+`supports_le_capability_app`; app12 anuncia lecturas pero sólo admite al operador root.
+La regresión de UI verifica este caso, resultados, bloqueo mientras está ocupado y
+textos en español e inglés sin abrir el transporte del simulador.
 
 Referencias de protocolo: Bluetooth Core, HCI Functional Specification;
 https://raw.githubusercontent.com/bluez/bluez/master/lib/bluetooth/hci.h

@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+@_silgen_name("NWBluetoothUIRegressionCheck")
+func checkBluetoothUI() -> Int32
 
 @_silgen_name("NWBLEUIRegressionCheck")
 func checkBLEUI() -> Int32
@@ -49,7 +51,8 @@ struct RegressionTabs: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         results.append(checkUI(2))
                         results.append(checkBLEUI())
-                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0]]
+                        results.append(checkBluetoothUI())
+                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0]]
                         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                             .appendingPathComponent("ui-regression.json")
                         try? JSONSerialization.data(withJSONObject: report).write(to: file)

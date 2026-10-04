@@ -21,6 +21,7 @@ static BOOL busy, cancelling;
 static pid_t worker;
 static NSObject *workerLock;
 static NSDictionary *lastReport;
+static BOOL readingLE;
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
 
@@ -46,9 +47,42 @@ static void saveInvocation(NSDictionary *details, BOOL cancellable) {
 }
 static NSString *reportText(NSDictionary *report) {
     NSString *code = report[@"error_code"];
+    if (!code && [report[@"operation"] isEqual:@"le_capabilities"])
+        return NWText([report[@"capabilities_verified"] boolValue] ? @"bt.le.success" : @"bt.le.partial");
     return code ? NWText([@"bt.error." stringByAppendingString:code]) :
         [NSString stringWithFormat:NWText(@"bt.summary"), [report[@"echo_replies_verified"] unsignedIntegerValue],
             [report[@"echo_requests_submitted"] unsignedIntegerValue]];
+}
+
+// A support bitmap is a declaration by the controller, not emission evidence.
+static NSString *advertisingSupport(NSDictionary *report, BOOL extended) {
+    NSString *hex = nil;
+    for (NSDictionary *query in report[@"queries"])
+        if ([query[@"opcode"] unsignedIntegerValue] == 0x1002 && ![query[@"hci_status"] unsignedIntegerValue])
+            hex = query[@"return_data_hex"];
+    if (![hex isKindOfClass:NSString.class] || hex.length != 128 ||
+        [hex rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"].invertedSet].location != NSNotFound)
+        return NWText(@"ble.unavailable");
+    const NSUInteger legacy[] = {205, 207, 209}, ext[] = {290, 291, 293};
+    const NSUInteger *bits = extended ? ext : legacy;
+    for (NSUInteger i = 0; i < 3; ++i) {
+        unsigned int byte = 0;
+        NSScanner *scanner = [NSScanner scannerWithString:[hex substringWithRange:NSMakeRange((bits[i] / 8) * 2, 2)]];
+        if (![scanner scanHexInt:&byte]) return NWText(@"ble.unavailable");
+        if (!(byte & (1u << (bits[i] % 8)))) return NWText(@"ble.no");
+    }
+    return NWText(@"ble.yes");
+}
+
+static NSString *queryTitle(NSDictionary *query) {
+    switch ([query[@"opcode"] unsignedIntegerValue]) {
+        case 0x1001: return NWText(@"bt.le.version");
+        case 0x1002: return NWText(@"bt.le.commands");
+        case 0x1003: return NWText(@"bt.le.features");
+        case 0x2003: return NWText(@"bt.le.le_features");
+        case 0x201c: return NWText(@"bt.le.states");
+        default: return NWText(@"bt.le.title");
+    }
 }
 
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
@@ -162,6 +196,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 @property(nonatomic, strong) NSDictionary *capabilities;
 @property(nonatomic) BOOL checking;
 @property(nonatomic) NSUInteger pingCount, intervalMS;
+- (void)runArguments:(NSArray<NSString *> *)arguments le:(BOOL)le;
 @end
 
 @implementation NWBluetoothViewController
@@ -262,9 +297,10 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 0 || section == 2) return 2;
+    (void)table; if (section == 0) return 3;
+    if (section == 2) return 2;
     if (section == 3) return busy ? 2 : 1;
-    if (section == 4) return lastReport ? MAX(1, [lastReport[@"samples"] count] + 1) : 1;
+    if (section == 4) return lastReport ? 1 + [(lastReport[@"operation"] && [lastReport[@"operation"] isEqual:@"le_capabilities"] ? lastReport[@"queries"] : lastReport[@"samples"]) count] : 1;
     return 1;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
@@ -278,7 +314,14 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (index.section == 0 && index.row == 1) {
+    if (index.section == 0 && index.row == 2) {
+        content.text = NWText(@"bt.le.title");
+        content.secondaryText = NWText([self.capabilities[@"supports_le_capability_app"] boolValue] ? @"bt.le.menu" : @"bt.le.update");
+        content.image = [UIImage systemImageNamed:@"cpu"];
+        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
+            [self.capabilities[@"supports_le_capability_app"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+        content.textProperties.color = NWAccentColor();
+    } else if (index.section == 0 && index.row == 1) {
         content.text = NWText(@"ble.title"); content.secondaryText = NWText(@"ble.menu");
         content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -300,7 +343,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         content.text = NWText(interval ? @"bt.interval_ms" : @"bt.count");
         cell.accessoryView = interval ? self.intervalField : self.countField;
     } else if (index.section == 3) {
-        content.text = index.row || busy ? NWText(index.row ? @"bt.cancel" : @"bt.running") :
+        content.text = index.row || busy ? NWText(index.row ? @"bt.cancel" : readingLE ? @"bt.le.running" : @"bt.running") :
             NWText(@"bt.start");
         content.image = [UIImage systemImageNamed:index.row ? @"stop.circle" : @"waveform.path"];
         cell.selectionStyle = index.row || (!busy && [self.capabilities[@"supported"] boolValue]) ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
@@ -310,6 +353,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         NSString *code = lastReport[@"error_code"];
         content.text = reportText(lastReport);
         NSMutableArray<NSString *> *details = [NSMutableArray new];
+        if ([lastReport[@"operation"] isEqual:@"le_capabilities"]) {
+            [details addObject:[NSString stringWithFormat:NWText(@"bt.le.support"),
+                advertisingSupport(lastReport, NO), advertisingSupport(lastReport, YES)]];
+            [details addObject:NWText(@"bt.le.read_only")];
+        }
         NSNumber *interval = lastReport[@"interval_ms"];
         if (!interval && lastReport[@"interval_seconds"]) interval = @([lastReport[@"interval_seconds"] doubleValue] * 1000);
         if (lastReport[@"requested_count"] && interval)
@@ -318,6 +366,13 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if ([lastReport[@"service_restored"] boolValue]) [details addObject:NWText(@"bt.restored")];
         content.secondaryText = [details componentsJoinedByString:@"\n"];
         content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
+    } else if ([lastReport[@"operation"] isEqual:@"le_capabilities"]) {
+        NSDictionary *query = lastReport[@"queries"][index.row - 1];
+        content.text = queryTitle(query);
+        BOOL success = query[@"return_data_hex"] && query[@"hci_status"] && ![query[@"hci_status"] unsignedIntegerValue];
+        content.secondaryText = success ? NWText(@"bt.le.reply") : query[@"hci_status"] ?
+            [NSString stringWithFormat:NWText(@"bt.le.rejected"), [query[@"hci_status"] unsignedIntegerValue]] : NWText(@"bt.timeout");
+        content.image = [UIImage systemImageNamed:success ? @"checkmark.circle" : @"exclamationmark.circle"];
     } else {
         NSDictionary *sample = lastReport[@"samples"][index.row - 1];
         content.text = [NSString stringWithFormat:NWText(@"bt.sequence"), [sample[@"sequence"] unsignedIntegerValue]];
@@ -331,6 +386,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [table deselectRowAtIndexPath:index animated:YES];
     if (index.section == 0 && index.row == 1 && !busy) {
         [self.navigationController pushViewController:NWBLEController() animated:YES]; return;
+    }
+    if (index.section == 0 && index.row == 2) {
+        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_capability_app"] boolValue])
+            [self runArguments:@[@"--le-capabilities"] le:YES];
+        return;
     }
     if (index.section != 3) return;
     if (index.row && busy) { cancelWorker(); return; }
@@ -385,15 +445,27 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     else if (self.pingCount == NWBT_DEFAULT_COUNT && self.intervalMS == NWBT_DEFAULT_INTERVAL_MS)
         arguments = @[@"--ping", address];
     else return;
+    [NSUserDefaults.standardUserDefaults setObject:address forKey:@"NukeWirelessBluetoothTarget"];
+    [self runArguments:arguments le:NO];
+}
+- (void)runArguments:(NSArray<NSString *> *)arguments le:(BOOL)le {
+    if (busy || NWScanBusy() || NWBulkBusy()) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil]; return;
+    }
+    if (!workerLock) workerLock = [NSObject new];
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
+    readingLE = le;
+    [self.view endEditing:YES];
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
-    [NSUserDefaults.standardUserDefaults setObject:address forKey:@"NukeWirelessBluetoothTarget"];
     background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ cancelWorker(); }];
     [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
     [self refresh:nil];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        NSDictionary *report = invoke(arguments, YES);
+        NSMutableDictionary *report = [invoke(arguments, YES) mutableCopy];
+        if (le) report[@"operation"] = @"le_capabilities";
         NSData *saved = [NSJSONSerialization dataWithJSONObject:report options:0 error:NULL];
         if (saved) {
             [NSUserDefaults.standardUserDefaults setObject:saved forKey:reportKey];
@@ -419,3 +491,45 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 @end
 
 UIViewController *NWBluetoothController(void) { return [NWBluetoothViewController new]; }
+
+#ifdef NW_UI_TESTING
+int NWBluetoothUIRegressionCheck(void) {
+    NSDictionary *previous = lastReport; BOOL previousBusy = busy, previousLE = readingLE;
+    @try {
+        busy = NO;
+        NSMutableString *bitmap = [NSMutableString new];
+        for (NSUInteger i = 0; i < 64; ++i) [bitmap appendString:@"ff"];
+        NSDictionary *commands = @{@"opcode": @0x1002, @"hci_status": @0, @"return_data_hex": bitmap};
+        lastReport = @{@"operation": @"le_capabilities", @"capabilities_verified": @YES,
+                       @"queries": @[commands], @"service_restored": @YES};
+        if (![advertisingSupport(lastReport, NO) isEqual:NWText(@"ble.yes")] ||
+            ![advertisingSupport(lastReport, YES) isEqual:NWText(@"ble.yes")]) return 1;
+        if (![advertisingSupport(@{@"queries": @[@{@"opcode": @0x1002, @"hci_status": @0,
+              @"return_data_hex": @"00"}]}, NO) isEqual:NWText(@"ble.unavailable")]) return 2;
+        NWBluetoothViewController *controller = [NWBluetoothViewController new];
+        [controller loadViewIfNeeded];
+        controller.capabilities = @{@"supported": @YES, @"supports_le_capability_reads": @YES};
+        NSIndexPath *button = [NSIndexPath indexPathForRow:2 inSection:0];
+        UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 3;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_capability_app": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault) return 4;
+        if ([controller tableView:controller.tableView numberOfRowsInSection:4] != 2) return 5;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]];
+        UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (![content.text isEqual:NWText(@"bt.le.success")] || ![content.secondaryText containsString:NWText(@"bt.restored")]) return 6;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:4]];
+        content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (![content.text isEqual:NWText(@"bt.le.commands")] || ![content.secondaryText isEqual:NWText(@"bt.le.reply")]) return 7;
+        busy = YES; readingLE = YES;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone ||
+            [controller tableView:controller.tableView numberOfRowsInSection:3] != 2) return 8;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:3]];
+        content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (![content.text isEqual:NWText(@"bt.le.running")]) return 9;
+        return 0;
+    } @finally { lastReport = previous; busy = previousBusy; readingLE = previousLE; }
+}
+#endif

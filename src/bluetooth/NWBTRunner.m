@@ -33,7 +33,7 @@ static NSDictionary *errorReport(NSString *code) {
 static int printReport(NSDictionary *report) {
     NSData *json = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingSortedKeys error:NULL];
     if (!json) return 1;
-    // Only an admitted ping writes this bounded, root-owned diagnostic.
+    // Only an admitted explicit diagnostic writes this bounded root-owned record.
     // No target address is included; status queries and recovery leave it intact.
     if (recordAppRun && bootstrapRoot && json.length <= 65536) {
         NSData *record = [NSJSONSerialization dataWithJSONObject:@{@"report": report,
@@ -304,8 +304,8 @@ int main(int argc, char **argv) {
         recordAppRun = milliseconds || ((argc == 3 || argc == 5) && !strcmp(argv[1], "--ping"));
         BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
         BOOL capabilities = argc == 2 && !strcmp(argv[1], "--le-capabilities");
-        // This first capability probe is reserved for the explicit root operator.
-        if (capabilities && invokingUID != 0) return printReport(errorReport(@"permissions"));
+        // callerAllowed below admits only root or the exact installed app parent.
+        recordAppRun = recordAppRun || capabilities;
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
         char ownPath[PATH_MAX] = {0};
         if (!callerAllowed(ownPath) || geteuid() || setgroups(0, NULL) || setgid(0) || setuid(0))
@@ -328,7 +328,7 @@ int main(int argc, char **argv) {
             BOOL supported = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
-                @"supports_le_capability_reads": @YES});
+                @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES});
         }
         if (!milliseconds && ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping"))) return printReport(errorReport(@"arguments"));
         NSUInteger count = NWBT_DEFAULT_COUNT, intervalMS = milliseconds ? NWBT_DEFAULT_INTERVAL_MS : NWBT_DEFAULT_INTERVAL;
