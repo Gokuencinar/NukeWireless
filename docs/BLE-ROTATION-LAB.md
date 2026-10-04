@@ -35,8 +35,14 @@ Fuentes:
 - https://github.com/pepeangell5/ESP32-TOOLS-MODERN/blob/dc59cd372530d17633efd20b8a2421c3e60cfdfe/src/BTDisruptor.cpp
 - Bluetooth Core, vol. 4, parte E, 7.8.54: LE Set Extended Advertising Data.
 
-Estado inicial: implementación preparada; compilación, instalación y recepción
-de la nueva secuencia pendientes. Dev31/app15 ya verificaron anuncios fijos.
+Verificación en iPhone XS / iOS 16.3.1 / Dopamine RootHide: dev32/app16
+compilados e instalados, pruebas de interfaz en español e inglés correctas y
+siete comprobaciones del paquete correctas. La app ejecutó la operación como
+UID 501. El controlador aceptó secuencias 0–9 y las catorce órdenes HCI
+terminaron con status 0, incluyendo desactivación y eliminación del set;
+service_restored=1. La laptop recibió los valores 1, 2, 5 y 6, entre -50 y
+-41 dBm. Su radio volvió al estado original apagado. Esta captura demuestra
+cambio de datos por radio, sin afirmar recepción de todos los valores.
 
 Para revertir después de instalar, reinstalar los paquetes dev31/app15
 conservados en `/var/mobile/Documents/NukeWireless-dev31-backup.deb` y
