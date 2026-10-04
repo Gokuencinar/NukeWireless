@@ -51,8 +51,15 @@ App15 añade --le-manufacturer-test y Dev31 lo muestra como «Anuncio de fabrica
 company ID 0xFFFF y datos 4E574C616201 (NWLab y versión 1). El anuncio completo
 ocupa exactamente 31 bytes. Conserva intervalo de 1000 ms, duración de 10 s,
 handle dedicado y recuperación independiente. No acepta payloads, fabricantes,
-direcciones, velocidades o duraciones externos. La recepción de esta nueva
-variante debe verificarse después de instalar app15.
+direcciones, velocidades o duraciones externos.
+
+Dev31/app15 se compilaron e instalaron en el mismo iPhone XS. El usuario ejecutó
+la variante desde NukeWireless y el informe del helper confirmó caller_uid=501,
+las cinco órdenes HCI con status 0, desactivación, eliminación del set y
+service_restored=1. La laptop recibió el UUID y company ID 0xFFFF con los datos
+exactos 4E574C616201 a -49 y -46 dBm. El receptor Windows se restaura a su estado
+original al terminar. El informe nativo conserva transmission_verified=false:
+la recepción por radio queda probada por el registro externo, no por el ACK HCI.
 
 Fuentes de protocolo: Bluetooth Core HCI; tabla y decodificación primaria BlueZ:
 https://github.com/bluez/bluez/blob/master/monitor/packet.c
