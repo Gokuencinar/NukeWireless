@@ -1,0 +1,17 @@
+name: Bluetooth transport inspector
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated Bluetooth capability library and inspector
+        run: bash scripts/build_bluetooth_inspector.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuke-bluetooth-inspector
+          path: build/bluetooth/
+          retention-days: 14
