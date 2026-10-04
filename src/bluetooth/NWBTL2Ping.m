@@ -296,6 +296,7 @@ NSDictionary<NSString *, id> *NWBTL2PingWithOptions(NSString *destination, NSUIn
             double creditDeadline = MIN(now() + 1.0, pingDeadline);
             while ((!session.credits || session.auxiliary.count) && now() < creditDeadline && !session.error && !NWBTCancelled) [session pump];
             if (session.error || NWBTCancelled || !session.connected) break;
+            if (now() >= pingDeadline) { session.error = @"Ping window deadline reached."; break; }
             if (!session.credits) { session.error = @"ACL transmission credit did not return."; break; }
             uint8_t nonce[8]; arc4random_buf(nonce, sizeof(nonce));
             session.nonce = [NSData dataWithBytes:nonce length:sizeof(nonce)]; session.echoID = identifier;
