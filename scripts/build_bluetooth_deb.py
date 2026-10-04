@@ -8,7 +8,7 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.2~probe8'
+VERSION = '0.0.3~app1'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -53,7 +53,8 @@ def build(artifact, output):
         raise ValueError('stale Bluetooth inspector sources')
     library = (artifact / 'NukeBluetoothBridge.dylib').read_bytes()
     tool = (artifact / 'nwbt-inspect').read_bytes()
-    for name, data in [('NukeBluetoothBridge.dylib', library), ('nwbt-inspect', tool)]:
+    runner = (artifact / 'nwbt-run').read_bytes()
+    for name, data in [('NukeBluetoothBridge.dylib', library), ('nwbt-inspect', tool), ('nwbt-run', runner)]:
         if sha(data) != report['files'][name]: raise ValueError('artifact hash mismatch')
         report[name + '_macho'] = inspect(data) if name.endswith('.dylib') else inspect_tool(data)
     control = f'''Package: com.gokuencinar.nukewireless.bluetooth
@@ -63,21 +64,24 @@ Architecture: iphoneos-arm64e
 Section: Development
 Maintainer: Gokuencinar
 Author: Gokuencinar
-Depends: firmware (>= 15.0), firmware (<< 19.0), rootless-compat, ldid
-Description: Experimental Bluetooth transport research for NukeWireless. Bounded five-echo L2CAP diagnostic restricted to the inspected iPhone XS / iOS 16.3.1. Requires exclusive transport ownership and external service recovery. Runtime verification pending.
+Depends: firmware (>= 16.3), firmware (<< 16.4), rootless-compat, ldid
+Description: Experimental native Bluetooth diagnostics for NukeWireless. Five finite echoes, cancellation and independent service recovery. Restricted to the inspected iPhone XS / iOS 16.3.1. App runner integration verification pending.
 '''.encode()
     postinst = b'''#!/bin/sh
 set -e
 ldid -Hsha256 -M -S/usr/share/nukewireless-bluetooth/inspector.entitlements /usr/bin/nwbt-inspect
+ldid -Hsha256 -M -S/usr/share/nukewireless-bluetooth/inspector.entitlements /usr/bin/nwbt-run
 ldid -Hsha256 -S /usr/lib/NukeBluetoothBridge.dylib
+chown root:wheel /usr/bin/nwbt-run
+chmod 4755 /usr/bin/nwbt-run
 exit 0
 '''
     entries = [directory(path) for path in ['usr', 'usr/bin', 'usr/lib', 'usr/share', 'usr/share/nukewireless-bluetooth']]
-    entries += [regular('usr/bin/nwbt-inspect', tool, 0o755),
+    entries += [regular('usr/bin/nwbt-inspect', tool, 0o755), regular('usr/bin/nwbt-run', runner, 0o755),
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'Run nwbt-inspect --inspect for passive inspection. Experimental nwbt-inspect --l2ping ADDRESS --exclusive submits five small echoes. Only iPhone XS / iOS 16.3.1 is admitted. Bluetooth must be off in Settings, HCI/ACL ownership exclusive, and independent service recovery scheduled by the operator. No service manipulation or app injection in this library. Runtime verification pending. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'NukeWireless Info > Bluetooth uses nwbt-run --ping ADDRESS for five bounded L2CAP echoes. Bluetooth must be off in Settings and the target in pairing mode. Only iPhone XS / iOS 16.3.1 / RootHide is admitted. The runner verifies its app caller and uses an independent recovery child before exclusive service access. No firmware modification, pairing-key storage, audio channel, or flooding. Raw nwbt-inspect diagnostics still require operator-managed recovery. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pack_ar([('debian-binary', b'2.0\n'),
         ('control.tar.gz', tar_bytes([regular('control', control), regular('postinst', postinst, 0o755)])),
