@@ -1,4 +1,4 @@
-"""Package the isolated, read-only RootHide transport inspection module."""
+"""Package the isolated RootHide transport inspector and bounded echo module."""
 import argparse
 import json
 import plistlib

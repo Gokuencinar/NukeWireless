@@ -1,24 +1,26 @@
 # Bluetooth nativo: biblioteca de investigación
 
-**Estado: la apertura de AppleConvergedTransport falla con operación no
-soportada en el dispositivo. Se investiga su ruta nativa HCI Skywalk; el ping
-L2CAP todavía no está implementado.** La app continúa en dev19, cuyas funciones
+**Estado: cinco ecos L2CAP reales enviados y respondidos por unos auriculares
+propios desde el iPhone, con cierre de conexión confirmado y bluetoothd
+restaurado.** La app continúa en dev19, cuyas funciones
 el usuario confirmó. Este paquete independiente no es una nueva versión de la
 app ni añade un botón de ping.
 
 El alcance solicitado es exclusivamente el Bluetooth del iPhone. No se utiliza
 un adaptador Linux ni un servidor externo. El ping propuesto es un diagnóstico
 finito: cinco solicitudes pequeñas, intervalo de un segundo, timeout por
-respuesta, plazo total y cancelación. No se ejecutó ningún ping.
+respuesta, plazo total y cancelación. La prueba funcional se realizó por SSH;
+la integración y ejecución autónoma desde la interfaz de la app siguen pendientes.
 
 ## Paquete separado
 
 - ID: `com.gokuencinar.nukewireless.bluetooth`.
-- Versión instalada: `0.0.2~probe5`.
+- Versión instalada: `0.0.2~probe8`; incluye el motor de eco HCI/ACL.
 - Esquema de esta candidata: RootHide; binarios arm64, deployment target iOS 15.
 - Biblioteca: `/usr/lib/NukeBluetoothBridge.dylib`.
 - Inspector: `/usr/bin/nwbt-inspect --inspect`.
-- Fuente: [NWBTBridge.m](../src/bluetooth/NWBTBridge.m) y
+- Fuente: [NWBTL2Ping.m](../src/bluetooth/NWBTL2Ping.m),
+  [NWBTController.m](../src/bluetooth/NWBTController.m) y
   [NWBTInspector.m](../src/bluetooth/NWBTInspector.m).
 - No tiene daemon, filtro de inyección ni constructor con efectos sobre Bluetooth.
   La inspección pasiva carga bibliotecas del sistema, busca símbolos y enumera
@@ -34,8 +36,15 @@ respuesta, plazo total y cancelación. No se ejecutó ningún ping.
   apertura/cierre del canal HCI real, localizado por IORegistry. No consume ni
   escribe slots. Tiene las mismas guardas de ABI, root, Bluetooth apagado y
   watchdog. No enciende el controlador ni llama selectores de configuración.
-- El JSON declara `l2ping_implemented: false`,
-  `bluetooth_packets_sent: 0` y `signatures_verified: false`.
+- `--l2ping DIRECCIÓN --exclusive` abre HCI y ACL, consulta buffers, solicita
+  una conexión BR/EDR y envía hasta cinco ecos de ocho bytes. Verifica identificador
+  y contenido de cada respuesta. No crea claves de emparejamiento, canales de
+  audio ni conexiones a otros destinos. La dirección procede del argumento;
+  no está incorporada en fuentes ni catálogos.
+- La inspección pasiva declara `l2ping_implemented: true`,
+  `bluetooth_packets_sent: 0` y `l2ping_verified: false`: sus resultados no
+  sustituyen la ejecución de un eco. La comprobación de firmas ACT sigue
+  siendo investigación; el motor utiliza el transporte Skywalk contrastado.
 
 Se comprobó su ejecución únicamente en **iPhone XS (`iPhone11,2`), iOS 16.3.1
 (20D67), Dopamine RootHide**. El deployment target no valida otros iOS ni
@@ -124,7 +133,87 @@ atributos ni a consumir slots. `bluetoothd` sigue ejecutándose en
 `user/501/com.apple.bluetoothd` aun con Bluetooth apagado en Ajustes.
 Esto permite proponer una prueba de exclusividad con recuperación acotada,
 pero no demuestra por sí solo que bluetoothd sea el propietario que bloquea
-la apertura. No se detuvo, deshabilitó ni reinició ese servicio en estas pruebas.
+la apertura. En las pruebas de `probe5` no se detuvo, deshabilitó ni reinició
+ese servicio.
+
+### Prueba exclusiva autorizada: probe6
+
+El usuario autorizó detener temporalmente el servicio Bluetooth y restaurarlo.
+`disable` más `SIGTERM` no mantuvo el servicio detenido: launchd volvió a
+iniciarlo con otro PID. Se restauró su estado habilitado. Un intento posterior
+se agotó durante la comprobación previa, antes de retirar el servicio.
+
+`probe6` hace opcional la recogida de OSLog (`NWBT_PROCESS_LOGS=1`) y registra
+fases acotadas en stderr. Además se utiliza el `timeout` instalado en el
+bootstrap, con límite de 25 segundos y SIGKILL de recuperación a los dos
+segundos adicionales, exclusivamente para este helper.
+
+[Actions 37176758909](https://github.com/Gokuencinar/NukeWireless/actions/runs/37176758909)
+compiló `97f6fa8`. SHA-256 del `.deb` instalado:
+`2a0973b9192cb612388c9de1651d6464ee8dbfebc41fa1cccceedb3deeb6d5f1`.
+La comprobación previa devolvió errno 16. Tras `bootout` del servicio verificado
+`user/501/com.apple.bluetoothd`, el helper terminó con código 0 y:
+
+```json
+{"stage":"skywalk_opened","slot_buffer_size":512,"tx_slots":16,"rx_slots":16,
+ "local_hci_commands_sent":0,"remote_bluetooth_packets_sent":0,"l2ping_verified":false}
+```
+
+Se cerró el canal y se restauró el servicio con `bootstrap user/501` usando
+su plist original bajo `/rootfs/System/Library/LaunchDaemons`, `enable` y
+`kickstart`. `launchctl print` confirmó estado `running` con nuevo PID.
+La recuperación independiente a los 45 segundos estaba programada antes de
+retirar el servicio y no requiere que SSH continúe conectado.
+
+`probe7` mantiene la apertura sin paquetes y añade `--skywalk-info --exclusive`:
+un único HCI Read Local Version Information, drenaje previo de RX acotado,
+buffers/slots limitados, respuesta en tres segundos y cierre del canal. Las
+funciones y estructura de 64 bytes se contrastan con XNU 8792.61.2. En BlueTool,
+`0x100005414` elimina el prefijo H4 antes de escribir el ring; el inspector envía
+solo `01 10 00`. La candidata aún no añade ACL, conexión remota ni eco L2CAP.
+
+[Actions 37176928783](https://github.com/Gokuencinar/NukeWireless/actions/runs/37176928783)
+compiló `c74fce5` (`probe7`). Se instaló y obtuvo una respuesta Command Complete
+real: HCI version 9, revision 2831, fabricante 15, LMP subversion 33005.
+SHA-256 del paquete: `669a40ded2e775f7a52784b5bec610e63e6f2ef976d21560b255e1f1a44bd742`.
+
+### Cinco ecos reales: probe8
+
+[Actions 37177516897](https://github.com/Gokuencinar/NukeWireless/actions/runs/37177516897)
+compiló `5b3f52b`, exclusivamente el módulo Bluetooth. SHA-256 del paquete
+instalado: `8c8dc1a2ce286fa6ff893b7405907c20e890def70b10442f8a9d3cd472a60639`.
+`dpkg-query` confirmó `0.0.2~probe8` y que NukeWireless conserva dev19.
+
+El usuario preparó sus Mi True Wireless EBs Basic 2 en modo de emparejamiento,
+desconectados de la laptop. Autorizó la prueba exclusiva temporal. La dirección
+se conserva solo en archivos locales ignorados. El helper devolvió código 0:
+
+| Eco | Respuesta comprobada | RTT observado |
+| --- | --- | --- |
+| 1 | Sí, mismo identificador y ocho bytes | 16,71 ms |
+| 2 | Sí | 30,21 ms |
+| 3 | Sí | 32,99 ms |
+| 4 | Sí | 25,69 ms |
+| 5 | Sí | 28,52 ms |
+
+El controlador devolvió Connection Complete para la dirección solicitada,
+créditos ACL y finalmente Disconnection Complete para ese handle. Se enviaron
+cinco ecos y una respuesta auxiliar L2CAP Information Response. El helper
+cerró ambos canales; la recuperación inmediata confirmó bluetoothd `running`.
+La recuperación independiente se había programado antes de retirar el servicio.
+No se modificaron firmware, BlueTool, bluetoothd ni sus plists.
+La comprobación posterior confirmó el servicio habilitado y en ejecución;
+no aparecieron nuevos registros de cierre de `nwbt-inspect`.
+
+El formato ACL se contrastó con `skywalk_write_channel` de bluetoothd 20D67
+en `0x100061d80`: escribe dos bytes de handle/flags y dos de longitud,
+seguidos del cuerpo, sin prefijo H4. Las constantes HCI y L2CAP se contrastan
+con las cabeceras del protocolo de BlueZ; no se utiliza su transporte Linux.
+
+La cancelación suave, errores de emparejamiento y timeouts tienen código y
+límites, pero esas rutas no están verificadas funcionalmente. Esta prueba
+no valida otros modelos, builds de iOS, jailbreaks ni todos los accesorios.
+La app todavía no enlaza ni invoca este motor y no muestra un botón de ping.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 
@@ -165,7 +254,7 @@ vacío. Esta biblioteca no necesita dicho parche. La dependencia interna usa
 la ruta y su carga se observaron en este bootstrap. No se ha integrado ese
 enlace en el ejecutable de NukeWireless.
 
-## Transporte pendiente de validar
+## Fuentes y análisis previo del transporte
 
 - [l2ping de BlueZ](https://github.com/bluez/bluez/blob/master/tools/l2ping.c)
   depende del transporte Linux `PF_BLUETOOTH`/`BTPROTO_L2CAP`. Recompilarlo
@@ -202,12 +291,12 @@ se inspeccionó mediante `/rootfs`, como documenta
 Los frameworks están en la caché compartida de dyld; que no exista un archivo
 individual en SFTP no significa que el framework no esté disponible.
 
-Para completar el backend nativo falta verificar en este iOS la ruta Skywalk de
-creación/lectura/escritura/liberación, el canal de recepción y el acceso al
-controlador compatible con el servicio Bluetooth del sistema. Después harán
-falta resultados de ecos reales en un dispositivo objetivo. No se sustituyen
-por datos simulados ni por una apertura de canal. No se modificó firmware,
-BlueTool o bluetoothd, ni se reiniciaron esos servicios.
+La ruta Skywalk de apertura/lectura/escritura/cierre y los ecos reales quedaron
+comprobados después de este análisis, en las pruebas `probe7` y `probe8`
+descritas arriba. Continúan pendientes la integración en la app y una gestión
+autónoma de exclusividad/recuperación: actualmente las ejecuta el operador por
+SSH. No debe llamarse `--l2ping` dejando el servicio retirado sin programar
+recuperación independiente antes. El motor no manipula servicios por sí mismo.
 
 ## Construcción y retirada
 

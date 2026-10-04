@@ -8,9 +8,11 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 **Bluetooth nativo en investigación:** se ha compilado e instalado una biblioteca
 independiente de inspección en el iPhone XS con iOS 16.3.1 y Dopamine RootHide.
-Su inspector carga y recoge interfaces del sistema; **l2ping todavía no está
-implementado**. La app continúa en dev19. Véase [evidencias, fuentes y transporte
-pendiente](docs/BLUETOOTH-L2PING.md).
+**L2ping comprobado por SSH:** cinco ecos reales respondidos por los auriculares
+del usuario mediante HCI/ACL Skywalk, con cierre de conexión y restauración del
+servicio Bluetooth. La app continúa en dev19; todavía no tiene botón de ping
+ni gestión autónoma del transporte. Solo se comprobó iPhone XS / iOS 16.3.1 /
+Dopamine RootHide. Véase [evidencias, fuentes y límites](docs/BLUETOOTH-L2PING.md).
 
 **Nueva interfaz candidata dev19 / compat2:** panel **Equipos** desde la lupa de Wi-Fi,
 con búsqueda, filtros y ordenación de los resultados existentes. **Información →
