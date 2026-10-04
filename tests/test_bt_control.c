@@ -19,7 +19,7 @@ int main(void) {
     assert(NWBTStartCancellationMonitor(&monitor, pair[0], cancelled) == 1);
     close(pair[0]); // Reader owns its private duplicate.
     awaitCancellation(); NWBTStopCancellationMonitor(&monitor);
-    assert(atomic_load(&monitor.requested)); close(pair[1]);
+    assert(atomic_load(&monitor.requested) && atomic_load(&monitor.requested_at_ns)); close(pair[1]);
 
     atomic_store(&cancellations, 0);
     assert(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);

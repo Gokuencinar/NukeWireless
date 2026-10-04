@@ -27,7 +27,29 @@ static void cancelRun(int number) {
     if (NWBTCancelled) _exit(128 + number);
     NWBTCancelled = 1; alarm(4);
 }
-static void cancelFromApp(void) { kill(getpid(), SIGTERM); }
+static void cancelFromApp(void) {
+    // Do not depend on signal dispositions/masks inherited from UIKit or changed
+    // by loaded frameworks. The radio loop observes this lock-free shared flag.
+    atomic_store(&NWBTCancelled, 1);
+    alarm(4);
+}
+static BOOL installCancellationSignals(void) {
+    if (signal(SIGINT, cancelRun) == SIG_ERR || signal(SIGTERM, cancelRun) == SIG_ERR ||
+        signal(SIGALRM, cancelRun) == SIG_ERR) return NO;
+    sigset_t signals; sigemptyset(&signals);
+    sigaddset(&signals, SIGINT); sigaddset(&signals, SIGTERM); sigaddset(&signals, SIGALRM);
+    return pthread_sigmask(SIG_UNBLOCK, &signals, NULL) == 0;
+}
+static void finishAppControl(NSMutableDictionary *report, NWBTCancellationMonitor *monitor) {
+    NWBTStopCancellationMonitor(monitor);
+    BOOL requested = atomic_load(&monitor->requested);
+    report[@"cancellation_requested_via_app_channel"] = @(requested);
+    uint64_t start = atomic_load(&monitor->requested_at_ns), end = NWBTControlMonotonicNS();
+    if (requested && start && end >= start) report[@"app_cancel_to_report_seconds"] = @((end - start) / 1e9);
+    if (NWBTCancelled && !report[@"error_code"]) {
+        report[@"error_code"] = @"cancelled"; report[@"error"] = @"Diagnostic cancelled.";
+    }
+}
 
 static NSDictionary *errorReport(NSString *code) {
     return @{@"version": NWBT_VERSION, @"error_code": code, @"stage": @"runner", @"l2ping_verified": @NO};
@@ -329,7 +351,7 @@ int main(int argc, char **argv) {
         signal(SIGCHLD, SIG_DFL);
         if (recovery) return recover();
         if (capabilities || lab) {
-            signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
+            if (!installCancellationSignals()) return printReport(errorReport(@"transport"));
             alarm(60);
             NWBTCancellationMonitor monitor;
             if (NWBTStartCancellationMonitor(&monitor, STDIN_FILENO, cancelFromApp) < 0) {
@@ -337,8 +359,7 @@ int main(int argc, char **argv) {
                 return printReport(errorReport(@"transport"));
             }
             NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair) mutableCopy];
-            NWBTStopCancellationMonitor(&monitor);
-            report[@"cancellation_requested_via_app_channel"] = @(atomic_load(&monitor.requested));
+            finishAppControl(report, &monitor);
             alarm(0); return printReport(report);
         }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
@@ -365,7 +386,7 @@ int main(int argc, char **argv) {
         if (!address || ![pattern firstMatchInString:address options:0 range:NSMakeRange(0, address.length)] ||
             [address isEqual:@"00:00:00:00:00:00"] || [address.uppercaseString isEqual:@"FF:FF:FF:FF:FF:FF"])
             return printReport(errorReport(@"address"));
-        signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
+        if (!installCancellationSignals()) return printReport(errorReport(@"transport"));
         unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
         alarm(timeout > 60 ? timeout : 60);
         NWBTCancellationMonitor monitor;
@@ -374,8 +395,7 @@ int main(int argc, char **argv) {
             return printReport(errorReport(@"transport"));
         }
         NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO) mutableCopy];
-        NWBTStopCancellationMonitor(&monitor);
-        report[@"cancellation_requested_via_app_channel"] = @(atomic_load(&monitor.requested));
+        finishAppControl(report, &monitor);
         alarm(0); return printReport(report);
     }
 }

@@ -1,6 +1,6 @@
 # Detener una prueba Bluetooth desde NukeWireless
 
-La versión dev35/app18 añade «Detener» a la barra superior de Información → Bluetooth
+La versión dev35/app19 añade «Detener» a la barra superior de Información → Bluetooth
 mientras hay una operación en curso. Las pruebas BLE conservan su límite de
 10 segundos y también pueden terminar antes mediante este botón.
 
@@ -10,11 +10,15 @@ un socket privado heredado como entrada estándar. El botón pasa a
 recuperación. La app mantiene bloqueados los nuevos diagnósticos durante ese
 intervalo. También solicita la misma cancelación al entrar en segundo plano.
 
-El trabajador app18 observa ese canal en un hilo independiente y se envía a sí
-mismo SIGTERM, usando su ruta existente de cancelación y limpieza. La app no
+El trabajador app19 observa ese canal en un hilo independiente y activa
+directamente un indicador atómico compartido con el bucle de radio, usando su
+ruta existente de cancelación y limpieza. La app no
 necesita permiso para señalar un proceso que ya ha cambiado a root. El cierre
 del canal (incluido el cierre de la app) también solicita la cancelación.
 No se aceptan PID externos ni comandos de radio a través de este canal.
+El informe registra el tiempo efectivo de emisión y el tiempo entre recibir la
+petición de parada y terminar la recuperación; la duración configurada de 10
+segundos no se presenta como duración efectiva.
 
 El trabajador abandona el bucle de anuncios, desactiva su
 conjunto de anuncios, lo retira y deja que el proceso independiente de

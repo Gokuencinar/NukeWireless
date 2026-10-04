@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-volatile sig_atomic_t NWBTCancelled = 0;
+atomic_int NWBTCancelled = 0;
 static double now(void) { return NSProcessInfo.processInfo.systemUptime; }
 static uint16_t u16(const uint8_t *p) { return p[0] | (uint16_t)p[1] << 8; }
 static void put16(uint8_t *p, uint16_t value) { p[0] = value; p[1] = value >> 8; }
@@ -241,6 +241,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
     NWBTLabSession *session = [NWBTLabSession new];
+    double advertisingStarted = 0;
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
         @"queries": session.queries, @"advertisement_name": manufacturer && !swiftPair ? @"" : @"NWLab",
@@ -292,6 +293,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
             enableSubmitted = YES;
             NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
             report[@"controller_advertising_acknowledged"] = @(reply != nil);
+            if (reply) advertisingStarted = now();
             double deadline = now() + 10.0, nextUpdate = now() + 1.0;
             unsigned sequence = 1;
             while (reply && !session.error && now() < deadline && !NWBTCancelled) {
@@ -307,6 +309,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
             }
         }
     } @finally {
+        if (advertisingStarted) report[@"advertising_elapsed_seconds"] = @(now() - advertisingStarted);
         // The controller duration stops this announcement even if the worker
         // dies. Normal/cancelled cleanup additionally disables our dedicated
         // handle and removes it before the independent daemon recovery.

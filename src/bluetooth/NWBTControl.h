@@ -8,6 +8,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdint.h>
+#include <time.h>
+
+static inline uint64_t NWBTControlMonotonicNS(void) {
+    struct timespec time;
+    if (clock_gettime(CLOCK_MONOTONIC, &time)) return 0;
+    return (uint64_t)time.tv_sec * UINT64_C(1000000000) + (uint64_t)time.tv_nsec;
+}
 
 // A private inherited socket carries cancellation, never a target PID or HCI data.
 // The reader also treats app exit (EOF) as cancellation. Only admitted diagnostic
@@ -17,6 +25,7 @@ typedef struct {
     pthread_t thread;
     bool started;
     atomic_bool finished, requested;
+    atomic_uint_fast64_t requested_at_ns;
     void (*cancel)(void);
 } NWBTCancellationMonitor;
 
@@ -33,6 +42,7 @@ static inline void *NWBTControlRead(void *context) {
             if (count < 0 && (errno == EINTR || errno == EAGAIN)) continue;
         }
         if (!atomic_load(&monitor->finished)) {
+            atomic_store(&monitor->requested_at_ns, NWBTControlMonotonicNS());
             atomic_store(&monitor->requested, true);
             monitor->cancel();
         }
@@ -46,6 +56,7 @@ static inline void *NWBTControlRead(void *context) {
 static inline int NWBTStartCancellationMonitor(NWBTCancellationMonitor *monitor, int descriptor, void (*cancel)(void)) {
     monitor->started = false;
     atomic_init(&monitor->finished, false); atomic_init(&monitor->requested, false);
+    atomic_init(&monitor->requested_at_ns, 0);
     struct stat info;
     if (fstat(descriptor, &info)) return -1;
     if (!S_ISSOCK(info.st_mode)) return 0;
