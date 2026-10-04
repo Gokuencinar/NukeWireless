@@ -25,8 +25,28 @@ static NSString *helperPath(void) {
     NSString *root = app.stringByDeletingLastPathComponent.stringByDeletingLastPathComponent;
     return [root stringByAppendingPathComponent:@"usr/bin/nwbt-run"];
 }
+// Synchronize reaping with UI cancellation. Once reaped (including by another
+// runtime child handler), a PID is never retained as a signal target.
+static BOOL childFinished(pid_t child, int *status, BOOL cancellable) {
+    @synchronized (workerLock) {
+        pid_t waited = waitpid(child, status, WNOHANG);
+        BOOL finished = waited == child || (waited < 0 && errno == ECHILD);
+        if (finished && cancellable && worker == child) worker = 0;
+        return finished;
+    }
+}
+static void signalChild(pid_t child, int number, BOOL cancellable) {
+    @synchronized (workerLock) {
+        int status = 0;
+        if (!childFinished(child, &status, cancellable)) {
+            // Only signal a child still present in our wait set.
+            if (waitpid(child, &status, WNOHANG) == 0) kill(child, number);
+            else if (cancellable && worker == child) worker = 0;
+        }
+    }
+}
 static void cancelWorker(void) {
-    @synchronized (workerLock) { cancelling = YES; if (worker > 0) kill(worker, SIGTERM); }
+    @synchronized (workerLock) { cancelling = YES; if (worker > 0) signalChild(worker, SIGTERM, YES); }
 }
 
 // A separate helper owns privileged operations and recovery. The app only
@@ -51,7 +71,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     posix_spawnattr_destroy(&attributes); posix_spawn_file_actions_destroy(&actions);
     close(out[1]); close(err[1]);
     if (launch) { close(out[0]); close(err[0]); return @{@"error_code": @"permissions"}; }
-    if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) kill(child, SIGTERM); }
+    if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) signalChild(child, SIGTERM, YES); }
     NSMutableData *data = [NSMutableData new]; NSUInteger stderrBytes = 0;
     double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? 65.0 : 12.0);
     BOOL exited = NO, invalid = NO; int status = 0;
@@ -65,17 +85,15 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             stderrBytes += (NSUInteger)count; if (stderrBytes > 65536) { invalid = YES; break; }
         }
         if (invalid) break;
-        pid_t waited = waitpid(child, &status, WNOHANG);
-        if (waited == child) { exited = YES; break; }
-        if (waited < 0 && errno != EINTR) { if (errno == ECHILD) exited = YES; break; }
+        if (childFinished(child, &status, cancellable)) { exited = YES; break; }
         struct pollfd descriptors[2] = {{out[0], POLLIN, 0}, {err[0], POLLIN, 0}}; poll(descriptors, 2, 25);
     }
     if (!exited) {
-        kill(child, SIGTERM); double cancelDeadline = NSProcessInfo.processInfo.systemUptime + 6.0;
+        signalChild(child, SIGTERM, cancellable); double cancelDeadline = NSProcessInfo.processInfo.systemUptime + 6.0;
         while (NSProcessInfo.processInfo.systemUptime < cancelDeadline) {
-            if (waitpid(child, &status, WNOHANG) == child) { exited = YES; break; } usleep(50000);
+            if (childFinished(child, &status, cancellable)) { exited = YES; break; } usleep(50000);
         }
-        if (!exited) { kill(child, SIGKILL); while (waitpid(child, &status, 0) < 0 && errno == EINTR) {} }
+        if (!exited) { signalChild(child, SIGKILL, cancellable); while (waitpid(child, &status, 0) < 0 && errno == EINTR) {} }
     }
     char buffer[2048]; ssize_t count;
     while ((count = read(out[0], buffer, sizeof(buffer))) > 0 && data.length + (NSUInteger)count <= 65536)
