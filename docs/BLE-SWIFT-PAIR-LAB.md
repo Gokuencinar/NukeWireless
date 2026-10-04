@@ -6,9 +6,9 @@ laptop. NukeWireless añade Información → Bluetooth → «BLE Spam: Swift Pai
 Swift Pair de Microsoft. No implementa un accesorio GATT emparejable.
 
 La sección de fabricante usa company ID `0x0006`, beacon ID `0x03`, escenario
-LE-only `0x00`, byte reservado `0x80` y nombre para mostrar NWLab. Se corrige
-la longitud AD del generador de Modern: el paquete contiene exactamente los
-bytes anunciados, sin estructuras incompletas. Los datos manufacturer que
+LE-only `0x00`, byte reservado `0x80` y nombre para mostrar NWLab. Cada sección
+AD contiene exactamente los bytes que declara. Se omite el UUID Fast Pair
+que Modern añade también a su anuncio de Microsoft. Los datos manufacturer que
 debe observar un receptor son `0300804e574c6162`.
 
 Se conserva el transporte verificado, un único set no conectable, dirección
@@ -41,8 +41,33 @@ mantener el iPhone desbloqueado y apagar Bluetooth desde sus Ajustes. Pulsar
 una vez la opción nueva y observar si Windows muestra un aviso de NWLab.
 El anuncio de prueba no permite completar un emparejamiento.
 
-Recuperación: se conserva dev32/app16 como copia de reinstalación. Las versiones
-nuevas y la aparición del aviso deben verificarse antes de afirmar éxito.
+## Resultado comprobado
+
+Dev33/app17 compilados e instalados en el iPhone XS con iOS 16.3.1 y Dopamine
+RootHide. Las comprobaciones del formato C, los tests de la app, la navegación
+del simulador y las siete comprobaciones del paquete terminaron correctamente.
+La identidad de firma de la app sigue siendo me.midnightchips.harpy-reloaded.
+
+La ejecución desde NukeWireless (UID 501) confirmó las cinco órdenes HCI con
+status 0, la desactivación, la eliminación del set y `service_restored=1`.
+La laptop registró tres recepciones válidas del company ID y datos exactos,
+con RSSI de -50 a -42 dBm. El usuario confirmó: «Termina correctamente y aparece
+el aviso NWLab». El aviso queda verificado por esa observación del usuario;
+el informe nativo conserva sus flags de verificación externa en false.
+No se observaron nuevos cierres inesperados relevantes y el receptor mantuvo
+Bluetooth encendido, sin cambios de alimentación.
+
+Antes de la ejecución correcta se registró un rechazo por Bluetooth encendido.
+Ese resultado se produjo antes de retirar el servicio y no emitió anuncios.
+El monitor inicial terminó al observar ese primer resultado; la verificación
+final usa el registro posterior de la ejecución correcta y la captura externa.
+
+Recuperación: se conservan en el iPhone
+`/var/mobile/Documents/NukeWireless-dev32-backup.deb` y
+`/var/mobile/Documents/NukeWireless-Bluetooth-app16-backup.deb`.
+
+El perfil Windows de diez segundos está comprobado. Esta compilación no incluye
+los perfiles Apple, Samsung o Google ni el modo continuo de Modern.
 
 Fuentes:
 
