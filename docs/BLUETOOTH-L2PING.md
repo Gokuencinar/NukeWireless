@@ -28,8 +28,19 @@ combinación antes de mostrar la confirmación o modificar el servicio.
   La planificación de iOS y el bombeo de eventos pueden añadir retraso; no se
   promete precisión de un milisegundo en el envío físico.
 
-Estado: cambios implementados; pendiente de compilación y empaquetado. Sin
-instalación ni prueba funcional en el iPhone para estas nuevas opciones.
+Estado: ambos paquetes compilados e inspeccionados. Sin instalación ni prueba
+funcional en el iPhone para estas nuevas opciones.
+
+- Fuente: commit `8fe12d7`.
+- App dev25: compilación `37203392586`, SHA-256 del `.deb`
+  `4e781bd720eb8027b8d93ecb7bbbead777e52fd4d5713da2d0fcbe7208ded390`.
+- Módulo app10: compilación `37203394127`, SHA-256 del `.deb`
+  `3ab5588c33c11336c408fa95f70940529422d9a683938640e2facc2932eda8df`.
+- Ambos workflows son de compilación. Comparación del paquete con dev24:
+  solo cambian metadatos, traducciones y el adaptador UIKit. Ejecutable original,
+  bibliotecas de rutas y tres helpers de red mantienen los mismos bytes.
+- Reversión: reinstalar la pareja anterior; dev23/app8 es la última confirmada
+  desde la interfaz en el dispositivo.
 
 ## Opciones de ping: candidata dev24 / app9
 
