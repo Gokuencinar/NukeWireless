@@ -4,7 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev15`. Conserva el estilo WiFi confirmado de dev14 y añade un aviso visible tras copiar un dato válido de red. La decoración de carga ahora se coloca sobre la ventana inicial, sin depender de un controlador llamado SplashView; se retira al aparecer las pestañas y tiene un límite de cuatro segundos. Compilación y navegación automática correctas e instalación SSH confirmada. Pendiente confirmación física de la transición de inicio.
+**Última candidata instalada:** `1.0.25+rh25.5~dev18`. El usuario confirmó que desapareció la antigua pantalla azul inicial. Conserva la interfaz WiFi, el cambio de idioma y el aviso de copia de datos de red. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
+
+**Port iOS 15–18 en desarrollo:** se preparan variantes separadas RootHide/Relaxin, Dopamine rootless y rootful. Son candidatas experimentales; no hay dispositivos con iOS 15, 17 o 18 disponibles para confirmarlas. Véase [compatibilidad, procedencia y construcción](docs/COMPATIBILITY.md).
 
 El usuario confirmó el resto de dev14, pero la pantalla azul de carga continuaba. Apartar su caché de SplashBoard tampoco resolvió el problema.
 
@@ -32,11 +34,11 @@ Consulta [el informe de auditoría](docs/AUDIT-rh25.5.md) para conocer las causa
 
 ## Arquitectura y compatibilidad
 
-Este proyecto contiene una extensión y herramientas de adaptación; **no contiene el código Swift original completo**. Se conservan las dos bibliotecas de rutas y los auxiliares del paquete base. En el ejecutable original solo se sustituyen dos textos visibles manteniendo exactamente su longitud; sus instrucciones permanecen intactas.
+Este proyecto contiene una extensión y herramientas de adaptación; **no contiene el código Swift original completo**. Se conservan las dos bibliotecas de rutas y los auxiliares del paquete base. En el ejecutable original solo se sustituyen dos textos visibles manteniendo exactamente su longitud; dev18 también sustituye la llamada de color y el nombre de imagen de SplashView con guardas del binario fijado.
 
 Las rutas `HarpyReloaded.app`, las clases Swift `_TtC13HarpyReloaded…`, el bundle ID `me.midnightchips.harpy-reloaded` y las preferencias existentes son identificadores de compatibilidad. No deben renombrarse. `src/HarpyRootHidePaths.c`, `scripts/build_deb.py` y el parche de Aegis son material histórico: no se recompilan ni aplican al generar esta versión.
 
-Objetivo: iOS 16.3 con Dopamine RootHide. SSID/BSSID se consultan mediante MobileWiFi sin solicitar ubicación; el acceso efectivo depende del dispositivo.
+Versión instalada comprobada: iOS 16.3.1 con Dopamine RootHide. Las variantes nuevas apuntan a iOS 15–18 y siguen pendientes de validación funcional. SSID/BSSID se consultan mediante MobileWiFi sin solicitar ubicación; el acceso efectivo depende del dispositivo.
 
 ## Compilación
 

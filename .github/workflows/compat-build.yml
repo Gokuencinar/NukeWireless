@@ -1,0 +1,30 @@
+name: iOS 15 compatibility candidates
+on:
+  push:
+    branches: [audit-rh25.5]
+    paths:
+      - 'src/compat/**'
+      - 'scripts/build_compat*'
+      - 'scripts/compat_*'
+      - '.github/workflows/compat-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile app adapters and launch resources for iOS 15
+        run: bash scripts/build_compat.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuke-wireless-compatibility
+          path: |
+            build/audit/NukeWirelessInfo_ios.dylib
+            build/audit/NukeWirelessPaths_ios.dylib
+            build/audit/build-manifest.json
+            build/audit/compat-manifest.json
+            build/audit/NukeLaunch.storyboardc/
+            build/audit/NWBootPic.png
+          retention-days: 14
