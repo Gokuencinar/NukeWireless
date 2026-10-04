@@ -101,7 +101,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
-        self.assertIn(b'NWBuild-rh25.5-dev18',binary)
+        self.assertTrue(('NWBuild-rh25.5-' + package.VERSION.split('~')[-1]).encode() in binary, 'Compiled version marker must match package version')
         self.assertNotIn(b'NWUIRegressionCheck',binary)
         for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
             self.assertNotIn(token,binary)

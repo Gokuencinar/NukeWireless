@@ -196,6 +196,7 @@ static pid_t startRecovery(const char *ownPath, int lock, int *writer) {
 
 static NSString *codeForReport(NSDictionary *report) {
     NSString *stage = report[@"stage"], *message = report[@"error"];
+    if ([report[@"connection_hci_status"] unsignedIntegerValue] == 0x04) return @"page_timeout";
     if ([stage isEqual:@"abi"]) return @"unsupported";
     if ([stage isEqual:@"bluetooth_state"]) return @"bluetooth_off";
     if ([stage isEqual:@"permissions"]) return @"permissions";

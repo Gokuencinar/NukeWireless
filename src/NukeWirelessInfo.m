@@ -18,7 +18,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev25";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev26";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -174,7 +174,7 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
         @"BSSID": available(bssid),
         @"IPv4": available(address),
         @"Puerta de enlace": available(router),
-        @"MÃ¡scara": available(mask),
+        @"Máscara": available(mask),
         @"DNS": available(dnsServer),
     };
 }
@@ -319,8 +319,8 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub Â· Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title"), NWText(@"bt.title")];
-        NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"EspaÃ±ol" : @"English") :
+        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title"), NWText(@"bt.title")];
+        NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") :
             (index.row == 4 ? NWText([@"appearance." stringByAppendingString:NWAccentName()]) : nil);
         UITableViewCell *cell = textCell(labels[index.row], detail, YES);
         NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette", @"antenna.radiowaves.left.and.right"];
@@ -328,10 +328,10 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev25", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev26", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
-    NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"MÃ¡scara",@"DNS"];
+    NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
     NSArray *labels = @[@"SSID",@"BSSID",@"IPv4",NWText(@"network.gateway"),NWText(@"network.mask"),@"DNS"];
     UITableViewCell *cell = textCell(labels[index.row], self.values[keys[index.row]] ?: NWText(@"unavailable"), YES);
     NSArray *symbols = @[@"wifi", @"antenna.radiowaves.left.and.right", @"number", @"arrow.triangle.branch", @"square.split.2x2", @"network"];
@@ -354,7 +354,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
             [self.navigationController pushViewController:NWBluetoothController() animated:YES];
         }
     } else if (index.section == 2) {
-        NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"MÃ¡scara",@"DNS"];
+        NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
         NSString *value = self.values[keys[index.row]];
         if (value.length && ![value isEqualToString:NWText(@"unavailable")]) {
             UIPasteboard.generalPasteboard.string = value;
@@ -368,8 +368,8 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     UIAlertController *picker = [UIAlertController alertControllerWithTitle:NWText(@"language.title")
         message:NWText(@"language.restartHint") preferredStyle:UIAlertControllerStyleAlert];
     for (NSString *code in @[@"es", @"en"]) {
-        NSString *name = [code isEqualToString:@"es"] ? @"EspaÃ±ol" : @"English";
-        if ([code isEqualToString:NWLanguageCode()]) name = [name stringByAppendingString:@" âœ“"];
+        NSString *name = [code isEqualToString:@"es"] ? @"Español" : @"English";
+        if ([code isEqualToString:NWLanguageCode()]) name = [name stringByAppendingString:@" ✓"];
         [picker addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
             (void)action;
             if ([code isEqualToString:NWLanguageCode()]) return;
@@ -656,7 +656,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev25 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev26 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.

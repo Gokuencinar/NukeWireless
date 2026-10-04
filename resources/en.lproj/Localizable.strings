@@ -112,3 +112,5 @@
 "bt.interval_ms" = "Interval (ms)";
 "bt.done" = "Done";
 "bt.error.values" = "Enter a valid count and interval.";
+
+"bt.error.page_timeout" = "The accessory did not respond to the connection attempt (HCI 0x04). If it is connected to your laptop or another device, disconnect it there and retry. You do not need to remove the pairing; if it still does not respond, put it in pairing mode.";

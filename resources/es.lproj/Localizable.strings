@@ -112,3 +112,5 @@
 "bt.interval_ms" = "Intervalo (ms)";
 "bt.done" = "Hecho";
 "bt.error.values" = "Introduce una cantidad y un intervalo válidos.";
+
+"bt.error.page_timeout" = "El accesorio no respondió al intento de conexión (HCI 0x04). Si está conectado a tu laptop u otro equipo, desconéctalo allí y vuelve a probar. No hace falta borrar el emparejamiento; si sigue sin responder, ponlo en modo de emparejamiento.";

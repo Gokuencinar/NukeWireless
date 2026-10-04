@@ -95,6 +95,7 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
 @property(nonatomic, strong) NSMutableArray<NSData *> *auxiliary;
 @property(nonatomic, strong) NSMutableArray *samples, *eventCodes;
 @property(nonatomic, copy) NSString *error;
+@property(nonatomic, strong) NSNumber *connectionStatus;
 @property(nonatomic) uint16_t handle, mtu;
 @property(nonatomic) BOOL connected, pending, disconnectConfirmed, cancelConfirmed;
 @property(nonatomic) NSUInteger credits, commandCredits, submitted, commands, auxiliarySent;
@@ -126,7 +127,7 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
         self.commandCredits = p[3] ? 1 : 0;
         if (p[2]) self.error = [NSString stringWithFormat:@"Command 0x%04x rejected: HCI 0x%02x.", u16(p + 4), p[2]];
     } else if (p[0] == 0x03 && length == 13 && !memcmp(p + 5, self.address.bytes, 6)) {
-        self.pending = NO;
+        self.pending = NO; self.connectionStatus = @(p[2]);
         if (p[2]) self.error = [NSString stringWithFormat:@"Connection failed: HCI 0x%02x.", p[2]];
         else if (p[11] == 1) { self.handle = u16(p + 3) & 0x0fff; self.connected = YES; self.credits = 1; }
         else self.error = @"The returned link is not an ACL connection.";
@@ -318,6 +319,7 @@ NSDictionary<NSString *, id> *NWBTL2PingWithMilliseconds(NSString *destination, 
         }
         NSString *originalError = session.error;
         [session cleanup];
+        if (session.connectionStatus) report[@"connection_hci_status"] = session.connectionStatus;
         report[@"samples"] = session.samples; report[@"echo_requests_submitted"] = @(session.submitted);
         report[@"auxiliary_packets_submitted"] = @(session.auxiliarySent); report[@"local_hci_commands_submitted"] = @(session.commands);
         report[@"event_codes"] = session.eventCodes;
