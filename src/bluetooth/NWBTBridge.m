@@ -13,7 +13,7 @@ static NSArray<NSString *> *transportSymbols(void) {
 }
 
 NSDictionary<NSString *, id> *NWBTCopyTransportCode(void) {
-    // Copies only the __text section of this fixed system library. It never
+    // Copies bounded code and constant sections of this fixed system library. It never
     // executes its private exports, changes page protections or opens drivers.
     void *handle = dlopen("/usr/lib/AppleConvergedTransport.dylib", RTLD_LAZY | RTLD_LOCAL);
     if (!handle) return @{@"error": @"AppleConvergedTransport could not be loaded"};
@@ -35,6 +35,20 @@ NSDictionary<NSString *, id> *NWBTCopyTransportCode(void) {
             if (!strncmp(segment->segname, "__TEXT", 16) && segment->nsects <=
                     (command->cmdsize - sizeof(*segment)) / sizeof(struct section_64)) {
                 const struct section_64 *sections = (const void *)(segment + 1);
+                NSMutableArray *constants = [NSMutableArray new];
+                for (uint32_t item = 0; item < segment->nsects; ++item) {
+                    const struct section_64 *constant = &sections[item];
+                    if (strncmp(constant->sectname, "__cstring", 16) && strncmp(constant->sectname, "__const", 16)) continue;
+                    if (!(segment->initprot & 1) || constant->addr < segment->vmaddr ||
+                        constant->size > 1024 * 1024 || constant->size > segment->vmsize ||
+                        constant->addr - segment->vmaddr > segment->vmsize - constant->size)
+                        return @{@"error": @"Transport constant section exceeds snapshot bounds"};
+                    NSData *value = [NSData dataWithBytes:(const uint8_t *)header + (constant->addr - segment->vmaddr)
+                        length:(NSUInteger)constant->size];
+                    [constants addObject:@{@"section": [NSString stringWithUTF8String:constant->sectname],
+                        @"virtual_address": @(constant->addr), @"size": @(constant->size),
+                        @"data_base64": [value base64EncodedStringWithOptions:0]}];
+                }
                 for (uint32_t sectionIndex = 0; sectionIndex < segment->nsects; ++sectionIndex) {
                     const struct section_64 *section = &sections[sectionIndex];
                     if (strncmp(section->sectname, "__text", 16)) continue;
@@ -55,7 +69,7 @@ NSDictionary<NSString *, id> *NWBTCopyTransportCode(void) {
                     return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": NWBT_VERSION,
                         @"image": image.dli_fname ? [NSString stringWithUTF8String:image.dli_fname] : @"unknown",
                         @"section": @"__TEXT.__text", @"virtual_address": @(section->addr),
-                        @"size": @(section->size), @"exports": exports,
+                        @"size": @(section->size), @"exports": exports, @"constant_sections": constants,
                         @"code_base64": [data base64EncodedStringWithOptions:0],
                         @"bluetooth_packets_sent": @0, @"private_functions_called": @0};
                 }
