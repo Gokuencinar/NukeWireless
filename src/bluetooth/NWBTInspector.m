@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
@@ -14,10 +15,13 @@ int main(int argc, char *argv[]) {
         }
         NSError *error = nil;
         if (controller) alarm(20); // Bound a stalled private driver call to this helper process.
+        if (controller) fputs("NWBT phase: diagnostic started\n", stderr);
         NSDate *start = [NSDate dateWithTimeIntervalSinceNow:-1.0];
         NSDictionary *report = skywalk ? NWBTOpenSkywalk() : controller ? NWBTReadControllerInfo() :
             (!strcmp(argv[1], "--transport-code") ? NWBTCopyTransportCode() : NWBTInspectTransport());
-        if (controller && report[@"error"]) {
+        if (controller) fputs("NWBT phase: diagnostic returned\n", stderr);
+        const char *collectLogs = getenv("NWBT_PROCESS_LOGS");
+        if (controller && report[@"error"] && collectLogs && !strcmp(collectLogs, "1")) {
             // Public API, restricted to this helper's own process. The log
             // command is absent on the device; do not request system log access.
             OSLogStore *store = [OSLogStore storeWithScope:OSLogStoreCurrentProcessIdentifier error:&error];

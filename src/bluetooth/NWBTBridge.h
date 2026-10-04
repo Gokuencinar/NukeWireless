@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.2~probe5"
+#define NWBT_VERSION @"0.0.2~probe6"
 
 // Capability inspection only. This version does not send Bluetooth packets.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTInspectTransport(void);

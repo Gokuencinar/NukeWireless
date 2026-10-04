@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <mach/mach.h>
 #include <uuid/uuid.h>
+#include <stdio.h>
 
 // Declarations from Apple IOKitUser/IOKitLib.h and XNU 8792.61.2
 // bsd/skywalk/channel/os_channel.h. BlueTool on 20D67 opens port 0
@@ -89,10 +90,13 @@ static NSDictionary *requireBluetoothOff(void) {
 
 NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
     if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
+    fputs("NWBT phase: ABI guard\n", stderr);
     NSDictionary *error = requireKnownABI();
     if (error) return error;
+    fputs("NWBT phase: Bluetooth state\n", stderr);
     error = requireBluetoothOff();
     if (error) return error;
+    fputs("NWBT phase: registry lookup\n", stderr);
     void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY | RTLD_LOCAL);
     NWMatching matching = (NWMatching)dlsym(iokit, "IOServiceMatching");
     NWServices services = (NWServices)dlsym(iokit, "IOServiceGetMatchingServices");
@@ -136,7 +140,9 @@ NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
     if (!identifier || uuid_parse(identifier.UTF8String, uuid))
         return failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface.");
     errno = 0;
+    fputs("NWBT phase: channel open\n", stderr);
     void *channel = create(uuid, 0);
+    fputs("NWBT phase: channel open returned\n", stderr);
     if (!channel) {
         int savedErrno = errno;
         NSMutableDictionary *report = [failure(@"skywalk_open", @"The native HCI Skywalk channel could not be opened.") mutableCopy];
