@@ -207,8 +207,12 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
         NSDictionary *preflight = NWBTOpenSkywalk();
-        if (![preflight[@"stage"] isEqual:@"skywalk_open"] || [preflight[@"system_errno"] intValue] != EBUSY)
-            return errorReport(@"exclusive");
+        if (![preflight[@"stage"] isEqual:@"skywalk_open"] || [preflight[@"system_errno"] intValue] != EBUSY) {
+            NSMutableDictionary *details = [errorReport(@"exclusive") mutableCopy];
+            details[@"exclusive_phase"] = @"preflight";
+            details[@"preflight"] = preflight;
+            return details;
+        }
         recovery = startRecovery(ownPath, lock, &writer);
         if (recovery <= 0) return errorReport(@"recovery");
         if (write(writer, "a", 1) != 1) return errorReport(@"recovery");
@@ -217,7 +221,12 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
         else {
             double deadline = uptime() + 3.0; NSString *state = nil; int status = 0;
             do { status = control("print", service, &state); if (status) break; usleep(100000); } while (uptime() < deadline && !NWBTCancelled);
-            if (!status || ![state containsString:@"Could not find service"]) report = [errorReport(@"exclusive") mutableCopy];
+            if (!status || ![state containsString:@"Could not find service"]) {
+                report = [errorReport(@"exclusive") mutableCopy];
+                report[@"exclusive_phase"] = @"service_retirement";
+                report[@"service_exit"] = @(status);
+                report[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
+            }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
             else report = [NWBTL2Ping(address) mutableCopy];
         }

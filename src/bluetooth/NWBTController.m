@@ -256,9 +256,9 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     errno = 0;
     fputs("NWBT phase: channel open\n", stderr);
     void *channel = create(uuid, 0);
+    int savedErrno = errno; // Logging may change errno; capture the syscall result first.
     fputs("NWBT phase: channel open returned\n", stderr);
     if (!channel) {
-        int savedErrno = errno;
         NSMutableDictionary *report = [failure(@"skywalk_open", @"The native HCI Skywalk channel could not be opened.") mutableCopy];
         report[@"system_errno"] = @(savedErrno);
         report[@"system_error"] = [NSString stringWithUTF8String:strerror(savedErrno)];
