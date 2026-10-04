@@ -234,7 +234,14 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
 @end
 
 NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
-    NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"l2ping", @"l2ping_verified": @NO} mutableCopy];
+    return NWBTL2PingWithOptions(destination, NWBT_DEFAULT_COUNT, NWBT_DEFAULT_INTERVAL);
+}
+
+NSDictionary<NSString *, id> *NWBTL2PingWithOptions(NSString *destination, NSUInteger count, NSUInteger intervalSeconds) {
+    if (!NWBTPingOptionsValid(count, intervalSeconds))
+        return @{@"version": NWBT_VERSION, @"stage": @"arguments", @"error_code": @"arguments", @"error": @"Invalid bounded ping options."};
+    NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"l2ping", @"l2ping_verified": @NO,
+        @"requested_count": @(count), @"interval_seconds": @(intervalSeconds)} mutableCopy];
     NSArray *parts = [destination componentsSeparatedByString:@":"]; uint8_t address[6];
     NSCharacterSet *hex = [NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"];
     if (parts.count != 6) { report[@"error"] = @"Expected a colon-separated Bluetooth address."; return report; }
@@ -281,8 +288,12 @@ NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
             while (!session.connected && !session.error && !NWBTCancelled && now() < deadline) [session pump];
             if (!session.connected && !session.error && !NWBTCancelled) session.error = @"Target connection timed out after six seconds.";
         }
-        for (uint8_t identifier = 1; identifier <= 5 && session.connected && !session.error && !NWBTCancelled; ++identifier) {
-            double creditDeadline = now() + 1.0;
+        // Credits may delay an individual send; the overall ping window remains
+        // bounded even if the target stops returning credits or responses.
+        double pingDeadline = now() + NWBT_MAX_PING_SECONDS;
+        for (uint8_t identifier = 1; identifier <= count && session.connected && !session.error && !NWBTCancelled; ++identifier) {
+            if (now() >= pingDeadline) { session.error = @"Ping window deadline reached."; break; }
+            double creditDeadline = MIN(now() + 1.0, pingDeadline);
             while ((!session.credits || session.auxiliary.count) && now() < creditDeadline && !session.error && !NWBTCancelled) [session pump];
             if (session.error || NWBTCancelled || !session.connected) break;
             if (!session.credits) { session.error = @"ACL transmission credit did not return."; break; }
@@ -291,11 +302,16 @@ NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination) {
             session.echoReceived = NO; session.echoRejected = NO; session.sentAt = now();
             if (![session.acl send:[session signaling:8 identifier:identifier payload:session.nonce]]) { session.error = session.acl.error; break; }
             session.credits = 0; session.submitted++;
-            double deadline = session.sentAt + 1.0;
+            double deadline = MIN(session.sentAt + 1.0, pingDeadline);
             while (now() < deadline && session.connected && !session.error && !NWBTCancelled) [session pump];
             NSMutableDictionary *sample = [@{@"sequence": @(identifier), @"reply": @(session.echoReceived), @"rejected": @(session.echoRejected)} mutableCopy];
             if (session.echoReceived) sample[@"rtt_ms"] = @(session.rtt);
             [session.samples addObject:sample];
+            // Keep a one-second response deadline independent of spacing.
+            // Pump during the gap so cancellation and remote link events work.
+            double nextSend = MIN(session.sentAt + intervalSeconds, pingDeadline);
+            if (identifier < count)
+                while (now() < nextSend && session.connected && !session.error && !NWBTCancelled) [session pump];
         }
         NSString *originalError = session.error;
         [session cleanup];

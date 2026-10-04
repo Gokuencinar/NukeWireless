@@ -154,8 +154,8 @@ static int recover(void) {
     struct pollfd descriptor = {3, POLLIN | POLLHUP, 0}; char byte = 0;
     if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 || byte != 'a') return 0;
     // This child survives app/worker exit and owns the inherited flock until
-    // restoration finishes. EOF, completion or the 45-second limit restores.
-    if (poll(&descriptor, 1, 45000) > 0) read(3, &byte, 1);
+    // restoration finishes. EOF, completion or the 60-second limit restores.
+    if (poll(&descriptor, 1, 60000) > 0) read(3, &byte, 1);
     BOOL restored = restoreService(); close(3); close(4);
     return restored ? 0 : 1;
 }
@@ -206,7 +206,9 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runPing(NSString *address, const char *ownPath) {
+static NSDictionary *runPing(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalSeconds) {
+    // Reject invalid options before guard, lock acquisition or service changes.
+    if (!NWBTPingOptionsValid(count, intervalSeconds)) return errorReport(@"arguments");
     NSDictionary *guard = NWBTNativeGuard();
     if (guard) { NSMutableDictionary *report = [guard mutableCopy]; report[@"error_code"] = codeForReport(guard); return report; }
     NSString *lockPath = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth.lock"];
@@ -257,7 +259,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
                 report[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
-            else report = [NWBTL2Ping(address) mutableCopy];
+            else report = [NWBTL2PingWithOptions(address, count, intervalSeconds) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -284,10 +286,20 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
     return report;
 }
 
+static BOOL decimalOption(const char *text, NSUInteger *value) {
+    if (!text || !*text || strlen(text) > 2) return NO;
+    NSUInteger parsed = 0;
+    for (const char *p = text; *p; ++p) {
+        if (*p < '0' || *p > '9') return NO;
+        parsed = parsed * 10 + (NSUInteger)(*p - '0');
+    }
+    *value = parsed; return YES;
+}
+
 int main(int argc, char **argv) {
     @autoreleasepool {
         invokingUID = getuid(); invokingParent = getppid();
-        recordAppRun = argc == 3 && !strcmp(argv[1], "--ping");
+        recordAppRun = (argc == 3 || argc == 5) && !strcmp(argv[1], "--ping");
         BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
         char ownPath[PATH_MAX] = {0};
@@ -303,17 +315,22 @@ int main(int argc, char **argv) {
         if (argc == 2 && !strcmp(argv[1], "--status")) {
             NSDictionary *information = NWBTInspectTransport();
             BOOL supported = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
-            return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES});
+            return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
+                @"supports_ping_options": @YES});
         }
-        if (argc != 3 || strcmp(argv[1], "--ping")) return printReport(errorReport(@"arguments"));
+        if ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping")) return printReport(errorReport(@"arguments"));
+        NSUInteger count = NWBT_DEFAULT_COUNT, intervalSeconds = NWBT_DEFAULT_INTERVAL;
+        if (argc == 5 && (!decimalOption(argv[3], &count) || !decimalOption(argv[4], &intervalSeconds)))
+            return printReport(errorReport(@"arguments"));
+        if (!NWBTPingOptionsValid(count, intervalSeconds)) return printReport(errorReport(@"arguments"));
         NSString *address = [NSString stringWithUTF8String:argv[2]];
         NSRegularExpression *pattern = [NSRegularExpression regularExpressionWithPattern:@"\\A(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\\z" options:0 error:NULL];
         if (!address || ![pattern firstMatchInString:address options:0 range:NSMakeRange(0, address.length)] ||
             [address isEqual:@"00:00:00:00:00:00"] || [address.uppercaseString isEqual:@"FF:FF:FF:FF:FF:FF"])
             return printReport(errorReport(@"address"));
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
-        alarm(30);
-        NSDictionary *report = runPing(address.uppercaseString, ownPath);
+        alarm(45);
+        NSDictionary *report = runPing(address.uppercaseString, ownPath, count, intervalSeconds);
         alarm(0); return printReport(report);
     }
 }

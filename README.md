@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Nueva candidata dev24 / app9:** en **Información → Bluetooth** permite elegir
+el número de pings (1–20) y el intervalo (1–5 segundos). La combinación se limita
+a una ventana de 20 segundos; al aumentar el intervalo se ajusta el máximo de
+pings. Preferencias persistentes, confirmación con las opciones elegidas y
+resultados con número solicitado e intervalo. Estas opciones todavía no están
+comprobadas en el dispositivo; la instalación confirmada sigue siendo dev23/app8.
+
 **Última candidata instalada:** `1.0.25+rh25.5~dev23`, con **Información → Bluetooth**
 para cinco pings clásicos, cancelación y resultados. El módulo separado
 `NukeWireless Bluetooth Bridge` (`0.0.3~app8`) gestiona permisos y recuperación

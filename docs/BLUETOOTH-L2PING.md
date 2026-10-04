@@ -1,5 +1,36 @@
 # Bluetooth nativo: biblioteca de investigación
 
+## Opciones de ping: candidata dev24 / app9
+
+La pantalla **Información → Bluetooth** incorpora dos controles de incremento:
+
+- Número de pings: de 1 a 20, limitado según el intervalo.
+- Intervalo: de 1 a 5 segundos, en pasos de un segundo.
+- Valores iniciales: 5 pings, intervalo de 1 segundo; se guarda la selección.
+- Se exige `número × intervalo <= 20`. Si se aumenta el intervalo, el número
+  se reduce automáticamente al máximo permitido. Los controles se desactivan
+  durante el diagnóstico. La confirmación muestra ambos valores.
+- Cada respuesta conserva un plazo de un segundo; los intervalos mayores
+  añaden espera entre solicitudes, atendiendo cancelación y eventos del enlace.
+- Ventana de pings de 20 segundos; conectar, desconectar y restaurar requieren
+  tiempo adicional. Los retrasos o errores pueden dejar resultados parciales.
+- Los límites se comparten entre UIKit y el transporte y también se validan
+  en el helper antes de cambiar el servicio Bluetooth.
+- El watchdog del runner es de 45 segundos, la recuperación independiente
+  tiene un máximo de espera de 60 segundos y la app espera hasta 85 segundos.
+  La cancelación sigue disparando la recuperación antes de esos máximos.
+
+`nwbt-run --ping ADDRESS COUNT INTERVAL_SECONDS` admite exclusivamente enteros
+dentro de esos límites. La forma previa `--ping ADDRESS` y el inspector anterior
+mantienen los 5 pings con intervalo de 1 segundo. La app detecta si el módulo
+admite opciones: con app8 conserva el diagnóstico predeterminado y pide
+actualizar el módulo para utilizar una selección distinta. Textos en español
+e inglés; resultados persistentes con número solicitado e intervalo.
+
+Estado de esta ampliación: implementación candidata, sin instalación ni prueba
+funcional en el iPhone. Las evidencias de dev23/app8 descritas abajo corresponden
+al diagnóstico original de cinco pings.
+
 **Estado: cinco ecos L2CAP reales comprobados por SSH; interfaz Bluetooth
 integrada en dev23 y helper separado con recuperación independiente.** Dev19
 tiene la confirmación previa de las funciones existentes. El usuario confirmó

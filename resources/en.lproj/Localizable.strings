@@ -75,9 +75,8 @@
 "bt.ready" = "Module available for this iPhone.";
 "bt.address" = "Bluetooth address (BR/EDR)";
 "bt.prepare" = "Use an accessory you own. Disconnect it from other devices, put it in pairing mode, and turn Bluetooth off in iPhone Settings before starting.";
-"bt.limits" = "Five small pings, one second apart. The Bluetooth service is restored when finished. This feature does not block devices or open audio channels.";
-"bt.confirm" = "Bluetooth will be controlled temporarily to send five pings to this address. Its service will be restored automatically when finished. Keep the accessory ready.";
-"bt.start" = "Send 5 pings";
+"bt.limits" = "Small pings with automatic Bluetooth service restoration and cancellation.";
+"bt.start" = "Send pings";
 "bt.running" = "Diagnostic in progress…";
 "bt.cancel" = "Cancel and restore Bluetooth";
 "bt.results" = "Results";
@@ -104,3 +103,13 @@
 "bt.error.cancelled" = "Diagnostic cancelled.";
 "bt.error.no_echo" = "No valid echo was received. Some accessories do not respond to this diagnostic.";
 "bt.error.transport" = "The Bluetooth transport could not complete the diagnostic.";
+"bt.options" = "Ping options";
+"bt.count" = "Number of pings";
+"bt.interval" = "Interval between pings";
+"bt.seconds" = "%lu seconds";
+"bt.count_value" = "%lu pings";
+"bt.start_count" = "Send %lu pings";
+"bt.options_limits" = "1–20 pings, 1–5 seconds apart, within a 20-second ping window. Increasing the interval automatically reduces the maximum count. Connection and restoration take additional time.";
+"bt.confirm_options" = "Send %lu small pings, %lu seconds apart, to this address. Bluetooth will be controlled temporarily and its service restored when finished. Keep your accessory ready.";
+"bt.result_options" = "Requested: %lu pings · Interval: %lu s";
+"bt.error.options" = "Update the NukeWireless Bluetooth Bridge module to choose ping options.";

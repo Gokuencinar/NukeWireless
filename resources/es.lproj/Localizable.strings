@@ -75,9 +75,8 @@
 "bt.ready" = "Módulo disponible para este iPhone.";
 "bt.address" = "Dirección Bluetooth (BR/EDR)";
 "bt.prepare" = "Usa un accesorio propio. Desconéctalo de otros equipos, ponlo en modo de emparejamiento y apaga Bluetooth desde Ajustes del iPhone antes de empezar.";
-"bt.limits" = "Cinco pings pequeños, separados por un segundo. El servicio Bluetooth se restaura al terminar. Esta función no bloquea dispositivos ni abre canales de audio.";
-"bt.confirm" = "Se tomará temporalmente el control de Bluetooth para enviar cinco pings a esta dirección. El servicio se restaurará automáticamente al terminar. Mantén el accesorio preparado.";
-"bt.start" = "Enviar 5 pings";
+"bt.limits" = "Pings pequeños con cancelación y restauración automática del servicio Bluetooth.";
+"bt.start" = "Enviar pings";
 "bt.running" = "Diagnóstico en curso…";
 "bt.cancel" = "Cancelar y restaurar Bluetooth";
 "bt.results" = "Resultados";
@@ -104,3 +103,13 @@
 "bt.error.cancelled" = "Diagnóstico cancelado.";
 "bt.error.no_echo" = "No se recibió ningún eco válido. Algunos accesorios no responden a este diagnóstico.";
 "bt.error.transport" = "El transporte Bluetooth no pudo completar el diagnóstico.";
+"bt.options" = "Opciones de ping";
+"bt.count" = "Número de pings";
+"bt.interval" = "Intervalo entre pings";
+"bt.seconds" = "%lu segundos";
+"bt.count_value" = "%lu pings";
+"bt.start_count" = "Enviar %lu pings";
+"bt.options_limits" = "De 1 a 20 pings, separados por 1–5 segundos, dentro de una ventana de 20 segundos. Al aumentar el intervalo se reduce automáticamente el número máximo. La conexión y la restauración requieren tiempo adicional.";
+"bt.confirm_options" = "Enviar %lu pings pequeños, separados por %lu segundos, a esta dirección. Se tomará temporalmente el control de Bluetooth y su servicio se restaurará al terminar. Mantén tu accesorio preparado.";
+"bt.result_options" = "Solicitados: %lu pings · Intervalo: %lu s";
+"bt.error.options" = "Actualiza el módulo NukeWireless Bluetooth Bridge para elegir las opciones de ping.";

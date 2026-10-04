@@ -2,6 +2,7 @@
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import "NWScanBridge.h"
+#import "NWBluetoothLimits.h"
 #include <spawn.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -13,6 +14,8 @@
 static NSString *const changed = @"NWBluetoothChanged";
 static NSString *const reportKey = @"NukeWirelessBluetoothLastReport";
 static NSString *const invocationKey = @"NukeWirelessBluetoothLastInvocation";
+static NSString *const countKey = @"NukeWirelessBluetoothPingCount";
+static NSString *const intervalKey = @"NukeWirelessBluetoothPingInterval";
 static BOOL busy, cancelling;
 static pid_t worker;
 static NSObject *workerLock;
@@ -82,8 +85,8 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     posix_spawnattr_t attributes; posix_spawnattr_init(&attributes);
     posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
-    char *argv[4] = {(char *)path.fileSystemRepresentation, NULL, NULL, NULL};
-    for (NSUInteger i = 0; i < arguments.count && i < 2; ++i) argv[i + 1] = (char *)arguments[i].UTF8String;
+    char *argv[6] = {(char *)path.fileSystemRepresentation, NULL, NULL, NULL, NULL, NULL};
+    for (NSUInteger i = 0; i < arguments.count && i < 4; ++i) argv[i + 1] = (char *)arguments[i].UTF8String;
     char *environment[] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", NULL}; pid_t child = 0;
     int launch = posix_spawn(&child, path.fileSystemRepresentation, &actions, &attributes, argv, environment);
     posix_spawnattr_destroy(&attributes); posix_spawn_file_actions_destroy(&actions);
@@ -94,7 +97,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     }
     if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) signalChild(child, SIGTERM, YES); }
     NSMutableData *data = [NSMutableData new], *diagnostics = [NSMutableData new]; NSUInteger stderrBytes = 0;
-    double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? 65.0 : 12.0);
+    double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? 85.0 : 12.0);
     BOOL exited = NO, invalid = NO; int status = 0;
     while (NSProcessInfo.processInfo.systemUptime < deadline) {
         char buffer[2048]; ssize_t count;
@@ -133,6 +136,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 @property(nonatomic, strong) UITextField *address;
 @property(nonatomic, strong) NSDictionary *capabilities;
 @property(nonatomic) BOOL checking;
+@property(nonatomic) NSUInteger pingCount, intervalSeconds;
 @end
 
 @implementation NWBluetoothViewController
@@ -153,6 +157,10 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     self.address.font = [UIFont monospacedSystemFontOfSize:17 weight:UIFontWeightRegular];
     self.address.accessibilityLabel = NWText(@"bt.address"); self.address.clearButtonMode = UITextFieldViewModeWhileEditing;
     self.address.text = [NSUserDefaults.standardUserDefaults stringForKey:@"NukeWirelessBluetoothTarget"];
+    NSUInteger savedCount = [NSUserDefaults.standardUserDefaults integerForKey:countKey];
+    NSUInteger savedInterval = [NSUserDefaults.standardUserDefaults integerForKey:intervalKey];
+    self.pingCount = NWBTPingOptionsValid(savedCount, savedInterval) ? savedCount : NWBT_DEFAULT_COUNT;
+    self.intervalSeconds = NWBTPingOptionsValid(savedCount, savedInterval) ? savedInterval : NWBT_DEFAULT_INTERVAL;
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:changed object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(backgrounded:) name:UIApplicationDidEnterBackgroundNotification object:nil];
 }
@@ -177,17 +185,18 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (void)backgrounded:(NSNotification *)notification { (void)notification; if (busy) cancelWorker(); }
 - (BOOL)textFieldShouldReturn:(UITextField *)field { [field resignFirstResponder]; return YES; }
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 2) return busy ? 2 : 1;
-    if (section == 3) return lastReport ? MAX(1, [lastReport[@"samples"] count] + 1) : 1;
+    (void)table; if (section == 2) return 2;
+    if (section == 3) return busy ? 2 : 1;
+    if (section == 4) return lastReport ? MAX(1, [lastReport[@"samples"] count] + 1) : 1;
     return 1;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
-    (void)table; return section == 1 ? NWText(@"bt.address") : section == 3 ? NWText(@"bt.results") : nil;
+    (void)table; return section == 1 ? NWText(@"bt.address") : section == 2 ? NWText(@"bt.options") : section == 4 ? NWText(@"bt.results") : nil;
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
-    (void)table; return section == 1 ? NWText(@"bt.prepare") : section == 2 ? NWText(@"bt.limits") : nil;
+    (void)table; return section == 1 ? NWText(@"bt.prepare") : section == 2 ? NWText(@"bt.options_limits") : section == 3 ? NWText(@"bt.limits") : nil;
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     (void)table; UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
@@ -207,7 +216,21 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [self.address.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor], [self.address.topAnchor constraintEqualToAnchor:guide.topAnchor],
             [self.address.bottomAnchor constraintEqualToAnchor:guide.bottomAnchor], [self.address.heightAnchor constraintGreaterThanOrEqualToConstant:30]]]; return cell;
     } else if (index.section == 2) {
-        content.text = NWText(index.row ? @"bt.cancel" : busy ? @"bt.running" : @"bt.start");
+        BOOL interval = index.row == 1;
+        content.text = NWText(interval ? @"bt.interval" : @"bt.count");
+        content.secondaryText = [NSString stringWithFormat:NWText(interval ? @"bt.seconds" : @"bt.count_value"),
+            interval ? self.intervalSeconds : self.pingCount];
+        UIStepper *stepper = [UIStepper new]; stepper.tag = index.row;
+        stepper.minimumValue = 1; stepper.maximumValue = interval ? NWBT_MAX_INTERVAL : NWBT_MAX_PING_SECONDS / self.intervalSeconds;
+        stepper.stepValue = 1; stepper.autorepeat = NO;
+        stepper.value = interval ? self.intervalSeconds : self.pingCount;
+        stepper.enabled = !busy; stepper.tintColor = NWAccentColor();
+        stepper.accessibilityLabel = content.text; stepper.accessibilityValue = content.secondaryText;
+        [stepper addTarget:self action:@selector(optionsChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = stepper;
+    } else if (index.section == 3) {
+        content.text = index.row || busy ? NWText(index.row ? @"bt.cancel" : @"bt.running") :
+            [NSString stringWithFormat:NWText(@"bt.start_count"), self.pingCount];
         content.image = [UIImage systemImageNamed:index.row ? @"stop.circle" : @"waveform.path"];
         cell.selectionStyle = index.row || (!busy && [self.capabilities[@"supported"] boolValue]) ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         content.textProperties.color = index.row ? UIColor.systemRedColor : NWAccentColor();
@@ -215,7 +238,12 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     else if (index.row == 0) {
         NSString *code = lastReport[@"error_code"];
         content.text = reportText(lastReport);
-        if ([lastReport[@"service_restored"] boolValue]) content.secondaryText = NWText(@"bt.restored");
+        NSMutableArray<NSString *> *details = [NSMutableArray new];
+        if (lastReport[@"requested_count"] && lastReport[@"interval_seconds"])
+            [details addObject:[NSString stringWithFormat:NWText(@"bt.result_options"),
+                [lastReport[@"requested_count"] unsignedIntegerValue], [lastReport[@"interval_seconds"] unsignedIntegerValue]]];
+        if ([lastReport[@"service_restored"] boolValue]) [details addObject:NWText(@"bt.restored")];
+        content.secondaryText = [details componentsJoinedByString:@"\n"];
         content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
     } else {
         NSDictionary *sample = lastReport[@"samples"][index.row - 1];
@@ -227,15 +255,21 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     content.imageProperties.tintColor = NWAccentColor(); cell.contentConfiguration = content; return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
-    [table deselectRowAtIndexPath:index animated:YES]; if (index.section != 2) return;
+    [table deselectRowAtIndexPath:index animated:YES]; if (index.section != 3) return;
     if (index.row && busy) { cancelWorker(); return; }
     if (busy || ![self.capabilities[@"supported"] boolValue]) return;
+    if (![self.capabilities[@"supports_ping_options"] boolValue] &&
+        (self.pingCount != NWBT_DEFAULT_COUNT || self.intervalSeconds != NWBT_DEFAULT_INTERVAL)) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.options") message:nil preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil]; return;
+    }
     NSString *address = [[self.address.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] uppercaseString];
     NSRegularExpression *pattern = [NSRegularExpression regularExpressionWithPattern:@"\\A(?:[0-9A-F]{2}:){5}[0-9A-F]{2}\\z" options:0 error:NULL];
     BOOL valid = [pattern firstMatchInString:address ?: @"" options:0 range:NSMakeRange(0, address.length)] != nil &&
         ![address isEqual:@"00:00:00:00:00:00"] && ![address isEqual:@"FF:FF:FF:FF:FF:FF"];
     UIAlertController *confirm = [UIAlertController alertControllerWithTitle:NWText(valid ? @"bt.start" : @"bt.error.address")
-        message:valid ? NWText(@"bt.confirm") : nil preferredStyle:UIAlertControllerStyleAlert];
+        message:valid ? [NSString stringWithFormat:NWText(@"bt.confirm_options"), self.pingCount, self.intervalSeconds] : nil preferredStyle:UIAlertControllerStyleAlert];
     if (valid) {
         [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
         [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"bt.start") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -244,6 +278,16 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     } else [confirm addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
+- (void)optionsChanged:(UIStepper *)stepper {
+    if (busy) return;
+    if (stepper.tag == 1) {
+        self.intervalSeconds = (NSUInteger)stepper.value;
+        self.pingCount = MIN(self.pingCount, NWBT_MAX_PING_SECONDS / self.intervalSeconds);
+    } else self.pingCount = (NSUInteger)stepper.value;
+    [NSUserDefaults.standardUserDefaults setInteger:self.pingCount forKey:countKey];
+    [NSUserDefaults.standardUserDefaults setInteger:self.intervalSeconds forKey:intervalKey];
+    [self refresh:nil];
+}
 - (void)begin:(NSString *)address {
     if (busy || NWScanBusy() || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
@@ -251,6 +295,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         [self presentViewController:alert animated:YES completion:nil]; return;
     }
     if (!workerLock) workerLock = [NSObject new];
+    if (!NWBTPingOptionsValid(self.pingCount, self.intervalSeconds)) return;
+    // Snapshot the selected options before dispatch; controls are locked while busy.
+    NSArray<NSString *> *arguments = [self.capabilities[@"supports_ping_options"] boolValue] ?
+        @[@"--ping", address, [NSString stringWithFormat:@"%lu", self.pingCount],
+            [NSString stringWithFormat:@"%lu", self.intervalSeconds]] : @[@"--ping", address];
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
@@ -259,7 +308,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
     [self refresh:nil];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        NSDictionary *report = invoke(@[@"--ping", address], YES);
+        NSDictionary *report = invoke(arguments, YES);
         NSData *saved = [NSJSONSerialization dataWithJSONObject:report options:0 error:NULL];
         if (saved) {
             [NSUserDefaults.standardUserDefaults setObject:saved forKey:reportKey];
@@ -272,7 +321,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [self refresh:nil];
             if (self.view.window && self.navigationController.topViewController == self) {
                 [self.tableView layoutIfNeeded];
-                [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:3]
+                [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]
                     atScrollPosition:UITableViewScrollPositionTop animated:YES];
             }
             UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.finished"));
