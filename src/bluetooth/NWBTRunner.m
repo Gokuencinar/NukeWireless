@@ -193,8 +193,14 @@ static NSDictionary *runPing(NSString *address, const char *ownPath) {
     int writer = -1; pid_t recovery = -1; BOOL armed = NO;
     NSMutableDictionary *report = nil;
     @try {
-        NSString *disabled = nil;
-        if (!running() || control("print-disabled", "user/501", &disabled) ||
+        NSString *disabled = nil, *state = nil;
+        int initialStatus = control("print", service, &state);
+        if (initialStatus || ![state hasPrefix:@"user/501/com.apple.bluetoothd = {"] || ![state containsString:@"\n\tstate = running\n"]) {
+            NSMutableDictionary *details = [errorReport(@"service") mutableCopy];
+            details[@"service_exit"] = @(initialStatus); details[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
+            return details;
+        }
+        if (control("print-disabled", "user/501", &disabled) ||
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
         NSDictionary *preflight = NWBTOpenSkywalk();
