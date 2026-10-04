@@ -1,0 +1,22 @@
+name: Bluetooth connection request probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile isolated connection probe
+        run: |
+          mkdir -p build/connection-probe
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
+            -Wall -Wextra -Werror -fobjc-arc -fblocks -O2 -framework Foundation \
+            research/NWBTConnectionProbe.m -o build/connection-probe/nwbt-connection-probe
+          shasum -a 256 build/connection-probe/nwbt-connection-probe > build/connection-probe/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bt-connection-probe
+          path: build/connection-probe/
+          retention-days: 7
