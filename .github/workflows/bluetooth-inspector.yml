@@ -1,5 +1,12 @@
 name: Bluetooth transport inspector
 on:
+  push:
+    branches: [audit-rh25.5]
+    paths:
+      - 'src/bluetooth/**'
+      - 'scripts/build_bluetooth_inspector.sh'
+      - 'scripts/bluetooth_manifest.py'
+      - '.github/workflows/bluetooth-inspector.yml'
   workflow_dispatch:
 permissions:
   contents: read
