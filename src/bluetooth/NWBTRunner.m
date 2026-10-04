@@ -91,7 +91,7 @@ static int control(const char *verb, const char *argument, NSString **output) {
         if (overflow) break;
         pid_t waited = waitpid(child, &status, WNOHANG);
         if (waited == child) { exited = YES; break; }
-        if (waited < 0 && errno != EINTR) break;
+        if (waited < 0 && errno != EINTR) { if (errno == ECHILD) { exited = YES; status = -1; } break; }
         struct pollfd descriptor = {descriptors[0], POLLIN, 0}; poll(&descriptor, 1, 20);
     }
     if (!exited) { kill(child, SIGKILL); while (waitpid(child, &status, 0) < 0 && errno == EINTR) {} }
@@ -257,6 +257,7 @@ int main(int argc, char **argv) {
         if (![physical hasSuffix:suffix]) return printReport(errorReport(@"permissions"));
         bootstrapRoot = [physical substringToIndex:physical.length - suffix.length];
         signal(SIGPIPE, SIG_IGN);
+        signal(SIGCHLD, SIG_DFL);
         if (recovery) return recover();
         if (argc == 2 && !strcmp(argv[1], "--status")) {
             NSDictionary *information = NWBTInspectTransport();

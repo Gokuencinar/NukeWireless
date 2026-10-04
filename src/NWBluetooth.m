@@ -67,7 +67,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if (invalid) break;
         pid_t waited = waitpid(child, &status, WNOHANG);
         if (waited == child) { exited = YES; break; }
-        if (waited < 0 && errno != EINTR) break;
+        if (waited < 0 && errno != EINTR) { if (errno == ECHILD) exited = YES; break; }
         struct pollfd descriptors[2] = {{out[0], POLLIN, 0}, {err[0], POLLIN, 0}}; poll(descriptors, 2, 25);
     }
     if (!exited) {
