@@ -1,7 +1,8 @@
 # Bluetooth nativo: biblioteca de investigación
 
-**Estado: biblioteca de inspección compilada, instalada y cargada. El ping
-L2CAP todavía no está implementado.** La app continúa en dev19, cuyas funciones
+**Estado: diagnóstico local del controlador compilado e instalado; pendiente
+de ejecución con Bluetooth apagado en Ajustes. El ping L2CAP todavía no está
+implementado.** La app continúa en dev19, cuyas funciones
 el usuario confirmó. Este paquete independiente no es una nueva versión de la
 app ni añade un botón de ping.
 
@@ -13,23 +14,71 @@ respuesta, plazo total y cancelación. No se ejecutó ningún ping.
 ## Paquete separado
 
 - ID: `com.gokuencinar.nukewireless.bluetooth`.
-- Versión instalada: `0.0.1~inspect1+rh2`.
+- Versión instalada: `0.0.2~probe1`.
 - Esquema de esta candidata: RootHide; binarios arm64, deployment target iOS 15.
 - Biblioteca: `/usr/lib/NukeBluetoothBridge.dylib`.
 - Inspector: `/usr/bin/nwbt-inspect --inspect`.
 - Fuente: [NWBTBridge.m](../src/bluetooth/NWBTBridge.m) y
   [NWBTInspector.m](../src/bluetooth/NWBTInspector.m).
 - No tiene daemon, filtro de inyección ni constructor con efectos sobre Bluetooth.
-  Carga bibliotecas del sistema, busca símbolos y enumera metadatos Objective-C.
-  No abre transportes del controlador ni llama a las funciones privadas encontradas.
+  La inspección pasiva carga bibliotecas del sistema, busca símbolos y enumera
+  metadatos Objective-C. `--transport-code` copia exclusivamente una sección
+  de código de AppleConvergedTransport para análisis local de su ABI.
+- `nwbt-inspect --controller-info --exclusive` intenta abrir BTI/HCI y enviar
+  únicamente **Read Local Version Information** al controlador local. Comprueba
+  UID root, modelo/iOS, SHA-256 de la sección de código y estado apagado de
+  Bluetooth antes de llamar al transporte. No conecta dispositivos remotos.
+  Tiene timeout de lectura, liberación de handles y watchdog de 20 segundos
+  que termina exclusivamente el helper si una llamada privada queda atascada.
 - El JSON declara `l2ping_implemented: false`,
   `bluetooth_packets_sent: 0` y `signatures_verified: false`.
 
 Se comprobó su ejecución únicamente en **iPhone XS (`iPhone11,2`), iOS 16.3.1
 (20D67), Dopamine RootHide**. El deployment target no valida otros iOS ni
-otros jailbreaks. Los entitlements son los cuatro permisos base documentados
-por [RootHide](https://github.com/roothide/Developer/blob/main/entitlements.md);
-no se añadieron permisos de acceso al controlador Bluetooth.
+otros jailbreaks. Los entitlements incluyen los cuatro permisos base
+documentados por [RootHide](https://github.com/roothide/Developer/blob/main/entitlements.md).
+El diagnóstico exclusivo añade acceso a AppleBluetoothModule/AppleConvergedIPC
+y las clases AppleBTHciUC, AppleBTMgmtUC y AppleConvergedIPCUserClient, observados
+en la firma del bluetoothd de este dispositivo. No se copiaron sus permisos
+de NVRAM, task_for_pid, DriverKit ni la firma completa del daemon.
+
+## Nueva investigación y candidata probe1
+
+- [Actions 37172118854](https://github.com/Gokuencinar/NukeWireless/actions/runs/37172118854)
+  compiló `inspect2` (`ed5b5d8`). Se instaló y ejecutó el inspector y la captura
+  de código sin error. Se obtuvo la sección `__TEXT.__text` de 63 748 bytes.
+- SHA-256 de dicha sección:
+  `16278d023790c1d38a796b31b7c52d4a105916fa7b9be6995b0ec5e3cf91ffed`.
+- [Actions 37172561306](https://github.com/Gokuencinar/NukeWireless/actions/runs/37172561306)
+  compiló `probe1` (`16706cf`). El `.deb` instalado tiene SHA-256
+  `0f94755f31e7df5042aa8f93e8dbad2a93e48011e4c3e67021394b18a9b1fc17`.
+  Su inspección pasiva terminó con código 0; la app conserva dev19.
+- No se ejecutó todavía el diagnóstico exclusivo. Se solicitó al usuario
+  apagar Bluetooth en Ajustes; se espera esa preparación antes de abrir handles.
+- El usuario dispone de unos Mi True Wireless EBs Basic 2 como posible destino.
+  Su dirección se localizó en los dispositivos emparejados de Windows y se
+  conserva exclusivamente en el entorno de trabajo local.
+
+### ABI contrastada para el diagnóstico
+
+La captura de código del transporte y los bloques de bluetoothd permiten
+contrastar estos puntos, sin ejecutar las funciones de transferencia aún:
+
+| Interfaz | Evidencia en iOS 16.3.1 |
+| --- | --- |
+| InitParameters | Escribe 0x58 bytes; inicializa todo a cero y QoS en offset 0x50 a 0x15 |
+| Create | Configuración en x0, puntero de salida de 64 bits en x1; devuelve 0/1 |
+| Free | Puntero al handle en x0; lee su valor y pone cero al liberar; devuelve 0/1 |
+| Write/Read | Handle, buffer, tamaño de 32 bits, puntero de salida de 32 bits, timeout en milisegundos y callback opcional de liberación |
+| Timeout | El cuerpo multiplica los milisegundos por 1 000 000; -1 espera indefinidamente, por lo que la candidata utiliza plazos finitos |
+| Configuración | Tipo en 0x00, queue en 0x08, bloque de estado en 0x10, timeout en 0x18, flags en 0x20 |
+| Bloque de estado | Los descriptores de bloques HCI/ACL de bluetoothd declaran `v28@?0i8^v12^v20`: void(int, void*, void*) |
+| Read síncrono | Rechazado con flags bit 2 activo; HCI de la candidata usa flags 8 |
+
+Las cabeceras del protocolo HCI de
+[BlueZ](https://github.com/bluez/bluez/blob/master/lib/bluetooth/hci.h)
+se consultaron para el opcode y formato de Read Local Version Information.
+No se portó su transporte Linux ni se utilizó su backend de sockets.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 
