@@ -35,6 +35,23 @@ int main(void) {
     uint8_t original[35];memcpy(original,data,sizeof data);
     assert(NWBTLabRotatingData(data,NWBT_LAB_ROTATION_COUNT)==0);
     assert(NWBTLabRotatingData(data,~0u)==0 && !memcmp(data,original,sizeof data));
+    NWBTLabSwiftPairParameters(p);
+    assert(p[1]==0x10 && p[2]==0 && p[10]==0); // No connection or identity rotation.
+    assert((p[3] | p[4]<<8 | p[5]<<16)==244 && !memcmp(p+3,p+6,3));
+    n=NWBTLabSwiftPairData(data);
+    assert(n==19 && data[3]==15 && data[0]==NWBT_LAB_HANDLE);
+    unsigned swiftSections=0;
+    for (size_t offset=4; offset<n;) {
+        assert(data[offset]>0 && offset+data[offset]+1<=n);
+        if (data[offset+1]==0xff) {
+            swiftSections++;
+            assert(data[offset]==11 && data[offset+2]==6 && data[offset+3]==0);
+            assert(data[offset+4]==3 && data[offset+5]==0 && data[offset+6]==0x80);
+            assert(!memcmp(data+offset+7,"NWLab",5));
+        }
+        offset+=data[offset]+1;
+    }
+    assert(swiftSections==1);
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
     assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);

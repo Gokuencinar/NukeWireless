@@ -8,10 +8,11 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.3~app16'
+VERSION = '0.0.3~app17'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
+    'com.apple.bluetooth.system': True,
     'com.apple.private.security.no-sandbox': True,
     'com.apple.private.security.storage.AppBundles': True,
     'com.apple.private.security.storage.AppDataContainers': True,

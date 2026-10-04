@@ -15,6 +15,7 @@
 #include <uuid/uuid.h>
 #include <stdio.h>
 #include <poll.h>
+#include <dispatch/dispatch.h>
 
 // Declarations from Apple IOKitUser/IOKitLib.h and XNU 8792.61.2
 // bsd/skywalk/channel/os_channel.h. BlueTool on 20D67 opens port 0
@@ -103,6 +104,44 @@ static NSDictionary *requireBluetoothOff(void) {
     if (((BOOL (*)(id, SEL))objc_msgSend)(instance, enabled))
         return failure(@"bluetooth_state", @"Turn Bluetooth off in Settings before using the exclusive transport.");
     return nil;
+}
+
+static BOOL managerSignature(Class cls, SEL selector, BOOL meta, const char *result, const char *argument) {
+    Method method = meta ? class_getClassMethod(cls, selector) : class_getInstanceMethod(cls, selector);
+    char type[16] = {0}, parameter[16] = {0};
+    if (!method || method_getNumberOfArguments(method) != (argument ? 3u : 2u)) return NO;
+    method_getReturnType(method, type, sizeof type);
+    if (strcmp(type, result)) return NO;
+    if (argument) {
+        method_getArgumentType(method, 2, parameter, sizeof parameter);
+        if (strcmp(parameter, argument)) return NO;
+    }
+    return YES;
+}
+
+NSDictionary *NWBTVerifyBluetoothOff(void) {
+    NSDictionary *abi = requireKnownABI(); if (abi) return abi;
+    Class cls = NSClassFromString(@"BluetoothManager");
+    SEL shared = NSSelectorFromString(@"sharedInstance"), queueSelector = NSSelectorFromString(@"setSharedInstanceQueue:");
+    SEL available = NSSelectorFromString(@"available"), enabled = NSSelectorFromString(@"enabled");
+    if (!managerSignature(cls, shared, YES, "@", NULL) ||
+        !managerSignature(cls, queueSelector, YES, "v", "@") ||
+        !managerSignature(cls, available, NO, "B", NULL) || !managerSignature(cls, enabled, NO, "B", NULL))
+        return failure(@"bluetooth_state_unavailable", @"Bluetooth state ABI differs from the inspected runtime.");
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        dispatch_queue_t queue = dispatch_queue_create("me.midnightchips.nw.bluetooth-state", DISPATCH_QUEUE_SERIAL);
+        ((void (*)(id, SEL, id))objc_msgSend)(cls, queueSelector, queue);
+    });
+    id instance = ((id (*)(id, SEL))objc_msgSend)(cls, shared);
+    if (!instance) return failure(@"bluetooth_state_unavailable", @"Bluetooth state service is unavailable.");
+    double deadline = NSProcessInfo.processInfo.systemUptime + 3.0;
+    while (!((BOOL (*)(id, SEL))objc_msgSend)(instance, available) &&
+            NSProcessInfo.processInfo.systemUptime < deadline && !NWBTCancelled) usleep(20000);
+    if (NWBTCancelled) return failure(@"cancelled", @"Diagnostic cancelled.");
+    if (!((BOOL (*)(id, SEL))objc_msgSend)(instance, available))
+        return failure(@"bluetooth_state_unavailable", @"Cannot verify Bluetooth state. System Bluetooth access is required.");
+    return requireBluetoothOff();
 }
 
 static NSDictionary *skywalkVersion(void *channel, uint64_t capacity) {

@@ -138,6 +138,10 @@
 "ble.scan_counts" = "%lu anuncios recibidos · %lu dispositivos";
 "ble.diagnostic_details" = "Estado de Bluetooth: %ld\nPermiso: %ld\nEscaneo activo: %@\nAnuncios recibidos: %lu\nDispositivos: %lu\n\nEstado 5: Bluetooth activo. Permiso 3: autorizado. Solo se detectan accesorios que están anunciando BLE; estar emparejado o conectado por Bluetooth clásico no garantiza que anuncien BLE.";
 "bt.lab.title" = "Prueba de emisión BLE (10 s)";
+"bt.lab.swift_title" = "BLE Spam: Swift Pair (10 s)";
+"bt.lab.swift_menu" = "Prueba del aviso en Windows: anuncio NWLab durante 10 s. Activa Swift Pair en la laptop y apaga Bluetooth en Ajustes del iPhone.";
+"bt.lab.swift_receiver" = "Comprueba si Windows muestra un aviso de NWLab. La prueba solo emite el anuncio: no implementa el emparejamiento de un accesorio. La respuesta del controlador no confirma que Windows haya mostrado el aviso.";
+"bt.error.bluetooth_unavailable" = "No se pudo comprobar el estado de Bluetooth. El servicio debe estar disponible antes de iniciar la prueba.";
 "bt.lab.manufacturer_title" = "Anuncio de fabricante (10 s)";
 "bt.lab.rotation_title" = "BT Disruptor: anuncios (10 s)";
 "bt.lab.rotation_menu" = "Prueba de laboratorio: diez anuncios con contador, uno por segundo. Apaga Bluetooth desde Ajustes.";

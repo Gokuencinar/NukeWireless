@@ -138,6 +138,10 @@
 "ble.scan_counts" = "%lu advertisements received · %lu devices";
 "ble.diagnostic_details" = "Bluetooth state: %ld\nAuthorization: %ld\nScan active: %@\nAdvertisements received: %lu\nDevices: %lu\n\nState 5: Bluetooth powered on. Authorization 3: allowed. Only accessories advertising BLE are detected; pairing or a classic Bluetooth connection does not guarantee BLE advertising.";
 "bt.lab.title" = "BLE advertising test (10 s)";
+"bt.lab.swift_title" = "BLE Spam: Swift Pair (10 s)";
+"bt.lab.swift_menu" = "Windows notification test: advertise NWLab for 10 s. Enable Swift Pair on the laptop and turn Bluetooth off in iPhone Settings.";
+"bt.lab.swift_receiver" = "Check whether Windows displays a notification for NWLab. This test only advertises: it does not implement accessory pairing. A controller response does not confirm that Windows displayed the notification.";
+"bt.error.bluetooth_unavailable" = "Bluetooth state could not be verified. The service must be available before starting the test.";
 "bt.lab.manufacturer_title" = "Manufacturer advertisement (10 s)";
 "bt.lab.rotation_title" = "BT Disruptor: advertisements (10 s)";
 "bt.lab.rotation_menu" = "Lab test: ten advertisements with a counter, one per second. Turn Bluetooth off in Settings.";

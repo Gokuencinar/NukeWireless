@@ -199,6 +199,7 @@ static NSString *codeForReport(NSDictionary *report) {
     if ([report[@"connection_hci_status"] unsignedIntegerValue] == 0x04) return @"page_timeout";
     if ([stage isEqual:@"abi"]) return @"unsupported";
     if ([stage isEqual:@"bluetooth_state"]) return @"bluetooth_off";
+    if ([stage isEqual:@"bluetooth_state_unavailable"]) return @"bluetooth_unavailable";
     if ([stage isEqual:@"permissions"]) return @"permissions";
     if ([message containsString:@"pairing"]) return @"pairing";
     if ([message containsString:@"Connection failed"] || [message containsString:@"Target connection timed out"]) return @"connection";
@@ -207,10 +208,11 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL manufacturer, BOOL rotating) {
+static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL manufacturer, BOOL rotating, BOOL swiftPair) {
     // Reject invalid options before guard, lock acquisition or service changes.
     if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
-    NSDictionary *guard = NWBTNativeGuard();
+    NSDictionary *guard = NWBTVerifyBluetoothOff();
+    if (!guard) guard = NWBTNativeGuard();
     if (guard) { NSMutableDictionary *report = [guard mutableCopy]; report[@"error_code"] = codeForReport(guard); return report; }
     NSString *lockPath = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth.lock"];
     int lock = open(lockPath.fileSystemRepresentation, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
@@ -261,7 +263,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
             else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : lab ?
-                (rotating ? NWBTAdvertiseRotatingLab() : manufacturer ? NWBTAdvertiseManufacturerLab() : NWBTAdvertiseLab()) : NWBTReadLECapabilities()) mutableCopy];
+                (swiftPair ? NWBTAdvertiseSwiftPairLab() : rotating ? NWBTAdvertiseRotatingLab() : manufacturer ? NWBTAdvertiseManufacturerLab() : NWBTAdvertiseLab()) : NWBTReadLECapabilities()) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -281,6 +283,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         close(lock);
     }
     if (!report) report = [errorReport(@"transport") mutableCopy];
+    report[@"radio_state_verified_before_exclusive"] = @YES;
     if (preflightStage) report[@"preflight_stage"] = preflightStage;
     if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);
@@ -308,7 +311,8 @@ int main(int argc, char **argv) {
         BOOL lab = argc == 2 && !strcmp(argv[1], "--le-advertise-test");
         BOOL manufacturer = argc == 2 && !strcmp(argv[1], "--le-manufacturer-test");
         BOOL rotating = argc == 2 && !strcmp(argv[1], "--le-rotation-test");
-        lab = lab || manufacturer || rotating;
+        BOOL swiftPair = argc == 2 && !strcmp(argv[1], "--le-swift-pair-test");
+        lab = lab || manufacturer || rotating || swiftPair;
         // callerAllowed below admits only root or the exact installed app parent.
         recordAppRun = recordAppRun || capabilities || lab;
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
@@ -325,7 +329,7 @@ int main(int argc, char **argv) {
         if (capabilities || lab) {
             signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
             alarm(60);
-            NSDictionary *report = runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating);
+            NSDictionary *report = runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair);
             alarm(0); return printReport(report);
         }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
@@ -335,7 +339,7 @@ int main(int argc, char **argv) {
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_le_advertising_test": @YES, @"supports_le_manufacturer_test": @YES,
-                @"supports_le_rotation_test": @YES});
+                @"supports_le_rotation_test": @YES, @"supports_le_swift_pair_test": @YES});
         }
         if (!milliseconds && ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping"))) return printReport(errorReport(@"arguments"));
         NSUInteger count = NWBT_DEFAULT_COUNT, intervalMS = milliseconds ? NWBT_DEFAULT_INTERVAL_MS : NWBT_DEFAULT_INTERVAL;
@@ -354,7 +358,7 @@ int main(int argc, char **argv) {
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
         unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
         alarm(timeout > 60 ? timeout : 60);
-        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO);
+        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO);
         alarm(0); return printReport(report);
     }
 }

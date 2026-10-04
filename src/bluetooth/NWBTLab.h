@@ -46,6 +46,23 @@ static inline size_t NWBTLabRotatingData(uint8_t p[35], unsigned sequence) {
     memcpy(p + 29, marker, sizeof marker);
     return 35;
 }
+static inline void NWBTLabSwiftPairParameters(uint8_t p[25]) {
+    NWBTLabParameters(p);
+    // Microsoft's normal Swift Pair cadence: 244 * 0.625 ms = 152.5 ms.
+    p[3] = p[6] = 0xf4; p[4] = p[7] = 0; p[5] = p[8] = 0;
+}
+static inline size_t NWBTLabSwiftPairData(uint8_t p[35]) {
+    // Microsoft Swift Pair's LE-only vendor section, with a lab display name.
+    // This finite discovery test does not implement a pairable GATT accessory.
+    const uint8_t advertisement[] = {
+        2, 1, 6,
+        11, 0xff, 0x06, 0x00, 0x03, 0x00, 0x80, 'N','W','L','a','b'
+    };
+    memset(p, 0, 35);
+    p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1; p[3] = sizeof advertisement;
+    memcpy(p + 4, advertisement, sizeof advertisement);
+    return sizeof advertisement + 4;
+}
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {
     memset(p, 0, 6); p[0] = enable ? 1 : 0; p[1] = 1; p[2] = NWBT_LAB_HANDLE;
     if (enable) { p[3] = 0xe8; p[4] = 3; } // Controller stops after 10 seconds.
