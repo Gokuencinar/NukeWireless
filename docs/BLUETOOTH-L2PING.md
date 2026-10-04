@@ -1,22 +1,23 @@
 # Bluetooth nativo: biblioteca de investigación
 
 **Estado: cinco ecos L2CAP reales comprobados por SSH; interfaz Bluetooth
-integrada en dev22 y helper separado con recuperación independiente.** Dev19
-es la última interfaz confirmada por el usuario. La prueba completa del nuevo
-botón con los auriculares y su revisión visual en el iPhone están pendientes.
+integrada en dev23 y helper separado con recuperación independiente.** Dev19
+tiene la confirmación previa de las funciones existentes. El usuario confirmó
+la pantalla Bluetooth y cinco respuestas desde el botón en dev23/app8; el
+registro local del helper confirma ecos, desconexión y recuperación.
 
 El alcance solicitado es exclusivamente el Bluetooth del iPhone. No se utiliza
 un adaptador Linux ni un servidor externo. El ping propuesto es un diagnóstico
 finito: cinco solicitudes pequeñas, intervalo de un segundo, timeout por
 respuesta, plazo total y cancelación. La primera prueba funcional se realizó
-por SSH. La integración está preparada; los auriculares están apagados durante
-las comprobaciones del nuevo supervisor.
+por SSH. Se comprobaron los errores con los auriculares apagados y después cinco
+respuestas desde la interfaz, con el accesorio preparado.
 
 ## Paquete separado
 
 - ID: `com.gokuencinar.nukewireless.bluetooth`.
 - Motor HCI/ACL: `probe8` validó cinco ecos reales.
-- Candidata integrada: app `1.0.25+rh25.5~dev22`, módulo `0.0.3~app5`.
+- Candidata integrada: app `1.0.25+rh25.5~dev23`, módulo `0.0.3~app8`.
 - Esquema de esta candidata: RootHide; binarios arm64, deployment target iOS 15.
 - Biblioteca: `/usr/lib/NukeBluetoothBridge.dylib`.
 - Inspector: `/usr/bin/nwbt-inspect --inspect`.
@@ -325,13 +326,90 @@ Se confirmó Disconnection Complete, `disconnect_confirmed: true` y
 accesorio, sin intervención manual para restaurar el servicio. Su dirección
 continúa solo en archivos locales ignorados.
 
-El usuario confirmó que la nueva opción Bluetooth aparece en Información.
-La comprobación del botón real está solicitada y pendiente de su resultado.
-No se ha observado todavía la invocación desde el botón real en el iPhone.
+El usuario confirmó la pantalla y después comunicó que el botón de dev22
+termina con «Exclusive Bluetooth controller access could not be obtained».
+No era una ausencia de resultados: el fallo sí aparece en la sección Results.
+Las comprobaciones posteriores no mostraron nuevos crashes y bluetoothd
+continuaba en ejecución. El éxito por SSH no valida este contexto de llamada.
+
+### Dev23 y app6: resultados persistentes y diagnóstico del acceso exclusivo
+
+- Dev23 guarda el último JSON en preferencias locales, refresca directamente
+  el controlador al terminar, muestra el resumen también arriba y desplaza
+  la lista hasta Resultados. Registra fases y stderr acotado para distinguir
+  errores de lanzamiento, lectura y apertura, sin guardar el destino en ese
+  registro. La dirección introducida conserva su preferencia local anterior.
+- App6 captura `errno` inmediatamente después de `os_channel_create`, antes
+  de `fputs`, y conserva el resultado del preflight o la retirada del servicio
+  si falla la exclusividad. La captura tardía era un defecto de código; no era
+  la causa del rechazo finalmente observado en app7.
+- App: [Actions 37200033425](https://github.com/Gokuencinar/NukeWireless/actions/runs/37200033425),
+  commit `d3d6c52`, SHA-256 del paquete instalado:
+  `64782dd109cfe412f1f4a076c0527d045cc71d11a28bfcd32159207eadbe3dc6`.
+- Módulo: [Actions 37200273225](https://github.com/Gokuencinar/NukeWireless/actions/runs/37200273225),
+  commit `eef1d3d`, SHA-256 del paquete instalado:
+  `75593a87320c3b22bac52e1679d2deb8698cb5de422e485590914410a7f11282`.
+  Su consulta pasiva devuelve `version: 0.0.3~app6`; el build rechaza versiones
+  distintas entre la cabecera y el manifiesto.
+- Ambas compilaciones completaron sin ejecutar tests. `dpkg-query` confirmó
+  la instalación de dev23/app6. Los hashes de los binarios originales de red
+  y de rutas se conservan respecto a dev19.
+
+El usuario repitió la prueba y confirmó el mismo error con app6.
+App7 añadió un registro JSON accesible únicamente a root (modo 0600,
+propietario root) en `var/run/nukewireless-bluetooth-app.json` dentro del bootstrap.
+Guarda respuesta y UID/PID del llamante, sin dirección de destino; las consultas
+pasivas y el hijo de recuperación no lo sustituyen. El usuario reprodujo el
+fallo de nuevo y el registro capturó UID original 501 y:
+
+```json
+{"error_code":"exclusive","exclusive_phase":"preflight",
+ "preflight":{"stage":"skywalk_opened","slot_buffer_size":512,
+              "remote_bluetooth_packets_sent":0}}
+```
+
+La apertura previa funcionaba, pero el runner solo admitía `skywalk_open` con
+errno EBUSY, el resultado observado desde SSH. App8 admite además la apertura
+validada `skywalk_opened` que ya cierra el canal en `finally`. Después mantiene
+el mismo bloqueo, recuperación armada y retirada comprobada del servicio antes
+del motor de ecos. Continúa rechazando los demás fallos del preflight.
+
+App7 compiló desde `7a074f8` en
+[Actions 37200825415](https://github.com/Gokuencinar/NukeWireless/actions/runs/37200825415),
+SHA-256 `badec2e869f57ce0904ceb67299edbbb5b5758afc7eeb06cc11db34c584fcbb2`.
+App8 compiló desde `eee2cc5` en
+[Actions 37201062696](https://github.com/Gokuencinar/NukeWireless/actions/runs/37201062696),
+SHA-256 `62ed83a51b70795540cfd44e727c2d2a2c09a9ae5aa18f8ebd67ceb41676ad41`.
+La instalación y consulta pasiva confirmaron versión `0.0.3~app8`.
+No se añadieron entitlements ni se cambió la ABI de los canales para esta
+corrección. Los workflows de ambos módulos compilaron sin ejecutar tests.
+
+### Cinco respuestas desde el botón real: dev23/app8
+
+El usuario confirmó «5 de 5 pings respondidos». El registro del helper capturó
+UID original 501, versión `0.0.3~app8`, `preflight_stage: skywalk_opened`, cinco
+solicitudes y cinco respuestas con identificador y nonce verificados:
+
+| Eco | RTT observado |
+| --- | --- |
+| 1 | 18,38 ms |
+| 2 | 31,91 ms |
+| 3 | 9,58 ms |
+| 4 | 30,52 ms |
+| 5 | 16,93 ms |
+
+La respuesta incluye `disconnect_confirmed: true`, `service_restored: true`
+y ausencia de error. Esta ejecución confirma el recorrido desde el botón
+hasta el motor, el retorno de resultados y la recuperación del servicio en
+el iPhone XS / iOS 16.3.1 / Dopamine RootHide observado. La interfaz y los
+resultados fueron confirmados por el usuario; no se deducen de `uiopen`.
+La consulta independiente posterior confirmó bluetoothd `running`, ambos
+paquetes instalados y ausencia de nuevos registros de cierre. El registro
+completo, incluido el PID efímero, permanece solo en archivos locales ignorados. La dirección Bluetooth no se publica.
 La captura remota de pantalla no estuvo disponible: agotó su plazo de conexión.
 No se instalaron herramientas de depuración ni se cambió Developer Mode para
 suplirla. `uiopen` confirma que la orden de abrir se aceptó; no confirma por sí
-solo la vista mostrada. Los cinco ecos desde la interfaz quedan pendientes de confirmación del usuario.
+solo la vista mostrada. La confirmación desde la interfaz llegó posteriormente en la prueba dev23/app8 anterior.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 
@@ -412,7 +490,7 @@ individual en SFTP no significa que el framework no esté disponible.
 La ruta Skywalk y los ecos reales quedaron comprobados después de este análisis,
 en `probe7` y `probe8`. `nwbt-run` añade gestión autónoma de exclusividad y
 recuperación, comprobada por SSH en el caso negativo y al interrumpir el worker.
-Su invocación desde la interfaz está pendiente de prueba. No debe llamarse
+Su invocación desde la interfaz quedó comprobada en dev23/app8. No debe llamarse
 el inspector crudo `--l2ping` dejando el servicio retirado sin programar
 recuperación independiente antes. El motor de la biblioteca no manipula
 servicios por sí mismo; esa responsabilidad pertenece al runner.

@@ -4,14 +4,16 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev22`, con **Información → Bluetooth**
+**Última candidata instalada:** `1.0.25+rh25.5~dev23`, con **Información → Bluetooth**
 para cinco pings clásicos, cancelación y resultados. El módulo separado
-`NukeWireless Bluetooth Bridge` (`0.0.3~app5`) gestiona permisos y recuperación
+`NukeWireless Bluetooth Bridge` (`0.0.3~app8`) gestiona permisos y recuperación
 del servicio. Ambos paquetes están confirmados por `dpkg` en el iPhone.
-El usuario confirmó que la opción Bluetooth aparece en Información; el ciclo
-completo con auriculares desde el botón todavía requiere comprobación. **Dev19 sigue siendo la última versión confirmada por
-el usuario**; su copia se conserva para reversión. El ejecutable original y
-los helpers de red tienen los mismos hashes en dev19 y dev22.
+El usuario confirmó cinco respuestas desde el botón en dev23/app8. El registro
+del helper confirma el llamante mobile, los cinco ecos, el cierre de conexión
+y la restauración automática. La causa del error previo era exigir «ocupado»
+en una comprobación donde la app abría correctamente el canal. Dev23 guarda
+los resultados y los muestra al terminar. La copia de dev19 se conserva para
+reversión; los binarios originales de red y rutas mantienen sus hashes.
 
 **Bluetooth nativo en investigación:** se ha compilado e instalado una biblioteca
 independiente de inspección en el iPhone XS con iOS 16.3.1 y Dopamine RootHide.
@@ -20,8 +22,8 @@ del usuario mediante HCI/ACL Skywalk, con cierre de conexión y restauración de
 servicio Bluetooth. Dev22 incorpora la interfaz y un runner autónomo, cuyo caso
 de destino apagado y recuperación tras cancelación/SIGKILL se comprobaron por
 SSH. El supervisor `app5` también completó cinco ecos reales con los auriculares
-encendidos y restauró el servicio automáticamente. El nuevo botón aún no tiene
-prueba completa con auriculares. Solo se
+encendidos y restauró el servicio automáticamente. El botón de dev23/app8 también completó cinco respuestas y restauración
+automática, confirmadas por el usuario y el registro del helper. Solo se
 comprobó iPhone XS / iOS 16.3.1 / Dopamine RootHide. Véase
 [evidencias, fuentes y límites](docs/BLUETOOTH-L2PING.md).
 
