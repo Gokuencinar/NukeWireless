@@ -305,12 +305,33 @@ salida SSH; el servicio ya estaba de nuevo en ejecución y no había nuevos
 crashes. La repetición con drenaje simultáneo de stdout/stderr terminó con
 JSON completo. No se atribuye ese timeout a una causa confirmada.
 
+### Auriculares encendidos: supervisor app5
+
+El usuario volvió a preparar sus auriculares propios, encendidos y sin
+emparejar. `nwbt-run --ping` se ejecutó por SSH con el módulo `0.0.3~app5`.
+Devolvió código 0, cinco solicitudes y cinco respuestas verificadas:
+
+| Eco | RTT observado |
+| --- | --- |
+| 1 | 16,32 ms |
+| 2 | 36,76 ms |
+| 3 | 15,72 ms |
+| 4 | 14,06 ms |
+| 5 | 8,92 ms |
+
+Se confirmó Disconnection Complete, `disconnect_confirmed: true` y
+`service_restored: true`. Una consulta independiente confirmó bluetoothd
+`running`. Este resultado comprueba el ciclo completo del supervisor con el
+accesorio, sin intervención manual para restaurar el servicio. Su dirección
+continúa solo en archivos locales ignorados.
+
+El usuario confirmó que la nueva opción Bluetooth aparece en Información.
+La comprobación del botón real está solicitada y pendiente de su resultado.
 No se ha observado todavía la invocación desde el botón real en el iPhone.
 La captura remota de pantalla no estuvo disponible: agotó su plazo de conexión.
 No se instalaron herramientas de depuración ni se cambió Developer Mode para
 suplirla. `uiopen` confirma que la orden de abrir se aceptó; no confirma por sí
-solo la vista mostrada. La prueba visual y los cinco ecos desde la interfaz
-quedan para cuando el usuario regrese y prepare el accesorio.
+solo la vista mostrada. Los cinco ecos desde la interfaz quedan pendientes de confirmación del usuario.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 

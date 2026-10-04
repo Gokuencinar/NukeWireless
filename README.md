@@ -8,8 +8,8 @@ Nuke Wireless is in development. This repository is public; development builds a
 para cinco pings clásicos, cancelación y resultados. El módulo separado
 `NukeWireless Bluetooth Bridge` (`0.0.3~app5`) gestiona permisos y recuperación
 del servicio. Ambos paquetes están confirmados por `dpkg` en el iPhone.
-La interfaz y el ciclo completo con auriculares desde el botón todavía requieren
-comprobación en el iPhone. **Dev19 sigue siendo la última versión confirmada por
+El usuario confirmó que la opción Bluetooth aparece en Información; el ciclo
+completo con auriculares desde el botón todavía requiere comprobación. **Dev19 sigue siendo la última versión confirmada por
 el usuario**; su copia se conserva para reversión. El ejecutable original y
 los helpers de red tienen los mismos hashes en dev19 y dev22.
 
@@ -19,7 +19,9 @@ independiente de inspección en el iPhone XS con iOS 16.3.1 y Dopamine RootHide.
 del usuario mediante HCI/ACL Skywalk, con cierre de conexión y restauración del
 servicio Bluetooth. Dev22 incorpora la interfaz y un runner autónomo, cuyo caso
 de destino apagado y recuperación tras cancelación/SIGKILL se comprobaron por
-SSH. El nuevo botón aún no tiene prueba completa con auriculares. Solo se
+SSH. El supervisor `app5` también completó cinco ecos reales con los auriculares
+encendidos y restauró el servicio automáticamente. El nuevo botón aún no tiene
+prueba completa con auriculares. Solo se
 comprobó iPhone XS / iOS 16.3.1 / Dopamine RootHide. Véase
 [evidencias, fuentes y límites](docs/BLUETOOTH-L2PING.md).
 
