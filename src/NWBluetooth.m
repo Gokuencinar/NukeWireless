@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
 
 static NSString *const changed = @"NWBluetoothChanged";
 static NSString *const reportKey = @"NukeWirelessBluetoothLastReport";
@@ -19,6 +20,7 @@ static NSString *const countKey = @"NukeWirelessBluetoothPingCount";
 static NSString *const intervalKey = @"NukeWirelessBluetoothPingIntervalMS";
 static BOOL busy, cancelling;
 static pid_t worker;
+static int workerControl = -1; // Owned/closed by invoke, guarded by workerLock.
 static NSObject *workerLock;
 static NSDictionary *lastReport;
 static BOOL readingLE;
@@ -122,7 +124,7 @@ static BOOL childFinished(pid_t child, int *status, BOOL cancellable) {
     @synchronized (workerLock) {
         pid_t waited = waitpid(child, status, WNOHANG);
         BOOL finished = waited == child || (waited < 0 && errno == ECHILD);
-        if (finished && cancellable && worker == child) worker = 0;
+        if (finished && cancellable && worker == child) { worker = 0; workerControl = -1; }
         return finished;
     }
 }
@@ -131,8 +133,11 @@ static void signalChild(pid_t child, int number, BOOL cancellable) {
         int status = 0;
         if (!childFinished(child, &status, cancellable)) {
             // Only signal a child still present in our wait set.
-            if (waitpid(child, &status, WNOHANG) == 0) kill(child, number);
-            else if (cancellable && worker == child) worker = 0;
+            if (waitpid(child, &status, WNOHANG) == 0) {
+                if (cancellable && worker == child && workerControl >= 0 && number == SIGTERM) {
+                    const char stop = 's'; send(workerControl, &stop, 1, 0);
+                } else kill(child, number);
+            } else if (cancellable && worker == child) { worker = 0; workerControl = -1; }
         }
     }
 }
@@ -144,7 +149,8 @@ static BOOL cancellationRequested(void) {
 }
 
 // A separate helper owns privileged operations and recovery. The app only
-// supplies argv, reads bounded JSON, and signals that worker when cancelled.
+// supplies argv, reads bounded JSON, and requests cancellation over a private
+// inherited socket. The worker's root credentials do not grant the app signals.
 static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     saveInvocation(@{@"phase": @"starting"}, cancellable);
     NSString *path = helperPath();
@@ -152,11 +158,23 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     int out[2], err[2];
     if (pipe(out)) return @{@"error_code": @"transport"};
     if (pipe(err)) { close(out[0]); close(out[1]); return @{@"error_code": @"transport"}; }
+    int control[2] = {-1, -1};
+    if (cancellable) {
+        int enabled = 1;
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, control) ||
+            setsockopt(control[1], SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled)) ||
+            fcntl(control[1], F_SETFL, O_NONBLOCK)) {
+            if (control[0] >= 0) close(control[0]); if (control[1] >= 0) close(control[1]);
+            close(out[0]); close(out[1]); close(err[0]); close(err[1]);
+            return @{@"error_code": @"transport"};
+        }
+    }
     fcntl(out[0], F_SETFL, O_NONBLOCK); fcntl(err[0], F_SETFL, O_NONBLOCK);
     posix_spawn_file_actions_t actions; posix_spawn_file_actions_init(&actions);
     posix_spawn_file_actions_adddup2(&actions, out[1], STDOUT_FILENO);
     posix_spawn_file_actions_adddup2(&actions, err[1], STDERR_FILENO);
-    posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+    if (cancellable) posix_spawn_file_actions_adddup2(&actions, control[0], STDIN_FILENO);
+    else posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     posix_spawnattr_t attributes; posix_spawnattr_init(&attributes);
     posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
     char *argv[6] = {(char *)path.fileSystemRepresentation, NULL, NULL, NULL, NULL, NULL};
@@ -165,11 +183,15 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     int launch = posix_spawn(&child, path.fileSystemRepresentation, &actions, &attributes, argv, environment);
     posix_spawnattr_destroy(&attributes); posix_spawn_file_actions_destroy(&actions);
     close(out[1]); close(err[1]);
+    if (control[0] >= 0) close(control[0]);
     if (launch) {
         saveInvocation(@{@"phase": @"spawn_failed", @"spawn_errno": @(launch)}, cancellable);
-        close(out[0]); close(err[0]); return @{@"error_code": @"permissions"};
+        close(out[0]); close(err[0]); if (control[1] >= 0) close(control[1]);
+        return @{@"error_code": @"permissions"};
     }
-    if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) signalChild(child, SIGTERM, YES); }
+    if (cancellable) @synchronized (workerLock) {
+        worker = child; workerControl = control[1]; if (cancelling) signalChild(child, SIGTERM, YES);
+    }
     NSMutableData *data = [NSMutableData new], *diagnostics = [NSMutableData new]; NSUInteger stderrBytes = 0;
     double estimatedTime = 85.0;
     if (arguments.count >= 4) {
@@ -209,7 +231,10 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     while ((count = read(out[0], buffer, sizeof(buffer))) > 0 && data.length + (NSUInteger)count <= maxDataSize)
         [data appendBytes:buffer length:(NSUInteger)count];
     close(out[0]); close(err[0]);
-    if (cancellable) @synchronized (workerLock) { if (worker == child) worker = 0; }
+    if (cancellable) @synchronized (workerLock) {
+        if (worker == child) { worker = 0; workerControl = -1; }
+        close(control[1]);
+    }
     id report = invalid ? nil : [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
     saveInvocation(@{@"phase": @"finished", @"bytes": @(data.length), @"invalid": @(invalid),
         @"child_exited": @(exited), @"wait_status": @(status),

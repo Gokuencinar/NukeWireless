@@ -8,6 +8,7 @@ on:
       - 'scripts/bluetooth_manifest.py'
       - 'tests/test_hci_read.c'
       - 'tests/test_bt_lab.c'
+      - 'tests/test_bt_control.c'
       - '.github/workflows/bluetooth-inspector.yml'
   workflow_dispatch:
 permissions:

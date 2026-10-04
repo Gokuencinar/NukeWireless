@@ -3,6 +3,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out=build/bluetooth
 mkdir -p "$out"
+clang -Wall -Wextra -Werror -pthread tests/test_bt_control.c -o "$out/test-bt-control"
+"$out/test-bt-control"
+rm "$out/test-bt-control"
 clang -std=c11 -Wall -Wextra -Werror tests/test_hci_read.c -o "$out/test-hci-read"
 "$out/test-hci-read"
 rm "$out/test-hci-read"

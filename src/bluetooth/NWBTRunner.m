@@ -1,5 +1,6 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
+#include "NWBTControl.h"
 #include <dlfcn.h>
 #include <spawn.h>
 #include <unistd.h>
@@ -26,6 +27,7 @@ static void cancelRun(int number) {
     if (NWBTCancelled) _exit(128 + number);
     NWBTCancelled = 1; alarm(4);
 }
+static void cancelFromApp(void) { kill(getpid(), SIGTERM); }
 
 static NSDictionary *errorReport(NSString *code) {
     return @{@"version": NWBT_VERSION, @"error_code": code, @"stage": @"runner", @"l2ping_verified": @NO};
@@ -329,7 +331,14 @@ int main(int argc, char **argv) {
         if (capabilities || lab) {
             signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
             alarm(60);
-            NSDictionary *report = runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair);
+            NWBTCancellationMonitor monitor;
+            if (NWBTStartCancellationMonitor(&monitor, STDIN_FILENO, cancelFromApp) < 0) {
+                alarm(0);
+                return printReport(errorReport(@"transport"));
+            }
+            NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair) mutableCopy];
+            NWBTStopCancellationMonitor(&monitor);
+            report[@"cancellation_requested_via_app_channel"] = @(atomic_load(&monitor.requested));
             alarm(0); return printReport(report);
         }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
@@ -338,6 +347,7 @@ int main(int argc, char **argv) {
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
+                @"supports_app_cancel_channel": @YES,
                 @"supports_le_advertising_test": @YES, @"supports_le_manufacturer_test": @YES,
                 @"supports_le_rotation_test": @YES, @"supports_le_swift_pair_test": @YES});
         }
@@ -358,7 +368,14 @@ int main(int argc, char **argv) {
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
         unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
         alarm(timeout > 60 ? timeout : 60);
-        NSDictionary *report = runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO);
+        NWBTCancellationMonitor monitor;
+        if (NWBTStartCancellationMonitor(&monitor, STDIN_FILENO, cancelFromApp) < 0) {
+            alarm(0);
+            return printReport(errorReport(@"transport"));
+        }
+        NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO) mutableCopy];
+        NWBTStopCancellationMonitor(&monitor);
+        report[@"cancellation_requested_via_app_channel"] = @(atomic_load(&monitor.requested));
         alarm(0); return printReport(report);
     }
 }
