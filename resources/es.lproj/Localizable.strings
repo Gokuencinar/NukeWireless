@@ -79,6 +79,12 @@
 "bt.start" = "Enviar pings";
 "bt.running" = "Diagnóstico en curso…";
 "bt.cancel" = "Cancelar y restaurar Bluetooth";
+"bt.stop" = "Detener";
+"bt.stopping" = "Deteniendo…";
+"bt.lab.stop" = "Detener emisión y restaurar Bluetooth";
+"bt.lab.stopped" = "Emisión detenida y Bluetooth restaurado.";
+"bt.lab.stop_unconfirmed" = "Prueba cancelada; no se ha confirmado la parada completa de la emisión.";
+"bt.lab.stop_help" = "Puedes detener esta prueba desde la barra superior. La emisión también termina automáticamente a los 10 segundos. Los avisos ya recibidos deben cerrarse en el dispositivo receptor.";
 "bt.results" = "Resultados";
 "bt.empty" = "Todavía no hay resultados.";
 "bt.summary" = "%lu de %lu pings respondidos";

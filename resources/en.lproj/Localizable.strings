@@ -79,6 +79,12 @@
 "bt.start" = "Send pings";
 "bt.running" = "Diagnostic in progress…";
 "bt.cancel" = "Cancel and restore Bluetooth";
+"bt.stop" = "Stop";
+"bt.stopping" = "Stopping…";
+"bt.lab.stop" = "Stop advertising and restore Bluetooth";
+"bt.lab.stopped" = "Advertising stopped and Bluetooth restored.";
+"bt.lab.stop_unconfirmed" = "Test cancelled; complete advertising shutdown has not been confirmed.";
+"bt.lab.stop_help" = "You can stop this test from the navigation bar. Advertising also ends automatically after 10 seconds. Notifications already received must be dismissed on the receiving device.";
 "bt.results" = "Results";
 "bt.empty" = "No results yet.";
 "bt.summary" = "%lu of %lu pings answered";

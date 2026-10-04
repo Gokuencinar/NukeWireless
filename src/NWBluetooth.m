@@ -51,6 +51,11 @@ static void saveInvocation(NSDictionary *details, BOOL cancellable) {
 }
 static NSString *reportText(NSDictionary *report) {
     NSString *code = report[@"error_code"];
+    if ([code isEqual:@"cancelled"] && labOperation(report[@"operation"]) &&
+        [report[@"controller_advertising_acknowledged"] boolValue])
+        return NWText([report[@"advertising_stopped_acknowledged"] boolValue] &&
+            [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] ?
+            @"bt.lab.stopped" : @"bt.lab.stop_unconfirmed");
     if (!code && [report[@"operation"] isEqual:@"le_rotation_test"])
         return NWText([report[@"controller_advertising_acknowledged"] boolValue] &&
             [report[@"advertising_stopped_acknowledged"] boolValue] &&
@@ -134,6 +139,9 @@ static void signalChild(pid_t child, int number, BOOL cancellable) {
 static void cancelWorker(void) {
     @synchronized (workerLock) { cancelling = YES; if (worker > 0) signalChild(worker, SIGTERM, YES); }
 }
+static BOOL cancellationRequested(void) {
+    @synchronized (workerLock) { return cancelling; }
+}
 
 // A separate helper owns privileged operations and recovery. The app only
 // supplies argv, reads bounded JSON, and signals that worker when cancelled.
@@ -216,6 +224,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 @property(nonatomic) BOOL checking;
 @property(nonatomic) NSUInteger pingCount, intervalMS;
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation;
+- (void)stopCurrentOperation;
 @end
 
 @implementation NWBluetoothViewController
@@ -287,8 +296,21 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     else [self.tableView reloadData];
     self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
     self.navigationItem.hidesBackButton = busy;
+    if (busy) {
+        BOOL stopping = cancellationRequested();
+        UIBarButtonItem *stop = [[UIBarButtonItem alloc] initWithTitle:NWText(stopping ? @"bt.stopping" : @"bt.stop")
+            style:UIBarButtonItemStylePlain target:self action:@selector(stopCurrentOperation)];
+        stop.enabled = !stopping; stop.tintColor = UIColor.systemRedColor;
+        stop.accessibilityIdentifier = @"nw.bluetooth.stop";
+        self.navigationItem.rightBarButtonItem = stop;
+    } else self.navigationItem.rightBarButtonItem = nil;
 }
-- (void)backgrounded:(NSNotification *)notification { (void)notification; if (busy) cancelWorker(); }
+- (void)stopCurrentOperation {
+    if (!busy || cancellationRequested()) return;
+    cancelWorker();
+    [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
+}
+- (void)backgrounded:(NSNotification *)notification { (void)notification; [self stopCurrentOperation]; }
 - (BOOL)textFieldShouldReturn:(UITextField *)field { [field resignFirstResponder]; return YES; }
 - (void)finishEditing { [self.view endEditing:YES]; }
 - (BOOL)readOptions {
@@ -326,7 +348,8 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     (void)table; return section == 1 ? NWText(@"bt.address") : section == 2 ? NWText(@"bt.options") : section == 4 ? NWText(@"bt.results") : nil;
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
-    (void)table; return section == 1 ? NWText(@"bt.prepare") : section == 2 ? NWText(@"bt.options_limits") : section == 3 ? NWText(@"bt.limits") : nil;
+    (void)table; return section == 1 ? NWText(@"bt.prepare") : section == 2 ? NWText(@"bt.options_limits") :
+        section == 3 ? NWText(busy && labRunning ? @"bt.lab.stop_help" : @"bt.limits") : nil;
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     (void)table; UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
@@ -384,10 +407,13 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         content.text = NWText(interval ? @"bt.interval_ms" : @"bt.count");
         cell.accessoryView = interval ? self.intervalField : self.countField;
     } else if (index.section == 3) {
-        content.text = index.row || busy ? NWText(index.row ? @"bt.cancel" : labRunning ? @"bt.lab.running" : readingLE ? @"bt.le.running" : @"bt.running") :
+        BOOL stopping = busy && cancellationRequested();
+        content.text = index.row || busy ? NWText(index.row ? (stopping ? @"bt.stopping" : labRunning ? @"bt.lab.stop" : @"bt.cancel") :
+            stopping ? @"bt.stopping" : labRunning ? @"bt.lab.running" : readingLE ? @"bt.le.running" : @"bt.running") :
             NWText(@"bt.start");
         content.image = [UIImage systemImageNamed:index.row ? @"stop.circle" : @"waveform.path"];
-        cell.selectionStyle = index.row || (!busy && [self.capabilities[@"supported"] boolValue]) ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+        cell.selectionStyle = (index.row && busy && !stopping) || (!index.row && !busy && [self.capabilities[@"supported"] boolValue]) ?
+            UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         content.textProperties.color = index.row ? UIColor.systemRedColor : NWAccentColor();
     } else if (!lastReport) content.text = NWText(@"bt.empty");
     else if (index.row == 0) {
@@ -463,7 +489,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         return;
     }
     if (index.section != 3) return;
-    if (index.row && busy) { cancelWorker(); return; }
+    if (index.row) { [self stopCurrentOperation]; return; }
     if (busy || ![self.capabilities[@"supported"] boolValue]) return;
     [self.view endEditing:YES];
     if (![self readOptions]) {
@@ -530,7 +556,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [self.view endEditing:YES];
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
-    background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ cancelWorker(); }];
+    background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ [self stopCurrentOperation]; }];
     [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
     [self refresh:nil];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
@@ -565,7 +591,10 @@ UIViewController *NWBluetoothController(void) { return [NWBluetoothViewControlle
 #ifdef NW_UI_TESTING
 int NWBluetoothUIRegressionCheck(void) {
     NSDictionary *previous = lastReport; BOOL previousBusy = busy, previousLE = readingLE, previousLab = labRunning;
+    if (!workerLock) workerLock = [NSObject new];
+    BOOL previousCancelling = cancellationRequested();
     @try {
+        @synchronized (workerLock) { cancelling = NO; }
         busy = NO;
         NSMutableString *bitmap = [NSMutableString new];
         for (NSUInteger i = 0; i < 64; ++i) [bitmap appendString:@"ff"];
@@ -653,7 +682,34 @@ int NWBluetoothUIRegressionCheck(void) {
         busy = YES;
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:swiftButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 23;
+        labRunning = YES;
+        [controller refresh:nil];
+        UIBarButtonItem *stop = controller.navigationItem.rightBarButtonItem;
+        if (!stop.enabled || ![stop.title isEqual:NWText(@"bt.stop")] || stop.action != @selector(stopCurrentOperation)) return 24;
+        // Cancellation before spawn must remain latched for the future worker.
+        [controller stopCurrentOperation];
+        stop = controller.navigationItem.rightBarButtonItem;
+        if (!cancellationRequested() || stop.enabled || ![stop.title isEqual:NWText(@"bt.stopping")]) return 25;
+        NSIndexPath *cancelButton = [NSIndexPath indexPathForRow:1 inSection:3];
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:cancelButton];
+        content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone || ![content.text isEqual:NWText(@"bt.stopping")]) return 26;
+        [controller stopCurrentOperation]; // A repeated tap cannot restart or re-enable anything.
+        busy = NO; [controller refresh:nil];
+        if (controller.navigationItem.rightBarButtonItem) return 27;
+        lastReport = @{@"operation": @"le_advertising_test", @"error_code": @"cancelled",
+            @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
+            @"advertising_set_removed": @YES, @"service_restored": @YES};
+        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.stopped")]) return 28;
+        NSMutableDictionary *incomplete = [lastReport mutableCopy];
+        incomplete[@"advertising_stopped_acknowledged"] = @NO;
+        if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 29;
+        incomplete[@"advertising_stopped_acknowledged"] = @YES; incomplete[@"service_restored"] = @NO;
+        if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 30;
         return 0;
-    } @finally { lastReport = previous; busy = previousBusy; readingLE = previousLE; labRunning = previousLab; }
+    } @finally {
+        lastReport = previous; busy = previousBusy; readingLE = previousLE; labRunning = previousLab;
+        @synchronized (workerLock) { cancelling = previousCancelling; }
+    }
 }
 #endif

@@ -30,5 +30,5 @@ if __name__ == '__main__':
         'launch_files': {p.relative_to(out / 'NukeLaunch.storyboardc').as_posix(): sha(p.read_bytes())
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
-        'version': '1.0.25+rh25.5~dev33', 'target': args.target,
+        'version': '1.0.25+rh25.5~dev34', 'target': args.target,
     }, indent=2) + '\n')
