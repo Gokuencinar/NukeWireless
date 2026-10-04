@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ['src/NukeWirelessInfo.m', 'src/NWAppearance.m', 'src/NWAppearance.h',
            'src/NWDeviceBrowser.m', 'src/NWDeviceBrowser.h',
            'src/NWBluetooth.m', 'src/NWBluetooth.h', 'src/NWBluetoothLimits.h',
+           'src/NWBLE.m', 'src/NWBLE.h', 'src/NWBLEAdvertisement.m', 'src/NWBLEAdvertisement.h',
            'resources/en.lproj/Localizable.strings', 'resources/es.lproj/Localizable.strings', 'src/NWScanBridge.m', 'src/NWScanBridge.h',
            'src/NWResources.m', 'src/NWResources.h', 'src/NWPolicy.c', 'src/NWPolicy.h',
            'src/NWLanguage.m', 'src/NWLanguage.h',
@@ -29,5 +30,5 @@ if __name__ == '__main__':
         'launch_files': {p.relative_to(out / 'NukeLaunch.storyboardc').as_posix(): sha(p.read_bytes())
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
-        'version': '1.0.25+rh25.5~dev26', 'target': args.target,
+        'version': '1.0.25+rh25.5~dev27', 'target': args.target,
     }, indent=2) + '\n')

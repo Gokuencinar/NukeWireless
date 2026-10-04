@@ -7,13 +7,15 @@ clang -Wall -Wextra -Werror src/NWPolicy.c tests/test_policy.c -o build/audit/te
 build/audit/test_policy
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/test_resources.m -o build/audit/test_resources
 build/audit/test_resources
+clang -Wall -Wextra -Werror -fobjc-arc -framework Foundation src/NWBLEAdvertisement.m tests/test_ble_advertisement.m -o build/audit/test_ble_advertisement
+build/audit/test_ble_advertisement
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=16.3 -isysroot "$sdk" \
   -Wall -Wextra -Werror -fobjc-arc -fblocks -fPIC -O2 -dynamiclib \
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework CoreGraphics -framework SystemConfiguration \
+  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
-  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
+  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target 16.3 --target-device iphone --target-device ipad

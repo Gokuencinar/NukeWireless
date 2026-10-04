@@ -114,3 +114,26 @@
 "bt.error.values" = "Introduce una cantidad y un intervalo válidos.";
 
 "bt.error.page_timeout" = "El accesorio no respondió al intento de conexión (HCI 0x04). Si está conectado a tu laptop u otro equipo, desconéctalo allí y vuelve a probar. No hace falta borrar el emparejamiento; si sigue sin responder, ponlo en modo de emparejamiento.";
+
+// BLE scanner adapted for iOS
+"ble.title" = "Escáner BLE";
+"ble.menu" = "Dispositivos cercanos, señal, fabricante y servicios anunciados.";
+"ble.idle" = "Preparado. Inicia un escaneo para solicitar acceso a Bluetooth.";
+"ble.stopped" = "Escaneo detenido. Los resultados se conservan hasta el siguiente escaneo.";
+"ble.scanning" = "Escaneando durante 15 segundos…";
+"ble.denied" = "Permite el acceso a Bluetooth para NukeWireless en Ajustes.";
+"ble.off" = "Activa Bluetooth en Ajustes para escanear BLE.";
+"ble.unsupported" = "El escaneo BLE no está disponible en este dispositivo.";
+"ble.waiting" = "Esperando a Bluetooth…";
+"ble.start" = "Iniciar escaneo BLE";
+"ble.stop" = "Detener escaneo BLE";
+"ble.limits" = "Hasta 30 dispositivos, ordenados por señal. Se detiene a los 15 segundos, al salir de esta pantalla o al pasar la app a segundo plano. No establece conexiones.";
+"ble.identity" = "iOS muestra un UUID del dispositivo, no su MAC Bluetooth. Este UUID no sirve para el ping L2CAP. Solo aparecen dispositivos que anuncian BLE; los datos del fabricante no están autenticados.";
+"ble.empty" = "No se han detectado dispositivos BLE.";
+"ble.unnamed" = "Dispositivo sin nombre";
+"ble.unavailable" = "No disponible";
+"ble.unknown_company" = "Fabricante desconocido";
+"ble.yes" = "Sí";
+"ble.no" = "No";
+"ble.none" = "No anunciado";
+"ble.details" = "UUID: %@\nSeñal: %@\nFabricante: %@\nServicios anunciados: %@\nConectable: %@\nÚltima detección: hace %.1f s\nDatos del fabricante: %@";

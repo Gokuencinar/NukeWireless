@@ -1,6 +1,9 @@
 import SwiftUI
 import UIKit
 
+@_silgen_name("NWBLEUIRegressionCheck")
+func checkBLEUI() -> Int32
+
 @_silgen_name("NWUIRegressionCheck")
 func checkUI(_ phase: Int32) -> Int32
 @_silgen_name("NWUIRegressionSetLanguage")
@@ -45,7 +48,8 @@ struct RegressionTabs: View {
                     selection = 0
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         results.append(checkUI(2))
-                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0]]
+                        results.append(checkBLEUI())
+                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0]]
                         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                             .appendingPathComponent("ui-regression.json")
                         try? JSONSerialization.data(withJSONObject: report).write(to: file)

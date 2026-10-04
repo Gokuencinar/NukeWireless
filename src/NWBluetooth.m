@@ -1,4 +1,5 @@
 #import "NWBluetooth.h"
+#import "NWBLE.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import "NWScanBridge.h"
@@ -261,7 +262,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 2) return 2;
+    (void)table; if (section == 0 || section == 2) return 2;
     if (section == 3) return busy ? 2 : 1;
     if (section == 4) return lastReport ? MAX(1, [lastReport[@"samples"] count] + 1) : 1;
     return 1;
@@ -277,7 +278,12 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (index.section == 0) {
+    if (index.section == 0 && index.row == 1) {
+        content.text = NWText(@"ble.title"); content.secondaryText = NWText(@"ble.menu");
+        content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = busy ? UITableViewCellSelectionStyleNone : UITableViewCellSelectionStyleDefault;
+    } else if (index.section == 0) {
         content.text = NWText(@"bt.intro"); content.image = [UIImage systemImageNamed:@"antenna.radiowaves.left.and.right"];
         if (!self.capabilities) content.secondaryText = NWText(@"bt.checking");
         else if (self.capabilities[@"error_code"]) content.secondaryText = NWText([@"bt.error." stringByAppendingString:self.capabilities[@"error_code"]]);
@@ -322,7 +328,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     content.imageProperties.tintColor = NWAccentColor(); cell.contentConfiguration = content; return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
-    [table deselectRowAtIndexPath:index animated:YES]; if (index.section != 3) return;
+    [table deselectRowAtIndexPath:index animated:YES];
+    if (index.section == 0 && index.row == 1 && !busy) {
+        [self.navigationController pushViewController:NWBLEController() animated:YES]; return;
+    }
+    if (index.section != 3) return;
     if (index.row && busy) { cancelWorker(); return; }
     if (busy || ![self.capabilities[@"supported"] boolValue]) return;
     [self.view endEditing:YES];

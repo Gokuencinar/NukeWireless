@@ -50,6 +50,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
         self.assertEqual(info['CFBundleLocalizations'],['en','es'])
+        self.assertTrue(info['NSBluetoothAlwaysUsageDescription'])
         self.assertFalse(any('LocationUsage' in key for key in info))
         bundle = package.APP+'NukeWirelessResources.bundle/'
         vendors = plistlib.loads(self.after[bundle+'oui_vendors.plist'][1])

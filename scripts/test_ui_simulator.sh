@@ -8,9 +8,9 @@ mkdir -p "$out/UIRegression.app/Frameworks"
 xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3 -isysroot "$sdk" \
   -Wall -Wextra -Werror -fobjc-arc -fblocks -fPIC -O2 -dynamiclib -DNW_UI_TESTING \
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework CoreGraphics -framework SystemConfiguration \
+  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
+  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios16.3-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
@@ -20,6 +20,7 @@ with open(sys.argv[1], 'wb') as f:
     plistlib.dump(dict(CFBundleIdentifier='app.nukewireless.ui-regression', CFBundleName='UIRegression',
         CFBundleExecutable='UIRegression', CFBundlePackageType='APPL', CFBundleVersion='1',
         CFBundleShortVersionString='1', MinimumOSVersion='16.3', UILaunchScreen={},
+        NSBluetoothAlwaysUsageDescription='Scan nearby BLE devices',
         UIApplicationSceneManifest={'UIApplicationSupportsMultipleScenes': False}), f)
 PY
 python3 scripts/language_catalog.py "$out/UIRegression.app"
