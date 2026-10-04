@@ -1,6 +1,7 @@
 # Candidatas de compatibilidad iOS 15–18
 
-La versión funcional instalada sigue siendo dev18. Este port genera **candidatas
+La referencia funcional sigue siendo dev18; dev19 está instalada y sus funciones
+nuevas están pendientes de comprobación. Este port genera **candidatas
 experimentales**, no una afirmación de funcionamiento en dispositivos que no
 se han probado. El único dispositivo disponible es iOS 16.3.1 con Dopamine
 RootHide; no se instala automáticamente este port sobre él.

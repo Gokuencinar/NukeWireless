@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev18`. El usuario confirmó que desapareció la antigua pantalla azul inicial. Conserva la interfaz WiFi, el cambio de idioma y el aviso de copia de datos de red. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
+**Última candidata instalada:** `1.0.25+rh25.5~dev19`, por SSH el 4 de octubre; `dpkg` confirma la instalación. Sus funciones nuevas siguen pendientes de comprobación de uso. La anterior `dev18` fue confirmada por el usuario: desapareció la antigua pantalla azul inicial. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
 
 **Nueva interfaz candidata dev19 / compat2:** panel **Equipos** desde la lupa de Wi-Fi,
 con búsqueda, filtros y ordenación de los resultados existentes. **Información →

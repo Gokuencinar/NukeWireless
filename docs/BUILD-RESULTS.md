@@ -17,7 +17,9 @@
 | Dopamine rootless | `0502c4ce65a1d9df81eadb893e5bb320dc44b0b0a7dd13b27ef777633000ffc7` |
 | Rootful | `232c75e9647b0abb146886dda1365374528267ba35262c9dc4aac246e2333604` |
 
-**Estado funcional:** las nuevas interacciones están pendientes de comprobación en el dispositivo. Compat2 sigue siendo experimental para los otros iOS y bootstraps; sus manifiestos incluyen `runtime_verified: false`. No se instaló por SSH ni se creó release; dev18 permanece en el iPhone. Detalles en [DEVICE-BROWSER.md](DEVICE-BROWSER.md) y [COMPATIBILITY.md](COMPATIBILITY.md).
+**Instalación autorizada:** dev19 instalada por SSH en el iPhone iOS 16.3.1/Dopamine RootHide el 4 de octubre. Se confirmó el hash del archivo transferido antes de instalar; `dpkg -i` terminó con código 0 y `dpkg-query` devuelve `install ok installed 1.0.25+rh25.5~dev19`. Se conservan preferencias mediante actualización del paquete. Respaldo dev18 en el dispositivo: `/var/mobile/Documents/NukeWireless-dev18-backup.deb`; recuperación: `dpkg -i /var/mobile/Documents/NukeWireless-dev18-backup.deb` y cerrar/abrir la app. No se ejecutaron ciclos de bloqueo ni nuevas pruebas de interacción.
+
+**Estado funcional:** las nuevas interacciones están pendientes de comprobación en el dispositivo. Compat2 sigue siendo experimental para los otros iOS y bootstraps; sus manifiestos incluyen `runtime_verified: false`. No se instaló ninguna variante compat2 ni se creó release. Detalles en [DEVICE-BROWSER.md](DEVICE-BROWSER.md) y [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Compatibilidad iOS 15–18 — compat1 (4 de octubre de 2026)
 
