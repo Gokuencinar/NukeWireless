@@ -1558,7 +1558,6 @@ static void hide_info_credits(id root) {
         sel_registerName("addSubview:"), overlay);
 
     Class label_class = objc_getClass("UILabel");
-    Class white_view_class = objc_getClass("UIView");
     struct cg_rect avatar_frame = {{(frame.size.width - 88) / 2, 24}, {88, 88}};
     Class image_view_class = objc_getClass("UIImageView");
     id bundle = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("NSBundle"),
