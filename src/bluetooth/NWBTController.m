@@ -10,6 +10,24 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <mach/mach.h>
+#include <uuid/uuid.h>
+
+// Declarations from Apple IOKitUser/IOKitLib.h and XNU 8792.61.2
+// bsd/skywalk/channel/os_channel.h. BlueTool on 20D67 opens port 0
+// with os_channel_create(uuid, 0), then reads these channel attributes.
+typedef CFMutableDictionaryRef (*NWMatching)(const char *);
+typedef kern_return_t (*NWServices)(mach_port_t, CFDictionaryRef, mach_port_t *);
+typedef mach_port_t (*NWNext)(mach_port_t);
+typedef kern_return_t (*NWIORelease)(mach_port_t);
+typedef CFTypeRef (*NWProperty)(mach_port_t, CFStringRef, CFAllocatorRef, uint32_t);
+typedef CFTypeRef (*NWSearch)(mach_port_t, const char *, CFStringRef, CFAllocatorRef, uint32_t);
+typedef void *(*NWChannelCreate)(const uuid_t, uint32_t);
+typedef void (*NWChannelDestroy)(void *);
+typedef void *(*NWAttrCreate)(void);
+typedef void (*NWAttrDestroy)(void *);
+typedef int (*NWAttrRead)(void *, void *);
+typedef int (*NWAttrGet)(void *, int, uint64_t *);
 
 // Reconstructed from the user's iOS 16.3.1 (20D67) transport code and
 // bluetoothd callsites/block signatures. No ABI fallback on other builds.
@@ -67,6 +85,80 @@ static NSDictionary *requireBluetoothOff(void) {
     if (((BOOL (*)(id, SEL))objc_msgSend)(instance, enabled))
         return failure(@"bluetooth_state", @"Turn Bluetooth off in Settings before using the exclusive transport.");
     return nil;
+}
+
+NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
+    if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
+    NSDictionary *error = requireKnownABI();
+    if (error) return error;
+    error = requireBluetoothOff();
+    if (error) return error;
+    void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY | RTLD_LOCAL);
+    NWMatching matching = (NWMatching)dlsym(iokit, "IOServiceMatching");
+    NWServices services = (NWServices)dlsym(iokit, "IOServiceGetMatchingServices");
+    NWNext next = (NWNext)dlsym(iokit, "IOIteratorNext");
+    NWIORelease release = (NWIORelease)dlsym(iokit, "IOObjectRelease");
+    NWProperty property = (NWProperty)dlsym(iokit, "IORegistryEntryCreateCFProperty");
+    NWSearch search = (NWSearch)dlsym(iokit, "IORegistryEntrySearchCFProperty");
+    NWChannelCreate create = (NWChannelCreate)dlsym(RTLD_DEFAULT, "os_channel_create");
+    NWChannelDestroy destroy = (NWChannelDestroy)dlsym(RTLD_DEFAULT, "os_channel_destroy");
+    NWAttrCreate attrCreate = (NWAttrCreate)dlsym(RTLD_DEFAULT, "os_channel_attr_create");
+    NWAttrDestroy attrDestroy = (NWAttrDestroy)dlsym(RTLD_DEFAULT, "os_channel_attr_destroy");
+    NWAttrRead attrRead = (NWAttrRead)dlsym(RTLD_DEFAULT, "os_channel_read_attr");
+    NWAttrGet attrGet = (NWAttrGet)dlsym(RTLD_DEFAULT, "os_channel_attr_get");
+    if (!iokit || !matching || !services || !next || !release || !property || !search ||
+        !create || !destroy || !attrCreate || !attrDestroy || !attrRead || !attrGet)
+        return failure(@"skywalk_symbols", @"The inspected IOKit/Skywalk interfaces are unavailable.");
+    CFMutableDictionaryRef match = matching("AppleConvergedIPCRTIInterface");
+    if (!match) return failure(@"skywalk_registry", @"The HCI registry matching dictionary could not be created.");
+    mach_port_t iterator = MACH_PORT_NULL;
+    kern_return_t status = services(MACH_PORT_NULL, match, &iterator); // Consumes match.
+    if (status || !iterator) {
+        if (iterator) release(iterator);
+        return failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]);
+    }
+    NSString *identifier = nil;
+    NSUInteger candidates = 0;
+    mach_port_t entry;
+    while (candidates++ < 64 && (entry = next(iterator))) {
+        id protocol = CFBridgingRelease(property(entry, CFSTR("ACIPCInterfaceProtocol"), kCFAllocatorDefault, 0));
+        id transport = CFBridgingRelease(property(entry, CFSTR("ACIPCInterfaceTransport"), kCFAllocatorDefault, 0));
+        if ([protocol isKindOfClass:NSString.class] && [protocol isEqual:@"hci"] &&
+            [transport isKindOfClass:NSString.class] && [transport isEqual:@"skywalk"]) {
+            id value = CFBridgingRelease(search(entry, "IOService", CFSTR("IOSkywalkNexusUUID"), kCFAllocatorDefault, 1));
+            if ([value isKindOfClass:NSString.class]) identifier = value;
+        }
+        release(entry);
+        if (identifier) break;
+    }
+    release(iterator);
+    uuid_t uuid;
+    if (!identifier || uuid_parse(identifier.UTF8String, uuid))
+        return failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface.");
+    errno = 0;
+    void *channel = create(uuid, 0);
+    if (!channel) {
+        int savedErrno = errno;
+        NSMutableDictionary *report = [failure(@"skywalk_open", @"The native HCI Skywalk channel could not be opened.") mutableCopy];
+        report[@"system_errno"] = @(savedErrno);
+        report[@"system_error"] = [NSString stringWithUTF8String:strerror(savedErrno)];
+        return report;
+    }
+    NSDictionary *report;
+    @try {
+        void *attributes = attrCreate();
+        if (!attributes) return failure(@"skywalk_attributes", @"Channel attributes could not be allocated.");
+        @try {
+            uint64_t bytes = 0, txSlots = 0, rxSlots = 0;
+            if (attrRead(channel, attributes) || attrGet(attributes, 4, &bytes) ||
+                attrGet(attributes, 2, &txSlots) || attrGet(attributes, 3, &rxSlots))
+                report = failure(@"skywalk_attributes", @"The channel opened but its attributes could not be read.");
+            else report = @{@"version": NWBT_VERSION, @"stage": @"skywalk_opened",
+                @"slot_buffer_size": @(bytes), @"tx_slots": @(txSlots), @"rx_slots": @(rxSlots),
+                @"local_hci_commands_sent": @0, @"remote_bluetooth_packets_sent": @0, @"l2ping_verified": @NO};
+        } @finally { attrDestroy(attributes); }
+    } @finally { destroy(channel); }
+    return report;
 }
 
 NSDictionary<NSString *, id> *NWBTReadControllerInfo(void) {
