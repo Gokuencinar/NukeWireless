@@ -1,5 +1,24 @@
 # Resultado de la compilación de desarrollo
 
+## Compatibilidad iOS 15–18 — compat1 (4 de octubre de 2026)
+
+- Versión candidata: `1.0.25+rh25.6~compat1`.
+- Código compilado y empaquetador: `fdb29ce`, rama `audit-rh25.5`.
+- [Compilación de compatibilidad](https://github.com/Gokuencinar/NukeWireless/actions/runs/37164463147): `success`. Extensión de interfaz, adaptador recuperado y storyboard compilados para iOS 15.0. No se añadieron ni ejecutaron nuevas pruebas para este port.
+- [Build de desarrollo existente](https://github.com/Gokuencinar/NukeWireless/actions/runs/37164237254): `success` sobre `9f95b9a`; el workflow ya existente ejecutó sus comprobaciones habituales automáticamente.
+- Inspección estática de las tres debs: arquitecturas Debian, prefijos, filtros limitados a la app, scripts de firma, mínimos Mach-O y dependencias enlazadas. Los mínimos reales son 14.1 en el ejecutable conservado, 15.0 en las dos bibliotecas recompiladas, 7.0/9.0 en los auxiliares arm64. No se falsificaron versiones mínimas de las bibliotecas anteriores.
+- El auxiliar conserva la validación completa del padre y recibe una guarda para las dos funciones opcionales antiguas de libjailbreak. Se revisaron sus instrucciones y las entradas importadas de getpid/proc_pidpath/memcmp/getppid.
+- Archivos locales: `dist/compat1/`. Manifiestos adjuntos con hashes del binario, fuentes, base fijada y `runtime_verified: false`.
+
+| Esquema | SHA-256 de la deb |
+| --- | --- |
+| RootHide / Relaxin | `5af674fc87d40330f423e25e8a93cb88226599110baab8a40793ba8455ba876d` |
+| Dopamine rootless | `cad35aceadaf8625898dac7946a8161c0490b21efa54dc481862277462a2c64a` |
+| Rootful | `8c2e823d40b78103b47e1ff7cdc72422d23c812e6abfc4bc88c6050dbd03376a` |
+
+**Límite:** ninguno de estos tres paquetes está instalado o validado funcionalmente. El usuario no dispone de iOS 15, 17 o 18. Dev18 permanece en el iPhone; no se alteró por SSH, no se publicó una release y no se modificó GokuEnREPO. La documentación completa está en [COMPATIBILITY.md](COMPATIBILITY.md).
+
+
 ## Candidata dev18 (4 de octubre de 2026)
 
 - Se localizó `SplashView` en el ejecutable original: carga `AccentColor` y `iconImage`, además de la pantalla de inicio de iOS. Cambiar el storyboard o añadir una cobertura no modificaba esos recursos internos.
