@@ -4,15 +4,24 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Última candidata instalada:** `1.0.25+rh25.5~dev19`, por SSH el 4 de octubre; `dpkg` confirma la instalación y el usuario confirmó que sus funciones funcionan. La anterior `dev18` fue confirmada por el usuario: desapareció la antigua pantalla azul inicial. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
+**Última candidata instalada:** `1.0.25+rh25.5~dev22`, con **Información → Bluetooth**
+para cinco pings clásicos, cancelación y resultados. El módulo separado
+`NukeWireless Bluetooth Bridge` (`0.0.3~app5`) gestiona permisos y recuperación
+del servicio. Ambos paquetes están confirmados por `dpkg` en el iPhone.
+La interfaz y el ciclo completo con auriculares desde el botón todavía requieren
+comprobación en el iPhone. **Dev19 sigue siendo la última versión confirmada por
+el usuario**; su copia se conserva para reversión. El ejecutable original y
+los helpers de red tienen los mismos hashes en dev19 y dev22.
 
 **Bluetooth nativo en investigación:** se ha compilado e instalado una biblioteca
 independiente de inspección en el iPhone XS con iOS 16.3.1 y Dopamine RootHide.
 **L2ping comprobado por SSH:** cinco ecos reales respondidos por los auriculares
 del usuario mediante HCI/ACL Skywalk, con cierre de conexión y restauración del
-servicio Bluetooth. La app continúa en dev19; todavía no tiene botón de ping
-ni gestión autónoma del transporte. Solo se comprobó iPhone XS / iOS 16.3.1 /
-Dopamine RootHide. Véase [evidencias, fuentes y límites](docs/BLUETOOTH-L2PING.md).
+servicio Bluetooth. Dev22 incorpora la interfaz y un runner autónomo, cuyo caso
+de destino apagado y recuperación tras cancelación/SIGKILL se comprobaron por
+SSH. El nuevo botón aún no tiene prueba completa con auriculares. Solo se
+comprobó iPhone XS / iOS 16.3.1 / Dopamine RootHide. Véase
+[evidencias, fuentes y límites](docs/BLUETOOTH-L2PING.md).
 
 **Nueva interfaz candidata dev19 / compat2:** panel **Equipos** desde la lupa de Wi-Fi,
 con búsqueda, filtros y ordenación de los resultados existentes. **Información →

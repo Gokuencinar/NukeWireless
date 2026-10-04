@@ -1,24 +1,29 @@
 # Bluetooth nativo: biblioteca de investigación
 
-**Estado: cinco ecos L2CAP reales enviados y respondidos por unos auriculares
-propios desde el iPhone, con cierre de conexión confirmado y bluetoothd
-restaurado.** La app continúa en dev19, cuyas funciones
-el usuario confirmó. Este paquete independiente no es una nueva versión de la
-app ni añade un botón de ping.
+**Estado: cinco ecos L2CAP reales comprobados por SSH; interfaz Bluetooth
+integrada en dev22 y helper separado con recuperación independiente.** Dev19
+es la última interfaz confirmada por el usuario. La prueba completa del nuevo
+botón con los auriculares y su revisión visual en el iPhone están pendientes.
 
 El alcance solicitado es exclusivamente el Bluetooth del iPhone. No se utiliza
 un adaptador Linux ni un servidor externo. El ping propuesto es un diagnóstico
 finito: cinco solicitudes pequeñas, intervalo de un segundo, timeout por
-respuesta, plazo total y cancelación. La prueba funcional se realizó por SSH;
-la integración y ejecución autónoma desde la interfaz de la app siguen pendientes.
+respuesta, plazo total y cancelación. La primera prueba funcional se realizó
+por SSH. La integración está preparada; los auriculares están apagados durante
+las comprobaciones del nuevo supervisor.
 
 ## Paquete separado
 
 - ID: `com.gokuencinar.nukewireless.bluetooth`.
-- Versión instalada: `0.0.2~probe8`; incluye el motor de eco HCI/ACL.
+- Motor HCI/ACL: `probe8` validó cinco ecos reales.
+- Candidata integrada: app `1.0.25+rh25.5~dev22`, módulo `0.0.3~app5`.
 - Esquema de esta candidata: RootHide; binarios arm64, deployment target iOS 15.
 - Biblioteca: `/usr/lib/NukeBluetoothBridge.dylib`.
 - Inspector: `/usr/bin/nwbt-inspect --inspect`.
+- Helper de la app: `/usr/bin/nwbt-run`; firma y permisos se aplican durante
+  `postinst`. Se comprueba el ejecutable padre bajo el mismo bootstrap antes
+  de elevar los UID de un llamante mobile. Operadores root también pueden
+  ejecutar el diagnóstico.
 - Fuente: [NWBTL2Ping.m](../src/bluetooth/NWBTL2Ping.m),
   [NWBTController.m](../src/bluetooth/NWBTController.m) y
   [NWBTInspector.m](../src/bluetooth/NWBTInspector.m).
@@ -210,10 +215,102 @@ en `0x100061d80`: escribe dos bytes de handle/flags y dos de longitud,
 seguidos del cuerpo, sin prefijo H4. Las constantes HCI y L2CAP se contrastan
 con las cabeceras del protocolo de BlueZ; no se utiliza su transporte Linux.
 
-La cancelación suave, errores de emparejamiento y timeouts tienen código y
-límites, pero esas rutas no están verificadas funcionalmente. Esta prueba
-no valida otros modelos, builds de iOS, jailbreaks ni todos los accesorios.
-La app todavía no enlaza ni invoca este motor y no muestra un botón de ping.
+Esta prueba no valida otros modelos, builds de iOS, jailbreaks ni todos los
+accesorios. Los errores de emparejamiento siguen sin prueba funcional.
+
+## Integración dev22: Información → Bluetooth
+
+La nueva pantalla usa UIKit y los mismos colores de la app. Tiene entrada de
+dirección Bluetooth clásica, instrucciones, confirmación para cinco pings,
+cancelación y resultados individuales con RTT. Los textos se incluyen en
+español e inglés. Recuerda solo la dirección introducida en las preferencias
+locales; el paquete no contiene la dirección de los auriculares del usuario.
+
+El trabajo se ejecuta fuera del hilo principal, en `nwbt-run`. La app no enlaza
+la biblioteca privada Bluetooth: si falta el módulo, muestra un aviso. El
+helper recibe argv validados, sin shell, y comprueba root, ABI y estado apagado.
+Antes de retirar el servicio crea un proceso independiente, espera su señal
+de disponibilidad y lo arma. Ese hijo conserva el bloqueo exclusivo y restaura
+Bluetooth al terminar, al cerrarse el pipe del worker o después de 45 segundos.
+La app cancela al pasar a segundo plano; el hijo de recuperación no depende
+del tiempo de ejecución que iOS conceda a la app.
+
+El helper resuelve `launchctl` y su lock desde su ruta física bajo el bootstrap,
+porque `/bin/launchctl` no existe en el sistema original de este iPhone. Los
+argumentos del bootstrap mantienen el plist original bajo `/rootfs`. No se
+instala un daemon permanente, se escribe firmware ni se modifica bluetoothd.
+
+### Compilaciones e instalación
+
+- App: [Actions 37178460542](https://github.com/Gokuencinar/NukeWireless/actions/runs/37178460542),
+  commit `026aa28`, compilación sin ejecutar tests. Paquete dev20 instalado:
+  `677b283250ae38c5c807ef98e17b082c80ec98007cda3b295da8d22d0e4b4cbf`.
+- Supervisor `app3`: [Actions 37178980756](https://github.com/Gokuencinar/NukeWireless/actions/runs/37178980756),
+  commit `36cdeaa`. Paquete instalado:
+  `dffb58b48cafa7c1e64d99034e23b0f4421aebcaeae02b21424a3101432747bb`.
+- Supervisor `app4`: [Actions 37179266397](https://github.com/Gokuencinar/NukeWireless/actions/runs/37179266397),
+  commit `43a2050`; corrige que una cancelación mostrara un timeout de conexión.
+  SHA-256 del paquete:
+  `47cc36717e6f38084b06f504230931ac2162ef6c62274b06d20e1a2a0ae40cc6`.
+
+El ejecutable de la app, aegis, arp-scan, arpspoof y ambas bibliotecas originales
+de rutas tienen los mismos SHA-256 en dev19 y dev22. Se conservó una copia de
+dev19 en `/var/mobile/Documents/NukeWireless-dev19-backup.deb`.
+
+La candidata final añade sincronización entre la cancelación de la interfaz y
+la recogida del proceso hijo: tras terminar o devolver `ECHILD`, el PID deja de
+ser un destino de señales, también durante el plazo de cancelación. El runner
+restaura `SIGCHLD` antes de crear sus hijos para poder observar su finalización.
+
+Compilaciones finales:
+
+- App `dev22`: [Actions 37180047210](https://github.com/Gokuencinar/NukeWireless/actions/runs/37180047210),
+  commit `79f474f`; compilación sin tests. SHA-256 del paquete:
+  `c580ff135baa5e8ec409fda15fd5a87c4b3d0694985c7615116d822d6b932928`.
+- Módulo `app5`: [Actions 37179650167](https://github.com/Gokuencinar/NukeWireless/actions/runs/37179650167),
+  commit `d142afe`; compilación sin tests. SHA-256 del paquete instalado:
+  `1ce58e94a22448e66d46262c2d2f9938a9fbed9d682f066a4b3bf39e96b86c7c`.
+
+`dpkg-query` confirmó `install ok installed` para app `dev22` y módulo `app5`.
+El primer intento de instalar la app agotó la espera SSH y conservó dev20.
+Se comprobó que no quedaba un proceso dpkg activo; después se repitió con
+`nohup`, salida local y hash del archivo remoto verificado. El registro confirma
+unpack, configure y triggers completos. La instalación ya no depende de que
+SSH conserve abierta su salida. La comprobación posterior volvió a confirmar
+ambas versiones, bluetoothd en estado `running` y ausencia de nuevos registros
+de cierre de la app o sus helpers respecto al inventario previo. La invocación
+desde un shell mobile siguió rechazada por permisos, como se esperaba.
+
+### Comprobaciones sin auriculares encendidos
+
+`app3` se ejecutó mediante SSH con el destino propio autorizado apagado:
+
+- Consulta pasiva: módulo disponible para el modelo y versión inspeccionados.
+- Dirección inválida: rechazada antes de acceso al servicio.
+- Invocación desde un shell mobile: rechazada por la whitelist del padre.
+- Destino apagado: HCI `0x04`, cero ecos enviados y servicio restaurado por el
+  supervisor; `launchctl print` confirmó estado `running`.
+- Cancelación durante el intento: Create Connection Cancel confirmado por
+  el controlador y restauración confirmada. El mensaje incorrecto de timeout
+  detectado en esta prueba motivó `app4`.
+- SIGKILL dirigido exclusivamente al PID del worker: el hijo independiente
+  restauró bluetoothd; el estado `running` se comprobó desde otra sesión SSH.
+
+`app4` confirmó después que la cancelación devuelve `error_code: cancelled`.
+`app5` repitió el caso de accesorio apagado: HCI `0x04`, cero ecos enviados,
+`service_restored: true` y servicio `running` observado desde otra sesión SSH.
+La cancelación en `app5` confirmó Create Connection Cancel, `error_code:
+cancelled`, cero ecos y restauración. Un intento previo agotó la espera de
+salida SSH; el servicio ya estaba de nuevo en ejecución y no había nuevos
+crashes. La repetición con drenaje simultáneo de stdout/stderr terminó con
+JSON completo. No se atribuye ese timeout a una causa confirmada.
+
+No se ha observado todavía la invocación desde el botón real en el iPhone.
+La captura remota de pantalla no estuvo disponible: agotó su plazo de conexión.
+No se instalaron herramientas de depuración ni se cambió Developer Mode para
+suplirla. `uiopen` confirma que la orden de abrir se aceptó; no confirma por sí
+solo la vista mostrada. La prueba visual y los cinco ecos desde la interfaz
+quedan para cuando el usuario regrese y prepare el accesorio.
 
 ## Evidencia de compilación, empaquetado y carga — 4 de octubre de 2026
 
@@ -291,12 +388,13 @@ se inspeccionó mediante `/rootfs`, como documenta
 Los frameworks están en la caché compartida de dyld; que no exista un archivo
 individual en SFTP no significa que el framework no esté disponible.
 
-La ruta Skywalk de apertura/lectura/escritura/cierre y los ecos reales quedaron
-comprobados después de este análisis, en las pruebas `probe7` y `probe8`
-descritas arriba. Continúan pendientes la integración en la app y una gestión
-autónoma de exclusividad/recuperación: actualmente las ejecuta el operador por
-SSH. No debe llamarse `--l2ping` dejando el servicio retirado sin programar
-recuperación independiente antes. El motor no manipula servicios por sí mismo.
+La ruta Skywalk y los ecos reales quedaron comprobados después de este análisis,
+en `probe7` y `probe8`. `nwbt-run` añade gestión autónoma de exclusividad y
+recuperación, comprobada por SSH en el caso negativo y al interrumpir el worker.
+Su invocación desde la interfaz está pendiente de prueba. No debe llamarse
+el inspector crudo `--l2ping` dejando el servicio retirado sin programar
+recuperación independiente antes. El motor de la biblioteca no manipula
+servicios por sí mismo; esa responsabilidad pertenece al runner.
 
 ## Construcción y retirada
 
@@ -321,4 +419,11 @@ Para retirar exclusivamente el módulo:
 dpkg -r com.gokuencinar.nukewireless.bluetooth
 ```
 
-NukeWireless no depende de este paquete de investigación.
+NukeWireless no depende de este paquete de investigación. Para volver a la app
+anterior conservada en este iPhone:
+
+```sh
+dpkg -i /var/mobile/Documents/NukeWireless-dev19-backup.deb
+```
+
+La reversión de la app y la retirada del módulo son operaciones separadas.
