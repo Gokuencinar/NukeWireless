@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/sysctl.h>
+#include <dispatch/dispatch.h>
 
 static BOOL signature(Class cls, SEL selector, BOOL meta, const char *result, const char *argument) {
     Method method = meta ? class_getClassMethod(cls,selector) : class_getInstanceMethod(cls,selector);
@@ -47,7 +48,7 @@ int main(int argc,char **argv) {
     @autoreleasepool {
         BOOL connect=argc==2 && !strcmp(argv[1],"--connect-once");
         if (argc!=1 && !connect) return 2;
-        NSMutableDictionary *report=[@{@"tool":@"NWBTConnectionProbe-1",@"request_submitted":@NO,
+        NSMutableDictionary *report=[@{@"tool":@"NWBTConnectionProbe-2",@"request_submitted":@NO,
             @"connection_requests":@0,@"radio_state_modified":@NO,@"raw_hci_commands":@0,
             @"laptop_disconnection_verified":@NO} mutableCopy];
         @try {
@@ -60,13 +61,25 @@ int main(int argc,char **argv) {
             if (!dlopen("/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager",RTLD_LAZY|RTLD_LOCAL))
                 @throw [NSException exceptionWithName:@"ProbeGuard" reason:@"BluetoothManager unavailable." userInfo:nil];
             Class cls=NSClassFromString(@"BluetoothManager");
+            SEL setQueue=NSSelectorFromString(@"setSharedInstanceQueue:");
+            if (!signature(cls,setQueue,YES,"v","@"))
+                @throw [NSException exceptionWithName:@"ProbeGuard" reason:@"Manager callback queue ABI mismatch." userInfo:nil];
+            // A CLI process has no UIApplication main loop. Service the legacy
+            // manager's asynchronous session callbacks on a dedicated queue.
+            dispatch_queue_t queue=dispatch_queue_create("me.midnightchips.nw.connection-probe",DISPATCH_QUEUE_SERIAL);
+            ((void (*)(id,SEL,id))objc_msgSend)(cls,setQueue,queue);
             SEL shared=NSSelectorFromString(@"sharedInstance");
             if (!signature(cls,shared,YES,"@",NULL))
                 @throw [NSException exceptionWithName:@"ProbeGuard" reason:@"Manager factory ABI mismatch." userInfo:nil];
             id manager=((id (*)(id,SEL))objc_msgSend)(cls,shared);
             if (!manager) @throw [NSException exceptionWithName:@"ProbeGuard" reason:@"Manager unavailable." userInfo:nil];
             pump(3);
+            SEL initError=NSSelectorFromString(@"lastInitError");
+            if (signature(cls,initError,YES,"i",NULL))
+                report[@"manager_init_error"]=@(((int (*)(id,SEL))objc_msgSend)(cls,initError));
+            report[@"manager_available"]=booleanValue(manager,@"available") ?: @NO;
             report[@"bluetooth_enabled"]=booleanValue(manager,@"enabled") ?: @NO;
+            report[@"bluetooth_powered"]=booleanValue(manager,@"powered") ?: @NO;
             id devices=objectValue(manager,@"pairedDevices");
             if (![devices isKindOfClass:NSArray.class])
                 @throw [NSException exceptionWithName:@"ProbeGuard" reason:@"Paired device list unavailable." userInfo:nil];
