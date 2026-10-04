@@ -16,4 +16,6 @@ if __name__ == '__main__':
     report = {'version': '0.0.3~app6', 'target': 'arm64-ios15.0', 'sources': sources(),
               'files': {name: sha((output / name).read_bytes()) for name in ['NukeBluetoothBridge.dylib', 'nwbt-inspect', 'nwbt-run']},
               'l2ping_implemented': True, 'runtime_verified': False}
+    if f'#define NWBT_VERSION @"{report["version"]}"' not in (ROOT / 'src/bluetooth/NWBTBridge.h').read_text():
+        raise ValueError('Bluetooth binary and manifest versions differ')
     (output / 'bluetooth-manifest.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
