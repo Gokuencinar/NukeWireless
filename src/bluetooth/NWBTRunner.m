@@ -154,8 +154,8 @@ static int recover(void) {
     struct pollfd descriptor = {3, POLLIN | POLLHUP, 0}; char byte = 0;
     if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 || byte != 'a') return 0;
     // This child survives app/worker exit and owns the inherited flock until
-    // restoration finishes. EOF, completion or the 60-second limit restores.
-    if (poll(&descriptor, 1, 60000) > 0) read(3, &byte, 1);
+    // restoration finishes. EOF, completion or process termination restores.
+    if (poll(&descriptor, 1, -1) > 0) read(3, &byte, 1);
     BOOL restored = restoreService(); close(3); close(4);
     return restored ? 0 : 1;
 }
@@ -287,7 +287,7 @@ static NSDictionary *runPing(NSString *address, const char *ownPath, NSUInteger 
 }
 
 static BOOL decimalOption(const char *text, NSUInteger *value) {
-    if (!text || !*text || strlen(text) > 4) return NO;
+    if (!text || !*text || strlen(text) > 9) return NO;
     NSUInteger parsed = 0;
     for (const char *p = text; *p; ++p) {
         if (*p < '0' || *p > '9') return NO;
@@ -334,7 +334,8 @@ int main(int argc, char **argv) {
             [address isEqual:@"00:00:00:00:00:00"] || [address.uppercaseString isEqual:@"FF:FF:FF:FF:FF:FF"])
             return printReport(errorReport(@"address"));
         signal(SIGINT, cancelRun); signal(SIGTERM, cancelRun); signal(SIGALRM, cancelRun);
-        alarm(45);
+        unsigned int timeout = (unsigned int)((count * (intervalMS / 1000.0)) + 60);
+        alarm(timeout > 60 ? timeout : 60);
         NSDictionary *report = runPing(address.uppercaseString, ownPath, count, intervalMS);
         alarm(0); return printReport(report);
     }

@@ -25,7 +25,7 @@ static UIBackgroundTaskIdentifier background;
 
 static BOOL numericValue(NSString *text, NSUInteger *result) {
     NSString *value = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    if (!value.length || value.length > 4) return NO;
+    if (!value.length || value.length > 9) return NO;
     NSUInteger number = 0;
     for (NSUInteger i = 0; i < value.length; ++i) {
         unichar digit = [value characterAtIndex:i];
@@ -109,12 +109,23 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     }
     if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) signalChild(child, SIGTERM, YES); }
     NSMutableData *data = [NSMutableData new], *diagnostics = [NSMutableData new]; NSUInteger stderrBytes = 0;
-    double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? 85.0 : 12.0);
+    double estimatedTime = 85.0;
+    if (arguments.count >= 4) {
+        NSUInteger countArg = (NSUInteger)[arguments[2] longLongValue];
+        NSUInteger intervalArg = (NSUInteger)[arguments[3] longLongValue];
+        if ([arguments[0] isEqualToString:@"--ping-ms"]) {
+            estimatedTime = MAX(85.0, (countArg * (double)intervalArg) / 1000.0 + 30.0);
+        } else if ([arguments[0] isEqualToString:@"--ping"]) {
+            estimatedTime = MAX(85.0, countArg * (double)intervalArg + 30.0);
+        }
+    }
+    double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? estimatedTime : 12.0);
     BOOL exited = NO, invalid = NO; int status = 0;
+    const NSUInteger maxDataSize = 10 * 1024 * 1024;
     while (NSProcessInfo.processInfo.systemUptime < deadline) {
         char buffer[2048]; ssize_t count;
         while ((count = read(out[0], buffer, sizeof(buffer))) > 0) {
-            if (data.length + (NSUInteger)count > 65536) { invalid = YES; break; }
+            if (data.length + (NSUInteger)count > maxDataSize) { invalid = YES; break; }
             [data appendBytes:buffer length:(NSUInteger)count];
         }
         while ((count = read(err[0], buffer, sizeof(buffer))) > 0) {
@@ -133,7 +144,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if (!exited) { signalChild(child, SIGKILL, cancellable); while (waitpid(child, &status, 0) < 0 && errno == EINTR) {} }
     }
     char buffer[2048]; ssize_t count;
-    while ((count = read(out[0], buffer, sizeof(buffer))) > 0 && data.length + (NSUInteger)count <= 65536)
+    while ((count = read(out[0], buffer, sizeof(buffer))) > 0 && data.length + (NSUInteger)count <= maxDataSize)
         [data appendBytes:buffer length:(NSUInteger)count];
     close(out[0]); close(err[0]);
     if (cancellable) @synchronized (workerLock) { if (worker == child) worker = 0; }
@@ -155,7 +166,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 @implementation NWBluetoothViewController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
 - (UITextField *)numericField:(NSString *)label value:(NSUInteger)value {
-    UITextField *field = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 90, 44)];
+    UITextField *field = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 140, 44)];
     field.keyboardType = UIKeyboardTypeNumberPad; field.delegate = self;
     field.textAlignment = NSTextAlignmentRight; field.textColor = NWAccentColor();
     field.font = [UIFont monospacedSystemFontOfSize:17 weight:UIFontWeightMedium];
@@ -243,7 +254,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 - (BOOL)textField:(UITextField *)field shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
     if (field == self.address) return YES;
     NSString *value = [field.text stringByReplacingCharactersInRange:range withString:string];
-    if (value.length > (field == self.countField ? 2 : 4)) return NO;
+    if (value.length > 9) return NO;
     for (NSUInteger i = 0; i < value.length; ++i)
         if ([value characterAtIndex:i] < '0' || [value characterAtIndex:i] > '9') return NO;
     return YES;
