@@ -1,5 +1,24 @@
 # Resultado de la compilación de desarrollo
 
+## Buscador, filtros, ordenación y colores — dev19 / compat2 (4 de octubre de 2026)
+
+- Fuente: `7731489`, rama `audit-rh25.5`, subida a `Gokuencinar/NukeWireless`.
+- [Build de desarrollo](https://github.com/Gokuencinar/NukeWireless/actions/runs/37165584419): `success`; extensión arm64/iOS 16.3, storyboard y comprobaciones habituales de navegación del workflow existente. La fixture se mantiene compilable con los dos módulos nuevos y el nuevo número de filas de Info; no se añadieron pruebas nuevas.
+- [Build de compatibilidad](https://github.com/Gokuencinar/NukeWireless/actions/runs/37165584436): `success`; extensión y adaptador recompilados para iOS 15.0, con avisos de disponibilidad como errores.
+- **Wi-Fi → lupa → Equipos:** búsqueda por nombre/IP/MAC/fabricante, filtros de estado almacenado, orden numérico de IP o por nombre/fabricante, prioridad opcional de iPhone/router, copia de IP con aviso. Usa una copia de los resultados existentes; no filtra ni reordena la lista SwiftUI original ni los objetivos de Bloquear todos.
+- **Información → Color de acento:** cian, violeta o verde, persistencia y aplicación inmediata. Los 24 textos nuevos de búsqueda/apariencia están incluidos en los dos idiomas. Se inspeccionó la captura española existente de Info: aparece la nueva fila Color de acento. La fixture no ejercita el panel de Equipos ni demuestra la interacción del selector de colores en el iPhone.
+- Dev19 conserva exactamente los hashes de dev18 del ejecutable (`0736ed1876bcc97992b8379a32008010d2a510d7f1b413ecba96c2abe4fe0f7b`), ambas bibliotecas de rutas, Aegis, arp-scan y arpspoof. El puente solo recibe lectores para la copia de presentación; las funciones existentes de escaneo, bloqueo y desbloqueo no se modifican.
+- Dev19: `dist/com.gokuencinar.nukewireless_1.0.25+rh25.5~dev19_iphoneos-arm64e.deb`, SHA-256 `25f52f5b03ca12d6236ba9d257570e6b91feb842ec21615dda6fd552ac35fd66`.
+- Compat2: tres paquetes en `dist/compat2/`, con los hashes, prefijos, mínimos Mach-O, dependencias y fuentes registrados en sus manifiestos adjuntos.
+
+| Compat2 | SHA-256 de la deb |
+| --- | --- |
+| RootHide / Relaxin | `1afd1751486645726ba1859e33c07fcae423b21056be199f9243fcfefd17a017` |
+| Dopamine rootless | `0502c4ce65a1d9df81eadb893e5bb320dc44b0b0a7dd13b27ef777633000ffc7` |
+| Rootful | `232c75e9647b0abb146886dda1365374528267ba35262c9dc4aac246e2333604` |
+
+**Estado funcional:** las nuevas interacciones están pendientes de comprobación en el dispositivo. Compat2 sigue siendo experimental para los otros iOS y bootstraps; sus manifiestos incluyen `runtime_verified: false`. No se instaló por SSH ni se creó release; dev18 permanece en el iPhone. Detalles en [DEVICE-BROWSER.md](DEVICE-BROWSER.md) y [COMPATIBILITY.md](COMPATIBILITY.md).
+
 ## Compatibilidad iOS 15–18 — compat1 (4 de octubre de 2026)
 
 - Versión candidata: `1.0.25+rh25.6~compat1`.
