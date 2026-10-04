@@ -9,3 +9,8 @@ NSString *NWBulkTitle(void);
 BOOL NWRefreshScan(void);
 void NWConfirmBulk(UIViewController *presenter);
 BOOL NWCanRestartForLanguage(void);
+// Presentation-only copies. Never expose native mutable devices to the browser.
+NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void);
+uint64_t NWDeviceGeneration(void);
+// Read-only existing gateway reader; call off the UI thread.
+NSString *NWReadGatewayAddress(void);

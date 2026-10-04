@@ -26,9 +26,12 @@ de iOS. Relaxin usa la candidata RootHide solo en sus instalaciones RootHide.
 
 ## Qué cambia
 
-- La extensión de interfaz de dev18 se recompila con mínimo iOS 15.0 y avisos
+- La extensión de interfaz se recompila con mínimo iOS 15.0 y avisos
   de disponibilidad tratados como errores. Conserva idioma, Info, copia,
   Actualizar, bloqueo masivo y diseño.
+- `compat1` corresponde a dev18; `compat2` incorpora el panel de búsqueda,
+  filtros, ordenación y los colores de dev19. Sus funciones nuevas se limitan
+  a presentación y preferencias, según [DEVICE-BROWSER.md](DEVICE-BROWSER.md).
 - `src/compat/NWLegacyPaths.c` recupera el adaptador del commit
   `29614397b9b3744f65bfa00aefaa734c3477b9d0` del checkout histórico. El hash de
   su prebuilt coincide **exactamente** con `NukeWirelessPaths.dylib` de rh25.3:

@@ -6,6 +6,12 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 **Última candidata instalada:** `1.0.25+rh25.5~dev18`. El usuario confirmó que desapareció la antigua pantalla azul inicial. Conserva la interfaz WiFi, el cambio de idioma y el aviso de copia de datos de red. El arreglo de SplashView usa el getter negro ya importado por el ejecutable y mantiene el catálogo de recursos original.
 
+**Nueva interfaz candidata dev19 / compat2:** panel **Equipos** desde la lupa de Wi-Fi,
+con búsqueda, filtros y ordenación de los resultados existentes. **Información →
+Color de acento** permite elegir cian, violeta o verde al momento. Los controles
+de escaneo y bloqueo permanecen en la lista original. Véase [uso, alcance y
+límites de comprobación](docs/DEVICE-BROWSER.md).
+
 **Port iOS 15–18 en desarrollo:** se preparan variantes separadas RootHide/Relaxin, Dopamine rootless y rootful. Son candidatas experimentales; no hay dispositivos con iOS 15, 17 o 18 disponibles para confirmarlas. Véase [compatibilidad, procedencia y construcción](docs/COMPATIBILITY.md).
 
 El usuario confirmó el resto de dev14, pero la pantalla azul de carga continuaba. Apartar su caché de SplashBoard tampoco resolvió el problema.

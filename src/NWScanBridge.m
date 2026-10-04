@@ -208,6 +208,40 @@ void NWReconcileDeviceStates(void) {
     for (NSString *ip in known) updateDeviceState(ip);
 }
 BOOL NWBulkBusy(void) { return bulkBusy; }
+NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void) {
+    NSCAssert(NSThread.isMainThread, @"Device presentation copies belong to main");
+    NSMutableArray *snapshot = [NSMutableArray new];
+    for (NSString *ip in devices) {
+        id device = devices[ip];
+        NSMutableDictionary *row = [NSMutableDictionary new];
+        for (NSArray *pair in @[@[@"ip", @"ipAddress"], @[@"name", @"hostname"],
+                               @[@"mac", @"macAddress"], @[@"vendor", @"brand"]]) {
+            id value = readObject(device, pair[1]);
+            row[pair[0]] = [value isKindOfClass:NSString.class] ? [value copy] : @"";
+        }
+        row[@"ip"] = [ip copy];
+        id nickname = readObject(device, @"nickName");
+        if ([nickname isKindOfClass:NSString.class] && [nickname length]) row[@"name"] = [nickname copy];
+        if (![row[@"name"] length]) row[@"name"] = [NSString stringWithFormat:NWText(@"device.fallback"), ip.pathExtension];
+        SEL local = NSSelectorFromString(@"isLocalDevice"); // Same getter already used by targets().
+        row[@"local"] = @([device respondsToSelector:local] && ((BOOL (*)(id, SEL))objc_msgSend)(device, local));
+        row[@"blocked"] = @([bulkOwned containsObject:ip]);
+        [snapshot addObject:[row copy]];
+    }
+    // Stable input order avoids needless table refreshes from dictionary enumeration.
+    [snapshot sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [a[@"ip"] compare:b[@"ip"]];
+    }];
+    return [snapshot copy];
+}
+uint64_t NWDeviceGeneration(void) { return state.generation; }
+NSString *NWReadGatewayAddress(void) {
+    uint32_t gateway = configurationGateway();
+    if (!gateway) return nil;
+    struct in_addr address = {.s_addr = htonl(gateway)};
+    char text[INET_ADDRSTRLEN];
+    return inet_ntop(AF_INET, &address, text, sizeof(text)) ? [NSString stringWithUTF8String:text] : nil;
+}
 static const uint8_t *appExecutableBase(void) {
     for (uint32_t index = 0; index < _dyld_image_count(); index++) {
         const char *path = _dyld_get_image_name(index);

@@ -4,6 +4,8 @@
 #import "NWScanBridge.h"
 #import "NWResources.h"
 #import "NWLanguage.h"
+#import "NWAppearance.h"
+#import "NWDeviceBrowser.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <arpa/inet.h>
@@ -15,47 +17,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev18";
-// Semantic colors keep the restrained blue theme legible in both appearances.
-static UIColor *canvasColor(void) {
-    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
-        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
-            [UIColor colorWithRed:0.025 green:0.045 blue:0.085 alpha:1] :
-            [UIColor colorWithRed:0.94 green:0.96 blue:0.99 alpha:1];
-    }];
-}
-static UIColor *panelColor(void) {
-    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
-        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
-            [UIColor colorWithRed:0.065 green:0.09 blue:0.14 alpha:1] : UIColor.whiteColor;
-    }];
-}
-static UIColor *accentColor(void) {
-    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
-        return traits.userInterfaceStyle == UIUserInterfaceStyleDark ?
-            [UIColor colorWithRed:0.22 green:0.74 blue:1 alpha:1] : UIColor.systemBlueColor;
-    }];
-}
-static void styleCell(UITableViewCell *cell) {
-    UIBackgroundConfiguration *background = UIBackgroundConfiguration.listGroupedCellConfiguration;
-    background.backgroundColor = panelColor();
-    background.strokeColor = [accentColor() colorWithAlphaComponent:0.16];
-    background.strokeWidth = 0.5;
-    cell.backgroundConfiguration = background;
-    cell.tintColor = accentColor();
-}
-static void styleNavigationBar(UINavigationBar *bar) {
-    UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
-    [appearance configureWithDefaultBackground];
-    appearance.backgroundColor = canvasColor();
-    appearance.shadowColor = [accentColor() colorWithAlphaComponent:0.18];
-    appearance.titleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor};
-    appearance.largeTitleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor,
-        NSFontAttributeName:[[UIFontMetrics metricsForTextStyle:UIFontTextStyleLargeTitle] scaledFontForFont:
-            [UIFont systemFontOfSize:34 weight:UIFontWeightBold]]};
-    bar.standardAppearance = appearance; bar.scrollEdgeAppearance = appearance;
-    bar.compactAppearance = appearance; bar.tintColor = accentColor();
-}
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev19";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -70,9 +32,9 @@ static void styleNavigationBar(UINavigationBar *bar) {
     [super traitCollectionDidChange:previous]; [self setNeedsDisplay];
 }
 - (void)drawRect:(CGRect)rect {
-    [canvasColor() setFill]; UIRectFill(rect);
+    [NWCanvasColor() setFill]; UIRectFill(rect);
     CGContextRef context = UIGraphicsGetCurrentContext();
-    CGContextSetStrokeColorWithColor(context, [accentColor() colorWithAlphaComponent:0.055].CGColor);
+    CGContextSetStrokeColorWithColor(context, [NWAccentColor() colorWithAlphaComponent:0.055].CGColor);
     CGContextSetLineWidth(context, 0.5);
     for (CGFloat x = 0; x < self.bounds.size.width; x += 32) {
         CGContextMoveToPoint(context, x, 0); CGContextAddLineToPoint(context, x, self.bounds.size.height);
@@ -86,20 +48,22 @@ static void styleNavigationBar(UINavigationBar *bar) {
 static void styleWiFiCell(UIView *cell) {
     cell.layer.cornerRadius = 12;
     cell.layer.borderWidth = 0.6;
-    cell.layer.borderColor = [accentColor() colorWithAlphaComponent:0.24].CGColor;
-    cell.tintColor = accentColor();
+    cell.layer.borderColor = [NWAccentColor() colorWithAlphaComponent:0.24].CGColor;
+    cell.tintColor = NWAccentColor();
 }
 static void styleWiFiLists(UIView *view) {
     if ([view isKindOfClass:UITableView.class]) {
         UITableView *table = (UITableView *)view;
         if (![table.backgroundView isKindOfClass:NWGridBackground.class]) table.backgroundView = [[NWGridBackground alloc] initWithFrame:table.bounds];
-        table.backgroundColor = canvasColor(); table.tintColor = accentColor();
-        table.separatorColor = [accentColor() colorWithAlphaComponent:0.15];
+        table.backgroundColor = NWCanvasColor(); table.tintColor = NWAccentColor();
+        [table.backgroundView setNeedsDisplay];
+        table.separatorColor = [NWAccentColor() colorWithAlphaComponent:0.15];
         for (UITableViewCell *cell in table.visibleCells) styleWiFiCell(cell);
     } else if ([view isKindOfClass:UICollectionView.class]) {
         UICollectionView *list = (UICollectionView *)view;
         if (![list.backgroundView isKindOfClass:NWGridBackground.class]) list.backgroundView = [[NWGridBackground alloc] initWithFrame:list.bounds];
-        list.backgroundColor = canvasColor(); list.tintColor = accentColor();
+        list.backgroundColor = NWCanvasColor(); list.tintColor = NWAccentColor();
+        [list.backgroundView setNeedsDisplay];
         for (UICollectionViewCell *cell in list.visibleCells) styleWiFiCell(cell);
     }
     for (UIView *child in view.subviews) styleWiFiLists(child);
@@ -228,7 +192,7 @@ static UITableViewCell *textCell(NSString *title, NSString *detail, BOOL link) {
     content.textProperties.adjustsFontForContentSizeCategory = YES;
     content.secondaryTextProperties.adjustsFontForContentSizeCategory = YES;
     cell.contentConfiguration = content;
-    styleCell(cell);
+    NWStyleCell(cell);
     cell.selectionStyle = link ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     return cell;
 }
@@ -239,7 +203,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     UIListContentConfiguration *content = [configuration copy];
     UIImageSymbolConfiguration *iconStyle = [UIImageSymbolConfiguration configurationWithPointSize:19 weight:UIImageSymbolWeightMedium];
     content.image = [UIImage systemImageNamed:symbol withConfiguration:iconStyle];
-    content.imageProperties.tintColor = accentColor();
+    content.imageProperties.tintColor = NWAccentColor();
     content.imageToTextPadding = 14;
     content.secondaryTextProperties.color = UIColor.secondaryLabelColor;
     if (networkValue) {
@@ -257,7 +221,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
 @end
 @implementation NWAdvancedController
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
-- (void)viewDidLoad { [super viewDidLoad]; self.title = NWText(@"advanced.title"); self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 70; self.tableView.backgroundColor = canvasColor(); self.tableView.tintColor = accentColor(); }
+- (void)viewDidLoad { [super viewDidLoad]; self.title = NWText(@"advanced.title"); self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 70; self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor(); }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 2; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : 2; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return NWText(section == 0 ? @"interval.explanation" : @"vendors.explanation"); }
@@ -270,7 +234,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         return cell;
     }
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-    cell.selectionStyle = UITableViewCellSelectionStyleNone; styleCell(cell);
+    cell.selectionStyle = UITableViewCellSelectionStyleNone; NWStyleCell(cell);
     UILabel *label = [UILabel new]; label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody]; label.numberOfLines = 0; label.adjustsFontForContentSizeCategory = YES;
     label.text = [NSString stringWithFormat:NWText(@"interval.value"), NWCurrentPacketInterval()]; self.intervalLabel = label;
     UISlider *slider = [UISlider new]; slider.minimumValue = 0.2; slider.maximumValue = 5; slider.value = (float)NWCurrentPacketInterval(); slider.accessibilityLabel = NWText(@"interval.title");
@@ -312,8 +276,8 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     [super viewDidLoad]; self.title = NWText(@"info.title");
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
     self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
-    self.tableView.backgroundColor = canvasColor();
-    self.tableView.tintColor = accentColor();
+    self.tableView.backgroundColor = NWCanvasColor();
+    self.tableView.tintColor = NWAccentColor();
     self.tableView.sectionHeaderHeight = UITableViewAutomaticDimension;
     self.tableView.sectionFooterHeight = UITableViewAutomaticDimension;
 }
@@ -337,14 +301,14 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     });
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 4 : (section == 2 ? 6 : 1)); }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 5 : (section == 2 ? 6 : 1)); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     (void)table;
     if (index.section == 0) {
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
-        cell.selectionStyle = UITableViewCellSelectionStyleNone; styleCell(cell);
+        cell.selectionStyle = UITableViewCellSelectionStyleNone; NWStyleCell(cell);
         UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
         avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20; avatar.layer.borderWidth = 1; avatar.layer.borderColor = UIColor.separatorColor.CGColor;
         [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:40],[avatar.heightAnchor constraintEqualToConstant:40]]];
@@ -354,15 +318,16 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title")];
-        NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") : nil;
+        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title")];
+        NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") :
+            (index.row == 4 ? NWText([@"appearance." stringByAppendingString:NWAccentName()]) : nil);
         UITableViewCell *cell = textCell(labels[index.row], detail, YES);
-        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe"];
+        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette"];
         decorateCell(cell, symbols[index.row], NO);
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), @"1.0.25+rh25.5~dev18", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev19", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -380,8 +345,10 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
             [UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];
         } else if (index.row == 2) {
             [self.navigationController pushViewController:[NWAdvancedController new] animated:YES];
-        } else {
+        } else if (index.row == 3) {
             [self chooseLanguage];
+        } else if (index.row == 4) {
+            [self.navigationController pushViewController:NWAppearanceSettingsController() animated:YES];
         }
     } else if (index.section == 2) {
         NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -427,15 +394,18 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
 static void (*originalViewWillAppear)(UIViewController *, SEL, BOOL);
 static char baseInsetKey, bulkBoundKey;
-static char infoOverlayKey, refreshItemKey, themedBarKey, themedTabKey;
+static char infoOverlayKey, refreshItemKey, themedBarKey, themedTabKey, browserItemKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
 static BOOL installingUI, layingOut;
 static void updateWiFi(void);
+static void applyAppearance(void);
 @interface NWActions : NSObject
 - (void)refresh:(id)sender;
 - (void)bulk:(id)sender;
 - (void)changed:(NSNotification *)notification;
+- (void)browse:(id)sender;
+- (void)appearanceChanged:(NSNotification *)notification;
 @end
 @implementation NWActions
 - (void)refresh:(id)sender {
@@ -445,6 +415,8 @@ static void updateWiFi(void);
 }
 - (void)bulk:(id)sender { (void)sender; NWConfirmBulk(activeTab.selectedViewController); updateWiFi(); }
 - (void)changed:(NSNotification *)notification { (void)notification; updateWiFi(); }
+- (void)browse:(id)sender { (void)sender; NWPresentDeviceBrowser(activeTab.selectedViewController); }
+- (void)appearanceChanged:(NSNotification *)notification { (void)notification; applyAppearance(); }
 @end
 static NWActions *actions;
 static void (*originalNavigationTitle)(UINavigationItem *, SEL, NSString *);
@@ -477,11 +449,11 @@ static void prepareInfoTab(UITabBarController *tab) {
     UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
     if (!info) {
         info = [[UINavigationController alloc] initWithRootViewController:[NWInfoController new]];
-        styleNavigationBar(info.navigationBar);
+        NWStyleNavigationBar(info.navigationBar);
         // SwiftUI owns the tab hosts and force-casts them during selection.
         // Keep the host identity and attach opaque content before its appearance.
         [host addChildViewController:info];
-        info.view.backgroundColor = canvasColor();
+        info.view.backgroundColor = NWCanvasColor();
         info.view.translatesAutoresizingMaskIntoConstraints = NO;
         [host.view addSubview:info.view];
         [NSLayoutConstraint activateConstraints:@[
@@ -535,11 +507,22 @@ static void updateRefreshItem(UIView *root) {
         NSMutableArray *items = [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray new];
         [items insertObject:refresh atIndex:0]; item.rightBarButtonItems = items;
     }
+    UIBarButtonItem *browser = objc_getAssociatedObject(item, &browserItemKey);
+    if (!browser) {
+        browser = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"magnifyingglass"]
+            style:UIBarButtonItemStylePlain target:actions action:@selector(browse:)];
+        objc_setAssociatedObject(item, &browserItemKey, browser, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![item.rightBarButtonItems containsObject:browser]) {
+        NSMutableArray *items = [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray new];
+        [items addObject:browser]; item.rightBarButtonItems = items;
+    }
+    browser.accessibilityLabel = NWText(@"browser.title"); browser.tintColor = NWAccentColor();
     refresh.enabled = !NWScanBusy() && !NWBulkBusy();
     refresh.accessibilityLabel = NWText(NWScanBusy() ? @"scan.scanning" : @"refresh");
-    refresh.tintColor = accentColor();
+    refresh.tintColor = NWAccentColor();
     if (!objc_getAssociatedObject(bar, &themedBarKey)) {
-        styleNavigationBar(bar);
+        NWStyleNavigationBar(bar);
         objc_setAssociatedObject(bar, &themedBarKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     [[root viewWithTag:refreshTag] removeFromSuperview];
@@ -563,9 +546,9 @@ static void updateWiFi(void) {
     }
     if (bulkButton && !bulkPanel.hidden && !bulkButton.hidden) {
         if (bulkPanel != bulkButton) {
-            bulkPanel.backgroundColor = panelColor(); bulkPanel.layer.cornerRadius = 18;
+            bulkPanel.backgroundColor = NWPanelColor(); bulkPanel.layer.cornerRadius = 18;
             bulkPanel.layer.borderWidth = 0.7;
-            bulkPanel.layer.borderColor = [accentColor() colorWithAlphaComponent:0.3].CGColor;
+            bulkPanel.layer.borderColor = [NWAccentColor() colorWithAlphaComponent:0.3].CGColor;
         }
         bulkButton.layer.cornerRadius = 12;
         for (UIView *child in bulkPanel.subviews) {
@@ -575,7 +558,7 @@ static void updateWiFi(void) {
             } else if ([child isKindOfClass:UIButton.class] && child != bulkButton) {
                 UIButton *names = (UIButton *)child;
                 names.layer.cornerRadius = 12; names.layer.borderWidth = 0.7;
-                names.layer.borderColor = [accentColor() colorWithAlphaComponent:0.35].CGColor;
+                names.layer.borderColor = [NWAccentColor() colorWithAlphaComponent:0.35].CGColor;
                 if (![names.currentTitle isEqualToString:NWText(@"device.names")]) [names setTitle:NWText(@"device.names") forState:UIControlStateNormal];
             }
         }
@@ -626,14 +609,39 @@ static void installUI(UIViewController *controller) {
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
         UITabBarAppearance *appearance = [UITabBarAppearance new];
         [appearance configureWithDefaultBackground];
-        appearance.backgroundColor = canvasColor();
-        appearance.shadowColor = [accentColor() colorWithAlphaComponent:0.18];
+        appearance.backgroundColor = NWCanvasColor();
+        appearance.shadowColor = [NWAccentColor() colorWithAlphaComponent:0.18];
         tab.tabBar.standardAppearance = appearance; tab.tabBar.scrollEdgeAppearance = appearance;
-        tab.tabBar.tintColor = accentColor();
+        tab.tabBar.tintColor = NWAccentColor();
         objc_setAssociatedObject(tab.tabBar, &themedTabKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     installingUI = NO;
     updateWiFi();
+}
+static void applyAppearance(void) {
+    UITabBarController *tab = activeTab;
+    if (!tab.isViewLoaded) return;
+    tab.view.tintColor = NWAccentColor();
+    objc_setAssociatedObject(tab.tabBar, &themedTabKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    UINavigationBar *wifiBar = wifiNavigationBar(tab.viewControllers.firstObject.view);
+    if (wifiBar) {
+        NWStyleNavigationBar(wifiBar);
+        objc_setAssociatedObject(wifiBar, &themedBarKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UIViewController *host in tab.viewControllers) {
+        UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
+        if (!info) continue;
+        NWStyleNavigationBar(info.navigationBar);
+        info.view.backgroundColor = NWCanvasColor();
+        for (UIViewController *controller in info.viewControllers) {
+            if (!controller.isViewLoaded || ![controller isKindOfClass:UITableViewController.class]) continue;
+            UITableView *table = ((UITableViewController *)controller).tableView;
+            table.backgroundColor = NWCanvasColor(); table.tintColor = NWAccentColor();
+            CGPoint position = table.contentOffset;
+            [UIView performWithoutAnimation:^{ [table reloadData]; [table layoutIfNeeded]; table.contentOffset = position; }];
+        }
+    }
+    installUI(tab);
 }
 static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
@@ -645,13 +653,14 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev18 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev19 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(changed:) name:NWStateChanged object:nil];
+        [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(appearanceChanged:) name:NWAppearanceChanged object:nil];
         Method method = class_getInstanceMethod(UIViewController.class,@selector(viewDidAppear:));
         originalViewDidAppear = (void *)method_setImplementation(method,(IMP)appeared);
         method = class_getInstanceMethod(UIViewController.class,@selector(viewWillAppear:));
@@ -663,7 +672,7 @@ __attribute__((constructor)) static void installExtension(void) {
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
             if (activeTab.selectedIndex == 0 && activeTab.view.window) {
-                NWReconcileDeviceStates(); updateWiFi();
+                NWReconcileDeviceStates(); updateWiFi(); NWRefreshVisibleDeviceBrowser();
             }
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -709,7 +718,7 @@ int NWUIRegressionCheck(int phase) {
         if (!info || info.parentViewController != host || !info.view.window) return 6;
         if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
         NWInfoController *content = (NWInfoController *)info.topViewController;
-        if ([content tableView:content.tableView numberOfRowsInSection:1] != 4) return 8;
+        if ([content tableView:content.tableView numberOfRowsInSection:1] != 5) return 8;
         for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
         [host.view layoutIfNeeded];
         if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;

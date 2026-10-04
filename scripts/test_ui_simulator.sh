@@ -10,7 +10,7 @@ xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
+  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios16.3-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"

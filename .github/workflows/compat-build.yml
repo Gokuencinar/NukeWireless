@@ -3,7 +3,11 @@ on:
   push:
     branches: [audit-rh25.5]
     paths:
-      - 'src/compat/**'
+      - 'src/**'
+      - 'resources/**'
+      - 'scripts/build_extension.sh'
+      - 'scripts/build_manifest.py'
+      - 'scripts/startup_resources.py'
       - 'scripts/build_compat*'
       - 'scripts/compat_*'
       - '.github/workflows/compat-build.yml'

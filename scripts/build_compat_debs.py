@@ -15,7 +15,7 @@ from compat_manifest import compat_sources
 from compat_macho import compatible_aegis, inspect, thin_arm64
 from package_utils import directory, regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "1.0.25+rh25.6~compat1"
+VERSION = "1.0.25+rh25.6~compat2"
 SCHEMES = {
     "roothide": ("", "usr/lib/TweakInject", "iphoneos-arm64e", "Dopamine RootHide / Relaxin"),
     "rootless": ("var/jb/", "Library/MobileSubstrate/DynamicLibraries", "iphoneos-arm64", "Dopamine rootless"),
@@ -74,7 +74,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.1", MinimumOSVersion="15.0")
+    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.2", MinimumOSVersion="15.0")
     replacement = {
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
@@ -105,7 +105,7 @@ def package(scheme, core, artifact, output):
               "runtime_verified": False, "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
               "core": core_manifest, "baseline_sha256": EXPECTED_SOURCE_SHA256,
-              "dev18_core_sha256": sha(core)}
+              "development_core_sha256": sha(core)}
     status_path = prefix + "usr/share/nukewireless-roothide/compatibility.json"
     final.append(regular(status_path, (json.dumps(report, indent=2) + "\n").encode()))
     predepends = "Pre-Depends: rootless-compat (>= 0.9)\n" if scheme == "roothide" else ""
@@ -135,10 +135,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat1")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat2")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
-    # The proven dev18 resource/Swift patches remain guarded in the original builder.
+    # The guarded startup resource/Swift patches remain guarded in the original builder.
     with tempfile.TemporaryDirectory(prefix="nuke-compat-", dir=ROOT / "work") as temporary:
         staged = Path(temporary) / "core.deb"
         build(args.baseline, args.artifact, staged)
