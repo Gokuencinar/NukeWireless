@@ -52,7 +52,7 @@ NSDictionary<NSString *, id> *NWBTCopyTransportCode(void) {
                         if (pointer >= base && pointer - base < section->size)
                             exports[name] = @(section->addr + pointer - base);
                     }
-                    return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": @"0.0.1~inspect2",
+                    return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": NWBT_VERSION,
                         @"image": image.dli_fname ? [NSString stringWithUTF8String:image.dli_fname] : @"unknown",
                         @"section": @"__TEXT.__text", @"virtual_address": @(section->addr),
                         @"size": @(section->size), @"exports": exports,
@@ -127,7 +127,7 @@ NSDictionary<NSString *, id> *NWBTInspectTransport(void) {
             return [a[@"class"] compare:b[@"class"]];
         }];
         NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
-        return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": @"0.0.1~inspect2",
+        return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": NWBT_VERSION,
             @"ios": [NSString stringWithFormat:@"%ld.%ld.%ld", (long)os.majorVersion, (long)os.minorVersion, (long)os.patchVersion],
             @"machine": machine(), @"libraries": libraries, @"method_metadata": metadata,
             @"l2ping_implemented": @NO, @"bluetooth_packets_sent": @0};

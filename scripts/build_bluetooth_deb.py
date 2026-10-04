@@ -8,13 +8,17 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.1~inspect2'
+VERSION = '0.0.2~probe1'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
     'com.apple.private.security.no-sandbox': True,
     'com.apple.private.security.storage.AppBundles': True,
     'com.apple.private.security.storage.AppDataContainers': True,
+    'com.apple.driver.AppleBluetoothModule.user-access': True,
+    'com.apple.driver.AppleConvergedIPC.user-access': True,
+    'com.apple.security.exception.iokit-user-client-class': [
+        'AppleBTHciUC', 'AppleBTMgmtUC', 'AppleConvergedIPCUserClient'],
 }
 
 def inspect_tool(data):
@@ -53,14 +57,14 @@ def build(artifact, output):
         if sha(data) != report['files'][name]: raise ValueError('artifact hash mismatch')
         report[name + '_macho'] = inspect(data) if name.endswith('.dylib') else inspect_tool(data)
     control = f'''Package: com.gokuencinar.nukewireless.bluetooth
-Name: NukeWireless Bluetooth Bridge (Inspection)
+Name: NukeWireless Bluetooth Bridge (Research)
 Version: {PACKAGE_VERSION}
 Architecture: iphoneos-arm64e
 Section: Development
 Maintainer: Gokuencinar
 Author: Gokuencinar
 Depends: firmware (>= 15.0), firmware (<< 19.0), rootless-compat, ldid
-Description: Read-only Bluetooth transport inspection library for NukeWireless research. Does not implement l2ping or send Bluetooth packets.
+Description: Experimental Bluetooth transport research for NukeWireless. Exclusive local controller diagnostic on the inspected iPhone XS / iOS 16.3.1. Does not implement l2ping or connect to remote Bluetooth devices.
 '''.encode()
     postinst = b'''#!/bin/sh
 set -e
@@ -73,7 +77,7 @@ exit 0
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'Run nwbt-inspect --inspect over SSH. This research module only reports available libraries and method metadata. It does not implement l2ping, open driver transports, connect to Bluetooth devices or send Bluetooth packets. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'Run nwbt-inspect --inspect over SSH for passive inspection. nwbt-inspect --controller-info --exclusive requires Bluetooth off in Settings and reads the local controller version only, with an exact inspected ABI guard. Does not implement l2ping or connect to remote Bluetooth devices. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pack_ar([('debian-binary', b'2.0\n'),
         ('control.tar.gz', tar_bytes([regular('control', control), regular('postinst', postinst, 0o755)])),
