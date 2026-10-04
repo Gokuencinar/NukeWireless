@@ -7,7 +7,7 @@ sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 -fPIC -dynamiclib \
   -framework Foundation -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeBluetoothBridge.dylib \
-  src/bluetooth/NWBTBridge.m src/bluetooth/NWBTController.m -o "$out/NukeBluetoothBridge.dylib"
+  src/bluetooth/NWBTBridge.m src/bluetooth/NWBTController.m src/bluetooth/NWBTL2Ping.m -o "$out/NukeBluetoothBridge.dylib"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 \
   -framework Foundation -framework OSLog -Wl,-fatal_warnings -Wl,-rpath,@executable_path/../lib \

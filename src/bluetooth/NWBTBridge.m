@@ -144,6 +144,6 @@ NSDictionary<NSString *, id> *NWBTInspectTransport(void) {
         return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": NWBT_VERSION,
             @"ios": [NSString stringWithFormat:@"%ld.%ld.%ld", (long)os.majorVersion, (long)os.minorVersion, (long)os.patchVersion],
             @"machine": machine(), @"libraries": libraries, @"method_metadata": metadata,
-            @"l2ping_implemented": @NO, @"bluetooth_packets_sent": @0};
+            @"l2ping_implemented": @YES, @"l2ping_verified": @NO, @"bluetooth_packets_sent": @0};
     }
 }

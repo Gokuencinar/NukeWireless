@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.2~probe7"
+#define NWBT_VERSION @"0.0.2~probe8"
 
-// Capability inspection only. This version does not send Bluetooth packets.
+// Passive capability inspection; this entry point sends no Bluetooth packets.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTInspectTransport(void);
 // Read-only snapshot of the loaded Apple transport's code for ABI analysis.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTCopyTransportCode(void);
@@ -12,3 +12,6 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadControllerInfo(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTOpenSkywalk(void);
 // Submits one standard local version query through the inspected HCI Skywalk ring.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadSkywalkController(void);
+// Experimental, bounded five-echo diagnostic on the exact inspected device.
+// Requires exclusive HCI/ACL ownership; never stops system services itself.
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTL2Ping(NSString *destination);

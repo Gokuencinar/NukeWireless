@@ -1,24 +1,36 @@
 #import "NWBTBridge.h"
+#import "NWBTNative.h"
 #import <OSLog/OSLog.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 
+static void cancelPing(int signalNumber) {
+    if (NWBTCancelled) _exit(128 + signalNumber);
+    NWBTCancelled = 1;
+    alarm(3); // Allow bounded link cleanup, then force termination if stalled.
+}
+
 int main(int argc, char *argv[]) {
     @autoreleasepool {
+        BOOL ping = argc == 4 && !strcmp(argv[1], "--l2ping") && !strcmp(argv[3], "--exclusive");
         BOOL skywalk = argc == 3 && !strcmp(argv[1], "--skywalk-open") && !strcmp(argv[2], "--exclusive");
         BOOL skywalkInfo = argc == 3 && !strcmp(argv[1], "--skywalk-info") && !strcmp(argv[2], "--exclusive");
-        BOOL controller = skywalk || skywalkInfo || (argc == 3 && !strcmp(argv[1], "--controller-info") && !strcmp(argv[2], "--exclusive"));
+        BOOL controller = ping || skywalk || skywalkInfo || (argc == 3 && !strcmp(argv[1], "--controller-info") && !strcmp(argv[2], "--exclusive"));
         if (!controller && (argc != 2 || (strcmp(argv[1], "--inspect") && strcmp(argv[1], "--transport-code")))) {
-            fputs("Usage: nwbt-inspect --inspect | --transport-code | --controller-info --exclusive | --skywalk-open --exclusive | --skywalk-info --exclusive\nExclusive diagnostics require Bluetooth off in Settings. No remote Bluetooth packets are sent.\n", stderr);
+            fputs("Usage: nwbt-inspect --inspect | --transport-code | --controller-info --exclusive | --skywalk-open --exclusive | --skywalk-info --exclusive | --l2ping ADDRESS --exclusive\nExclusive access requires Bluetooth off in Settings. Only --l2ping connects to a remote target (five bounded echoes).\n", stderr);
             return 64;
         }
         NSError *error = nil;
         if (controller) alarm(20); // Bound a stalled private driver call to this helper process.
+        if (ping) {
+            signal(SIGINT, cancelPing); signal(SIGTERM, cancelPing); signal(SIGALRM, cancelPing);
+            alarm(23);
+        }
         if (controller) fputs("NWBT phase: diagnostic started\n", stderr);
         NSDate *start = [NSDate dateWithTimeIntervalSinceNow:-1.0];
-        NSDictionary *report = skywalkInfo ? NWBTReadSkywalkController() : skywalk ? NWBTOpenSkywalk() : controller ? NWBTReadControllerInfo() :
+        NSDictionary *report = ping ? NWBTL2Ping([NSString stringWithUTF8String:argv[2]]) : skywalkInfo ? NWBTReadSkywalkController() : skywalk ? NWBTOpenSkywalk() : controller ? NWBTReadControllerInfo() :
             (!strcmp(argv[1], "--transport-code") ? NWBTCopyTransportCode() : NWBTInspectTransport());
         if (controller) fputs("NWBT phase: diagnostic returned\n", stderr);
         const char *collectLogs = getenv("NWBT_PROCESS_LOGS");

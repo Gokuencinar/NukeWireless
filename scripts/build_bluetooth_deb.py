@@ -8,7 +8,7 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.2~probe7'
+VERSION = '0.0.2~probe8'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -64,7 +64,7 @@ Section: Development
 Maintainer: Gokuencinar
 Author: Gokuencinar
 Depends: firmware (>= 15.0), firmware (<< 19.0), rootless-compat, ldid
-Description: Experimental Bluetooth transport research for NukeWireless. Exclusive local controller diagnostic on the inspected iPhone XS / iOS 16.3.1. Does not implement l2ping or connect to remote Bluetooth devices.
+Description: Experimental Bluetooth transport research for NukeWireless. Bounded five-echo L2CAP diagnostic restricted to the inspected iPhone XS / iOS 16.3.1. Requires exclusive transport ownership and external service recovery. Runtime verification pending.
 '''.encode()
     postinst = b'''#!/bin/sh
 set -e
@@ -77,7 +77,7 @@ exit 0
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'Run nwbt-inspect --inspect over SSH for passive inspection. nwbt-inspect --controller-info --exclusive requires Bluetooth off in Settings and reads the local controller version only, with an exact inspected ABI guard. Does not implement l2ping or connect to remote Bluetooth devices. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'Run nwbt-inspect --inspect for passive inspection. Experimental nwbt-inspect --l2ping ADDRESS --exclusive submits five small echoes. Only iPhone XS / iOS 16.3.1 is admitted. Bluetooth must be off in Settings, HCI/ACL ownership exclusive, and independent service recovery scheduled by the operator. No service manipulation or app injection in this library. Runtime verification pending. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pack_ar([('debian-binary', b'2.0\n'),
         ('control.tar.gz', tar_bytes([regular('control', control), regular('postinst', postinst, 0o755)])),

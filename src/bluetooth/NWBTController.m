@@ -1,4 +1,5 @@
 #import "NWBTBridge.h"
+#import "NWBTNative.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <CommonCrypto/CommonDigest.h>
@@ -195,7 +196,7 @@ static NSDictionary *skywalkVersion(void *channel, uint64_t capacity) {
     return details;
 }
 
-static NSDictionary *skywalkDiagnostic(BOOL queryController) {
+NSDictionary *NWBTNativeGuard(void) {
     if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
     fputs("NWBT phase: ABI guard\n", stderr);
     NSDictionary *error = requireKnownABI();
@@ -203,6 +204,12 @@ static NSDictionary *skywalkDiagnostic(BOOL queryController) {
     fputs("NWBT phase: Bluetooth state\n", stderr);
     error = requireBluetoothOff();
     if (error) return error;
+    return nil;
+}
+
+static void *nativeOpenFailure(NSDictionary **error, NSDictionary *report) { *error = report; return NULL; }
+
+void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary **error) {
     fputs("NWBT phase: registry lookup\n", stderr);
     void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY | RTLD_LOCAL);
     NWMatching matching = (NWMatching)dlsym(iokit, "IOServiceMatching");
@@ -219,14 +226,14 @@ static NSDictionary *skywalkDiagnostic(BOOL queryController) {
     NWAttrGet attrGet = (NWAttrGet)dlsym(RTLD_DEFAULT, "os_channel_attr_get");
     if (!iokit || !matching || !services || !next || !release || !property || !search ||
         !create || !destroy || !attrCreate || !attrDestroy || !attrRead || !attrGet)
-        return failure(@"skywalk_symbols", @"The inspected IOKit/Skywalk interfaces are unavailable.");
+        return nativeOpenFailure(error, failure(@"skywalk_symbols", @"The inspected IOKit/Skywalk interfaces are unavailable."));
     CFMutableDictionaryRef match = matching("AppleConvergedIPCRTIInterface");
-    if (!match) return failure(@"skywalk_registry", @"The HCI registry matching dictionary could not be created.");
+    if (!match) return nativeOpenFailure(error, failure(@"skywalk_registry", @"The HCI registry matching dictionary could not be created."));
     mach_port_t iterator = MACH_PORT_NULL;
     kern_return_t status = services(MACH_PORT_NULL, match, &iterator); // Consumes match.
     if (status || !iterator) {
         if (iterator) release(iterator);
-        return failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]);
+        return nativeOpenFailure(error, failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]));
     }
     NSString *identifier = nil;
     NSUInteger candidates = 0;
@@ -234,7 +241,7 @@ static NSDictionary *skywalkDiagnostic(BOOL queryController) {
     while (candidates++ < 64 && (entry = next(iterator))) {
         id protocol = CFBridgingRelease(property(entry, CFSTR("ACIPCInterfaceProtocol"), kCFAllocatorDefault, 0));
         id transport = CFBridgingRelease(property(entry, CFSTR("ACIPCInterfaceTransport"), kCFAllocatorDefault, 0));
-        if ([protocol isKindOfClass:NSString.class] && [protocol isEqual:@"hci"] &&
+        if ([protocol isKindOfClass:NSString.class] && [protocol isEqual:wanted] &&
             [transport isKindOfClass:NSString.class] && [transport isEqual:@"skywalk"]) {
             id value = CFBridgingRelease(search(entry, "IOService", CFSTR("IOSkywalkNexusUUID"), kCFAllocatorDefault, 1));
             if ([value isKindOfClass:NSString.class]) identifier = value;
@@ -245,7 +252,7 @@ static NSDictionary *skywalkDiagnostic(BOOL queryController) {
     release(iterator);
     uuid_t uuid;
     if (!identifier || uuid_parse(identifier.UTF8String, uuid))
-        return failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface.");
+        return nativeOpenFailure(error, failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface."));
     errno = 0;
     fputs("NWBT phase: channel open\n", stderr);
     void *channel = create(uuid, 0);
@@ -255,24 +262,36 @@ static NSDictionary *skywalkDiagnostic(BOOL queryController) {
         NSMutableDictionary *report = [failure(@"skywalk_open", @"The native HCI Skywalk channel could not be opened.") mutableCopy];
         report[@"system_errno"] = @(savedErrno);
         report[@"system_error"] = [NSString stringWithUTF8String:strerror(savedErrno)];
-        return report;
+        *error = report; return NULL;
     }
-    NSDictionary *report;
+    void *attributes = attrCreate();
+    if (!attributes) { destroy(channel); return nativeOpenFailure(error, failure(@"skywalk_attributes", @"No channel attributes.")); }
+    uint64_t bytes = 0;
+    int result = attrRead(channel, attributes) || attrGet(attributes, 4, &bytes);
+    attrDestroy(attributes);
+    if (result || bytes < 20 || bytes > UINT16_MAX) {
+        destroy(channel); return nativeOpenFailure(error, failure(@"skywalk_attributes", @"Invalid channel capacity."));
+    }
+    *capacity = bytes;
+    return channel;
+}
+
+void NWBTCloseNativeChannel(void *channel) {
+    NWChannelDestroy destroy = (NWChannelDestroy)dlsym(RTLD_DEFAULT, "os_channel_destroy");
+    if (channel && destroy) destroy(channel);
+}
+
+static NSDictionary *skywalkDiagnostic(BOOL queryController) {
+    NSDictionary *error = NWBTNativeGuard();
+    if (error) return error;
+    uint64_t capacity = 0;
+    void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    if (!channel) return error;
     @try {
-        void *attributes = attrCreate();
-        if (!attributes) return failure(@"skywalk_attributes", @"Channel attributes could not be allocated.");
-        @try {
-            uint64_t bytes = 0, txSlots = 0, rxSlots = 0;
-            if (attrRead(channel, attributes) || attrGet(attributes, 4, &bytes) ||
-                attrGet(attributes, 2, &txSlots) || attrGet(attributes, 3, &rxSlots))
-                report = failure(@"skywalk_attributes", @"The channel opened but its attributes could not be read.");
-            else if (queryController) report = skywalkVersion(channel, bytes);
-            else report = @{@"version": NWBT_VERSION, @"stage": @"skywalk_opened",
-                @"slot_buffer_size": @(bytes), @"tx_slots": @(txSlots), @"rx_slots": @(rxSlots),
-                @"local_hci_commands_sent": @0, @"remote_bluetooth_packets_sent": @0, @"l2ping_verified": @NO};
-        } @finally { attrDestroy(attributes); }
-    } @finally { destroy(channel); }
-    return report;
+        return queryController ? skywalkVersion(channel, capacity) :
+            @{@"version": NWBT_VERSION, @"stage": @"skywalk_opened", @"slot_buffer_size": @(capacity),
+              @"remote_bluetooth_packets_sent": @0, @"l2ping_verified": @NO};
+    } @finally { NWBTCloseNativeChannel(channel); }
 }
 
 NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) { return skywalkDiagnostic(NO); }
