@@ -27,9 +27,18 @@ admite opciones: con app8 conserva el diagnóstico predeterminado y pide
 actualizar el módulo para utilizar una selección distinta. Textos en español
 e inglés; resultados persistentes con número solicitado e intervalo.
 
-Estado de esta ampliación: implementación candidata, sin instalación ni prueba
-funcional en el iPhone. Las evidencias de dev23/app8 descritas abajo corresponden
-al diagnóstico original de cinco pings.
+Estado de esta ampliación: ambos paquetes compilados e inspeccionados, sin
+instalación ni prueba funcional en el iPhone. Las evidencias de dev23/app8
+descritas abajo corresponden al diagnóstico original de cinco pings.
+
+- App dev24: compilación `37202560686`, commit `3901926`, SHA-256 del `.deb`
+  `bc31460ef154a822a2b355d93249710151ac3d906ce4e6a62070a7147e29df66`.
+- Módulo app9: compilación `37202623622`, commit `e097884`, SHA-256 del `.deb`
+  `701890dae293d1ed49691ea146bcd8ba1a2f2e4e27054d179f11afc0b6687199`.
+- Comparación de paquetes: solo cambian metadatos de versión, traducciones y
+  el adaptador UIKit. Ejecutable original, dos bibliotecas de rutas, `aegis`,
+  `arp-scan` y `arpspoof` mantienen exactamente los bytes de dev23.
+- Para revertir esta ampliación: reinstalar los paquetes dev23 y app8.
 
 **Estado: cinco ecos L2CAP reales comprobados por SSH; interfaz Bluetooth
 integrada en dev23 y helper separado con recuperación independiente.** Dev19
