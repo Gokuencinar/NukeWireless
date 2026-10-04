@@ -52,6 +52,14 @@ int main(void) {
         offset+=data[offset]+1;
     }
     assert(swiftSections==1);
+    n=NWBTLabApplePairingData(data);
+    assert(n==35 && data[3]==31 && data[0]==NWBT_LAB_HANDLE);
+    // Exactly one well-formed manufacturer section fills the legacy AD budget.
+    assert(data[4]+1==31 && data[5]==0xff && data[6]==0x4c && data[7]==0);
+    assert(data[8]==7 && data[9]==25 && (size_t)data[9]+10==n);
+    assert(data[10]==7 && (data[11] | data[12]<<8)==0x200e);
+    uint8_t appleCopy[35]; memcpy(appleCopy,data,sizeof data);
+    assert(NWBTLabApplePairingData(data)==35 && !memcmp(data,appleCopy,sizeof data));
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
     assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);

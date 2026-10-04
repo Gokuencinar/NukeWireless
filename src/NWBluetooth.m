@@ -26,7 +26,7 @@ static NSDictionary *lastReport;
 static BOOL readingLE;
 static BOOL labRunning;
 static BOOL labOperation(NSString *operation) {
-    return [operation isEqual:@"le_advertising_test"] || [operation isEqual:@"le_manufacturer_test"] || [operation isEqual:@"le_rotation_test"] || [operation isEqual:@"le_swift_pair_test"];
+    return [operation isEqual:@"le_advertising_test"] || [operation isEqual:@"le_manufacturer_test"] || [operation isEqual:@"le_rotation_test"] || [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"];
 }
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
@@ -363,7 +363,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 0) return 7;
+    (void)table; if (section == 0) return 8;
     if (section == 2) return 2;
     if (section == 3) return busy ? 2 : 1;
     if (section == 4) return 1 + reportRows(lastReport).count;
@@ -381,7 +381,14 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (index.section == 0 && index.row == 6) {
+    if (index.section == 0 && index.row == 7) {
+        content.text = NWText(@"bt.lab.apple_title");
+        content.secondaryText = NWText(@"bt.lab.apple_menu");
+        content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
+        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
+            [self.capabilities[@"supports_le_apple_pairing_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+        content.textProperties.color = NWAccentColor();
+    } else if (index.section == 0 && index.row == 6) {
         content.text = NWText(@"bt.lab.swift_title");
         content.secondaryText = NWText(@"bt.lab.swift_menu");
         content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
@@ -453,6 +460,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if ([lastReport[@"operation"] isEqual:@"le_advertising_test"]) [details addObject:NWText(@"bt.lab.receiver")];
         if ([lastReport[@"operation"] isEqual:@"le_manufacturer_test"]) [details addObject:NWText(@"bt.lab.manufacturer_receiver")];
         if ([lastReport[@"operation"] isEqual:@"le_swift_pair_test"]) [details addObject:NWText(@"bt.lab.swift_receiver")];
+        if ([lastReport[@"operation"] isEqual:@"le_apple_pairing_test"]) [details addObject:NWText(@"bt.lab.apple_receiver")];
         if ([lastReport[@"operation"] isEqual:@"le_rotation_test"]) {
             [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.rotation_count"),
                 [lastReport[@"acknowledged_sequence_count"] unsignedIntegerValue]]];
@@ -511,6 +519,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     if (index.section == 0 && index.row == 6) {
         if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_swift_pair_test"] boolValue])
             [self runArguments:@[@"--le-swift-pair-test"] operation:@"le_swift_pair_test"];
+        return;
+    }
+    if (index.section == 0 && index.row == 7) {
+        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_apple_pairing_test"] boolValue])
+            [self runArguments:@[@"--le-apple-pairing-test"] operation:@"le_apple_pairing_test"];
         return;
     }
     if (index.section != 3) return;
@@ -731,6 +744,20 @@ int NWBluetoothUIRegressionCheck(void) {
         if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 29;
         incomplete[@"advertising_stopped_acknowledged"] = @YES; incomplete[@"service_restored"] = @NO;
         if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 30;
+        NSIndexPath *appleButton = [NSIndexPath indexPathForRow:7 inSection:0];
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 31;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_apple_pairing_test": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_apple_pairing_test")) return 32;
+        lastReport = @{@"operation": @"le_apple_pairing_test", @"controller_advertising_acknowledged": @YES,
+            @"advertising_stopped_acknowledged": @YES, @"service_restored": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]];
+        content = (UIListContentConfiguration *)cell.contentConfiguration;
+        if (![content.secondaryText containsString:NWText(@"bt.lab.apple_receiver")]) return 33;
+        busy = YES;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 34;
         return 0;
     } @finally {
         lastReport = previous; busy = previousBusy; readingLE = previousLE; labRunning = previousLab;

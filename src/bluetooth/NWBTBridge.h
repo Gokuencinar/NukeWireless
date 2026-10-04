@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app19"
+#define NWBT_VERSION @"0.0.3~app20"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
@@ -22,6 +22,7 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseLab(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseManufacturerLab(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseRotatingLab(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseSwiftPairLab(void);
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseApplePairingLab(void);
 // Before retiring bluetoothd, verify its state is readable and Bluetooth off.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTVerifyBluetoothOff(void);
 // Experimental, bounded echo diagnostic on the exact inspected device.

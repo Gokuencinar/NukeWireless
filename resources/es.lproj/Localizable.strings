@@ -80,6 +80,9 @@
 "bt.running" = "Diagnóstico en curso…";
 "bt.cancel" = "Cancelar y restaurar Bluetooth";
 "bt.stop" = "Detener";
+"bt.lab.apple_title" = "Apple: prueba BLE (10 s)";
+"bt.lab.apple_menu" = "Prueba de proximidad AirPods Pro para laboratorio aislado. Un anuncio fijo durante 10 segundos; puedes detenerlo antes.";
+"bt.lab.apple_receiver" = "La aparición del aviso en iOS no está verificada. Esta prueba emite el anuncio; no permite emparejar un accesorio real.";
 "bt.stopping" = "Deteniendo…";
 "bt.lab.stop" = "Detener emisión y restaurar Bluetooth";
 "bt.lab.stopped" = "Emisión detenida y Bluetooth restaurado.";

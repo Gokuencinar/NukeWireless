@@ -63,6 +63,18 @@ static inline size_t NWBTLabSwiftPairData(uint8_t p[35]) {
     memcpy(p + 4, advertisement, sizeof advertisement);
     return sizeof advertisement + 4;
 }
+static inline size_t NWBTLabApplePairingData(uint8_t p[35]) {
+    // Fixed AirPods Pro proximity-pairing research fixture (company 0x004C,
+    // subtype 0x07). One identity, ordinary cadence, finite controller duration.
+    const uint8_t advertisement[31] = {
+        0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, 0x0e, 0x20,
+        0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45, 0x12, 0x12, 0x12,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1; p[3] = sizeof advertisement;
+    memcpy(p + 4, advertisement, sizeof advertisement);
+    return 35;
+}
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {
     memset(p, 0, 6); p[0] = enable ? 1 : 0; p[1] = 1; p[2] = NWBT_LAB_HANDLE;
     if (enable) { p[3] = 0xe8; p[4] = 3; } // Controller stops after 10 seconds.

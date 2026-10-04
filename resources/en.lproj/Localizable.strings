@@ -80,6 +80,9 @@
 "bt.running" = "Diagnostic in progress…";
 "bt.cancel" = "Cancel and restore Bluetooth";
 "bt.stop" = "Stop";
+"bt.lab.apple_title" = "Apple: BLE test (10 s)";
+"bt.lab.apple_menu" = "AirPods Pro proximity test for an isolated lab. One fixed advertisement for 10 seconds; you can stop earlier.";
+"bt.lab.apple_receiver" = "The iOS notification has not been verified. This test advertises the fixture; it does not pair a real accessory.";
 "bt.stopping" = "Stopping…";
 "bt.lab.stop" = "Stop advertising and restore Bluetooth";
 "bt.lab.stopped" = "Advertising stopped and Bluetooth restored.";
