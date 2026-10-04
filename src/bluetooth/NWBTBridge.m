@@ -2,6 +2,69 @@
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
+#import <mach-o/loader.h>
+#import <ptrauth.h>
+#include <string.h>
+
+static NSArray<NSString *> *transportSymbols(void) {
+    return @[@"AppleConvergedTransportInitParameters", @"AppleConvergedTransportCreate",
+        @"AppleConvergedTransportRead", @"AppleConvergedTransportWrite", @"AppleConvergedTransportFree",
+        @"AppleConvergedTransportIsValid", @"AppleConvergedTransportRegisterEventBlockQ"];
+}
+
+NSDictionary<NSString *, id> *NWBTCopyTransportCode(void) {
+    // Copies only the __text section of this fixed system library. It never
+    // executes its private exports, changes page protections or opens drivers.
+    void *handle = dlopen("/usr/lib/AppleConvergedTransport.dylib", RTLD_LAZY | RTLD_LOCAL);
+    if (!handle) return @{@"error": @"AppleConvergedTransport could not be loaded"};
+    void *symbol = dlsym(handle, "AppleConvergedTransportInitParameters");
+    Dl_info image = {0};
+    if (!symbol || !dladdr(symbol, &image) || !image.dli_fbase)
+        return @{@"error": @"Transport image could not be identified"};
+    const struct mach_header_64 *header = image.dli_fbase;
+    if (header->magic != MH_MAGIC_64 || header->ncmds > 1024 || header->sizeofcmds > 65536)
+        return @{@"error": @"Unsupported transport Mach-O header"};
+    const uint8_t *cursor = (const uint8_t *)(header + 1);
+    const uint8_t *end = cursor + header->sizeofcmds;
+    for (uint32_t index = 0; index < header->ncmds; ++index) {
+        if ((size_t)(end - cursor) < sizeof(struct load_command)) break;
+        const struct load_command *command = (const void *)cursor;
+        if (command->cmdsize < sizeof(*command) || command->cmdsize > (size_t)(end - cursor)) break;
+        if (command->cmd == LC_SEGMENT_64 && command->cmdsize >= sizeof(struct segment_command_64)) {
+            const struct segment_command_64 *segment = (const void *)cursor;
+            if (!strncmp(segment->segname, "__TEXT", 16) && segment->nsects <=
+                    (command->cmdsize - sizeof(*segment)) / sizeof(struct section_64)) {
+                const struct section_64 *sections = (const void *)(segment + 1);
+                for (uint32_t sectionIndex = 0; sectionIndex < segment->nsects; ++sectionIndex) {
+                    const struct section_64 *section = &sections[sectionIndex];
+                    if (strncmp(section->sectname, "__text", 16)) continue;
+                    if (!(segment->initprot & 1) || section->addr < segment->vmaddr ||
+                        section->size > 2 * 1024 * 1024 || section->size > segment->vmsize ||
+                        section->addr - segment->vmaddr > segment->vmsize - section->size)
+                        return @{@"error": @"Transport code section exceeds snapshot bounds"};
+                    const uint8_t *bytes = (const uint8_t *)header + (section->addr - segment->vmaddr);
+                    NSData *data = [NSData dataWithBytes:bytes length:(NSUInteger)section->size];
+                    NSMutableDictionary *exports = [NSMutableDictionary new];
+                    for (NSString *name in transportSymbols()) {
+                        void *address = dlsym(handle, name.UTF8String);
+                        uintptr_t pointer = (uintptr_t)ptrauth_strip(address, ptrauth_key_function_pointer);
+                        uintptr_t base = (uintptr_t)bytes;
+                        if (pointer >= base && pointer - base < section->size)
+                            exports[name] = @(section->addr + pointer - base);
+                    }
+                    return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": @"0.0.1~inspect2",
+                        @"image": image.dli_fname ? [NSString stringWithUTF8String:image.dli_fname] : @"unknown",
+                        @"section": @"__TEXT.__text", @"virtual_address": @(section->addr),
+                        @"size": @(section->size), @"exports": exports,
+                        @"code_base64": [data base64EncodedStringWithOptions:0],
+                        @"bluetooth_packets_sent": @0, @"private_functions_called": @0};
+                }
+            }
+        }
+        cursor += command->cmdsize;
+    }
+    return @{@"error": @"Transport code section not found"};
+}
 
 static NSString *machine(void) {
     char value[128] = {0}; size_t size = sizeof(value);
@@ -34,9 +97,7 @@ NSDictionary<NSString *, id> *NWBTInspectTransport(void) {
     @autoreleasepool {
         NSMutableArray *libraries = [NSMutableArray new];
         // Names observed in BlueTool and bluetoothd from the user's iOS 16.3.1.
-        NSArray *symbols = @[@"AppleConvergedTransportInitParameters", @"AppleConvergedTransportCreate",
-            @"AppleConvergedTransportRead", @"AppleConvergedTransportWrite", @"AppleConvergedTransportFree",
-            @"AppleConvergedTransportIsValid", @"AppleConvergedTransportRegisterEventBlockQ"];
+        NSArray *symbols = transportSymbols();
         for (NSString *path in @[@"/usr/lib/AppleConvergedTransport.dylib",
                 @"/System/Library/Frameworks/CoreBluetooth.framework/CoreBluetooth",
                 @"/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager"]) {
@@ -66,7 +127,7 @@ NSDictionary<NSString *, id> *NWBTInspectTransport(void) {
             return [a[@"class"] compare:b[@"class"]];
         }];
         NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
-        return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": @"0.0.1~inspect1",
+        return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": @"0.0.1~inspect2",
             @"ios": [NSString stringWithFormat:@"%ld.%ld.%ld", (long)os.majorVersion, (long)os.minorVersion, (long)os.patchVersion],
             @"machine": machine(), @"libraries": libraries, @"method_metadata": metadata,
             @"l2ping_implemented": @NO, @"bluetooth_packets_sent": @0};

@@ -8,8 +8,8 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.1~inspect1'
-PACKAGE_VERSION = VERSION + '+rh2'
+VERSION = '0.0.1~inspect2'
+PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
     'com.apple.private.security.no-sandbox': True,
