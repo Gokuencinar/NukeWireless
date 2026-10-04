@@ -95,4 +95,18 @@ def compatible_aegis(data):
                        0x34000000 | ((0x7DA8 - 0x7CF8) // 4 << 5),
                        branch(0x7CFC, 0x7D3C, 0x14000000))
     result[0x7CF4:0x7D00] = site
+    # The old optional libjailbreak bridge invokes both dlsym results unchecked.
+    # A bootstrap can have the library while omitting those legacy exports.
+    # Skip that optional bridge through its existing epilogue in that case.
+    guard = 0x7120
+    if any(result[guard:guard + 20]) or struct.unpack_from("<I", result, 0x7C84)[0] != branch(0x7C84, 0x7E10, 0x94000000):
+        raise ValueError("unexpected optional jailbreak bridge")
+    payload = struct.pack("<IIIII",
+        0xB4000014 | ((0x7C9C - guard) // 4 << 5),  # cbz x20, old epilogue
+        0xF94007E8,  # ldr x8, [sp, #8]: second dlsym result
+        0xB4000008 | ((0x7C9C - guard - 8) // 4 << 5),
+        branch(guard + 12, 0x7E10, 0x94000000),  # original getpid call
+        branch(guard + 16, 0x7C88, 0x14000000))  # original first indirect call
+    result[guard:guard + len(payload)] = payload
+    struct.pack_into("<I", result, 0x7C84, branch(0x7C84, guard, 0x14000000))
     return bytes(result)

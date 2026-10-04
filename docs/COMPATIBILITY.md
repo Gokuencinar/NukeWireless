@@ -50,6 +50,9 @@ de iOS. Relaxin usa la candidata RootHide solo en sus instalaciones RootHide.
   exige que app y auxiliar estén en la misma raíz. Se adapta el control ya
   presente en arm64e a arm64, con offsets e instrucciones verificados y hash
   del binario original obligatorio. No se permite un padre arbitrario.
+- El puente opcional antiguo de `libjailbreak` comprueba ahora las dos
+  direcciones devueltas por `dlsym` antes de invocarlas. Si una implementación
+  nueva no exporta esos símbolos, el auxiliar no llama a una dirección nula.
 - Los auxiliares se empaquetan con su slice arm64. Las firmas se renuevan al
   instalar. Los enlaces `.roothidepatch` y `rootless-compat` se conservan
   exclusivamente en RootHide; los otros paquetes usan `mobilesubstrate`.

@@ -10,7 +10,7 @@ import plistlib
 import tempfile
 from pathlib import Path
 from build_manifest import ROOT, sha
-from build_nuke_info_deb import build, read_tar, APP
+from build_nuke_info_deb import build, read_tar, APP, EXPECTED_SOURCE_SHA256
 from compat_manifest import compat_sources
 from compat_macho import compatible_aegis, inspect, thin_arm64
 from package_utils import directory, regular, read_ar, get_tar_member, pack_ar, tar_bytes
@@ -104,7 +104,8 @@ def package(scheme, core, artifact, output):
               "architecture": architecture, "minimum_ios": "15.0", "maximum_ios_exclusive": "19.0",
               "runtime_verified": False, "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
-              "core": core_manifest, "source_base_sha256": sha(core)}
+              "core": core_manifest, "baseline_sha256": EXPECTED_SOURCE_SHA256,
+              "dev18_core_sha256": sha(core)}
     status_path = prefix + "usr/share/nukewireless-roothide/compatibility.json"
     final.append(regular(status_path, (json.dumps(report, indent=2) + "\n").encode()))
     predepends = "Pre-Depends: rootless-compat (>= 0.9)\n" if scheme == "roothide" else ""
