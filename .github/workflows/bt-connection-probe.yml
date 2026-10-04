@@ -1,5 +1,10 @@
 name: Bluetooth connection request probe
 on:
+  push:
+    branches: [audit-rh25.5]
+    paths:
+      - 'research/NWBTConnectionProbe.m'
+      - '.github/workflows/bt-connection-probe.yml'
   workflow_dispatch:
 permissions:
   contents: read
