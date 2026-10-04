@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.2~probe6"
+#define NWBT_VERSION @"0.0.2~probe7"
 
 // Capability inspection only. This version does not send Bluetooth packets.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTInspectTransport(void);
@@ -10,3 +10,5 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTCopyTransportCode(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadControllerInfo(void);
 // Opens and closes only the actual HCI Skywalk nexus. No slot is consumed or written.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTOpenSkywalk(void);
+// Submits one standard local version query through the inspected HCI Skywalk ring.
+FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadSkywalkController(void);

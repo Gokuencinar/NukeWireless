@@ -13,6 +13,7 @@
 #include <mach/mach.h>
 #include <uuid/uuid.h>
 #include <stdio.h>
+#include <poll.h>
 
 // Declarations from Apple IOKitUser/IOKitLib.h and XNU 8792.61.2
 // bsd/skywalk/channel/os_channel.h. BlueTool on 20D67 opens port 0
@@ -29,6 +30,21 @@ typedef void *(*NWAttrCreate)(void);
 typedef void (*NWAttrDestroy)(void *);
 typedef int (*NWAttrRead)(void *, void *);
 typedef int (*NWAttrGet)(void *, int, uint64_t *);
+typedef struct {
+    uint16_t flags, length;
+    uint32_t index;
+    uint64_t externalPointer, bufferPointer, metadataPointer;
+    uint32_t reserved[8];
+} NWSlotProperties;
+_Static_assert(sizeof(NWSlotProperties) == 64, "Skywalk slot property size");
+_Static_assert(offsetof(NWSlotProperties, bufferPointer) == 16, "Skywalk buffer offset");
+typedef uint32_t (*NWRingID)(void *, int);
+typedef void *(*NWRing)(void *, uint32_t);
+typedef void *(*NWSlot)(void *, void *, NWSlotProperties *);
+typedef void (*NWSetSlot)(void *, void *, const NWSlotProperties *);
+typedef int (*NWAdvance)(void *, void *);
+typedef int (*NWSync)(void *, int);
+typedef int (*NWChannelFD)(void *);
 
 // Reconstructed from the user's iOS 16.3.1 (20D67) transport code and
 // bluetoothd callsites/block signatures. No ABI fallback on other builds.
@@ -88,7 +104,98 @@ static NSDictionary *requireBluetoothOff(void) {
     return nil;
 }
 
-NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
+static NSDictionary *skywalkVersion(void *channel, uint64_t capacity) {
+    NWRingID ringID = (NWRingID)dlsym(RTLD_DEFAULT, "os_channel_ring_id");
+    NWRing txRing = (NWRing)dlsym(RTLD_DEFAULT, "os_channel_tx_ring");
+    NWRing rxRing = (NWRing)dlsym(RTLD_DEFAULT, "os_channel_rx_ring");
+    NWSlot nextSlot = (NWSlot)dlsym(RTLD_DEFAULT, "os_channel_get_next_slot");
+    NWSetSlot setSlot = (NWSetSlot)dlsym(RTLD_DEFAULT, "os_channel_set_slot_properties");
+    NWAdvance advance = (NWAdvance)dlsym(RTLD_DEFAULT, "os_channel_advance_slot");
+    NWSync sync = (NWSync)dlsym(RTLD_DEFAULT, "os_channel_sync");
+    NWChannelFD descriptor = (NWChannelFD)dlsym(RTLD_DEFAULT, "os_channel_get_fd");
+    if (!ringID || !txRing || !rxRing || !nextSlot || !setSlot || !advance || !sync || !descriptor)
+        return failure(@"skywalk_symbols", @"Required channel transfer interfaces are unavailable.");
+    if (capacity < 3 || capacity > UINT16_MAX)
+        return failure(@"skywalk_capacity", @"The channel buffer size is outside the inspected bounds.");
+    void *tx = txRing(channel, ringID(channel, 0));
+    void *rx = rxRing(channel, ringID(channel, 2));
+    int fd = descriptor(channel);
+    if (!tx || !rx || fd < 0) return failure(@"skywalk_rings", @"HCI rings or descriptor are unavailable.");
+    // Discard only pre-existing local HCI events before submitting the query.
+    // A bounded drain prevents an old version response from counting as new.
+    if (sync(channel, 1)) return failure(@"skywalk_drain", @"RX synchronization failed before the query.");
+    NSUInteger drained = 0;
+    for (; drained < 32; ++drained) {
+        NWSlotProperties properties = {0};
+        void *slot = nextSlot(rx, NULL, &properties);
+        if (!slot) break;
+        if (advance(rx, slot)) return failure(@"skywalk_drain", @"A pre-existing RX slot could not be released.");
+    }
+    if (drained == 32 || sync(channel, 1))
+        return failure(@"skywalk_drain", @"Pre-existing events exceeded the bounded drain.");
+    NWSlotProperties properties = {0};
+    void *slot = nextSlot(tx, NULL, &properties);
+    uint8_t command[] = {0x01, 0x10, 0x00}; // HCI 0x1001; no H4 prefix on Skywalk.
+    if (!slot || !properties.bufferPointer || properties.length < sizeof(command) || properties.length > capacity)
+        return failure(@"skywalk_tx", @"No TX slot with the inspected capacity is available.");
+    // BlueTool's 0x100005414 wrapper removes its one-byte H4 prefix before
+    // 0x100005428 writes to this ring. Preserve all immutable slot fields.
+    memcpy((void *)(uintptr_t)properties.bufferPointer, command, sizeof(command));
+    properties.length = sizeof(command);
+    setSlot(tx, slot, &properties);
+    if (advance(tx, slot)) return failure(@"skywalk_tx", @"The command slot could not be committed.");
+    fputs("NWBT phase: local version command submitted\n", stderr);
+    NSDictionary *result = nil;
+    if (sync(channel, 0)) result = failure(@"skywalk_tx", @"TX synchronization failed after command submission.");
+    NSMutableData *events = [NSMutableData new];
+    NSMutableArray *eventCodes = [NSMutableArray new];
+    NSUInteger slotsRead = 0, totalBytes = 0;
+    double deadline = NSProcessInfo.processInfo.systemUptime + 3.0;
+    while (!result && NSProcessInfo.processInfo.systemUptime < deadline) {
+        if (sync(channel, 1)) { result = failure(@"skywalk_rx", @"RX synchronization failed."); break; }
+        NWSlotProperties received = {0};
+        void *rxSlot = nextSlot(rx, NULL, &received);
+        if (!rxSlot) {
+            struct pollfd waitFD = {.fd = fd, .events = POLLIN};
+            int ready = poll(&waitFD, 1, 50);
+            if (ready < 0 && errno != EINTR) result = failure(@"skywalk_rx", @"Polling the HCI descriptor failed.");
+            else if (ready > 0 && (waitFD.revents & (POLLERR | POLLHUP | POLLNVAL)))
+                result = failure(@"skywalk_rx", @"The HCI descriptor reported a terminal condition.");
+            continue;
+        }
+        if (!received.bufferPointer || !received.length || received.length > capacity ||
+            ++slotsRead > 128 || totalBytes + received.length > 8192) {
+            result = failure(@"skywalk_rx", @"RX data exceeded the bounded slot or stream limits.");
+            break;
+        }
+        [events appendBytes:(const void *)(uintptr_t)received.bufferPointer length:received.length];
+        totalBytes += received.length;
+        if (advance(rx, rxSlot)) { result = failure(@"skywalk_rx", @"The received slot could not be released."); break; }
+        while (events.length >= 2 && !result) {
+            const uint8_t *packet = events.bytes;
+            NSUInteger length = (NSUInteger)packet[1] + 2;
+            if (events.length < length) break;
+            if (eventCodes.count < 16) [eventCodes addObject:@(packet[0])];
+            if (packet[0] == 0x0e && length >= 14 && packet[3] == 0x01 && packet[4] == 0x10) {
+                if (packet[5]) result = failure(@"hci_response", [NSString stringWithFormat:@"HCI status 0x%02x.", packet[5]]);
+                else result = @{@"version": NWBT_VERSION, @"stage": @"controller_ready",
+                    @"hci_version": @(packet[6]), @"hci_revision": @(packet[7] | packet[8] << 8),
+                    @"lmp_version": @(packet[9]), @"manufacturer": @(packet[10] | packet[11] << 8),
+                    @"lmp_subversion": @(packet[12] | packet[13] << 8),
+                    @"remote_bluetooth_packets_sent": @0, @"l2ping_verified": @NO};
+            }
+            [events replaceBytesInRange:NSMakeRange(0, length) withBytes:NULL length:0];
+        }
+    }
+    if (!result) result = failure(@"skywalk_rx", @"No matching local version response arrived within three seconds.");
+    NSMutableDictionary *details = [result mutableCopy];
+    details[@"local_hci_commands_submitted"] = @1;
+    details[@"rx_slots_consumed"] = @(slotsRead);
+    details[@"event_codes"] = eventCodes;
+    return details;
+}
+
+static NSDictionary *skywalkDiagnostic(BOOL queryController) {
     if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
     fputs("NWBT phase: ABI guard\n", stderr);
     NSDictionary *error = requireKnownABI();
@@ -159,6 +266,7 @@ NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
             if (attrRead(channel, attributes) || attrGet(attributes, 4, &bytes) ||
                 attrGet(attributes, 2, &txSlots) || attrGet(attributes, 3, &rxSlots))
                 report = failure(@"skywalk_attributes", @"The channel opened but its attributes could not be read.");
+            else if (queryController) report = skywalkVersion(channel, bytes);
             else report = @{@"version": NWBT_VERSION, @"stage": @"skywalk_opened",
                 @"slot_buffer_size": @(bytes), @"tx_slots": @(txSlots), @"rx_slots": @(rxSlots),
                 @"local_hci_commands_sent": @0, @"remote_bluetooth_packets_sent": @0, @"l2ping_verified": @NO};
@@ -166,6 +274,9 @@ NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) {
     } @finally { destroy(channel); }
     return report;
 }
+
+NSDictionary<NSString *, id> *NWBTOpenSkywalk(void) { return skywalkDiagnostic(NO); }
+NSDictionary<NSString *, id> *NWBTReadSkywalkController(void) { return skywalkDiagnostic(YES); }
 
 NSDictionary<NSString *, id> *NWBTReadControllerInfo(void) {
     @autoreleasepool {
