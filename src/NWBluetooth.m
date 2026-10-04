@@ -15,7 +15,8 @@ static BOOL busy, cancelling;
 static pid_t worker;
 static NSObject *workerLock;
 static NSDictionary *lastReport;
-static UIBackgroundTaskIdentifier background = UIBackgroundTaskInvalid;
+// Assigned by beginBackgroundTask before any worker/completion can read it.
+static UIBackgroundTaskIdentifier background;
 
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
 static NSString *helperPath(void) {
