@@ -11,12 +11,29 @@
 #include <errno.h>
 
 static NSString *const changed = @"NWBluetoothChanged";
+static NSString *const reportKey = @"NukeWirelessBluetoothLastReport";
+static NSString *const invocationKey = @"NukeWirelessBluetoothLastInvocation";
 static BOOL busy, cancelling;
 static pid_t worker;
 static NSObject *workerLock;
 static NSDictionary *lastReport;
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
+
+static void saveInvocation(NSDictionary *details, BOOL cancellable) {
+    if (!cancellable) return;
+    NSData *data = [NSJSONSerialization dataWithJSONObject:details options:0 error:NULL];
+    if (data) {
+        [NSUserDefaults.standardUserDefaults setObject:data forKey:invocationKey];
+        [NSUserDefaults.standardUserDefaults synchronize];
+    }
+}
+static NSString *reportText(NSDictionary *report) {
+    NSString *code = report[@"error_code"];
+    return code ? NWText([@"bt.error." stringByAppendingString:code]) :
+        [NSString stringWithFormat:NWText(@"bt.summary"), [report[@"echo_replies_verified"] unsignedIntegerValue],
+            [report[@"echo_requests_submitted"] unsignedIntegerValue]];
+}
 
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
 static NSString *helperPath(void) {
@@ -52,6 +69,7 @@ static void cancelWorker(void) {
 // A separate helper owns privileged operations and recovery. The app only
 // supplies argv, reads bounded JSON, and signals that worker when cancelled.
 static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
+    saveInvocation(@{@"phase": @"starting"}, cancellable);
     NSString *path = helperPath();
     if (!path || ![NSFileManager.defaultManager isExecutableFileAtPath:path]) return @{@"error_code": @"missing"};
     int out[2], err[2];
@@ -70,9 +88,12 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     int launch = posix_spawn(&child, path.fileSystemRepresentation, &actions, &attributes, argv, environment);
     posix_spawnattr_destroy(&attributes); posix_spawn_file_actions_destroy(&actions);
     close(out[1]); close(err[1]);
-    if (launch) { close(out[0]); close(err[0]); return @{@"error_code": @"permissions"}; }
+    if (launch) {
+        saveInvocation(@{@"phase": @"spawn_failed", @"spawn_errno": @(launch)}, cancellable);
+        close(out[0]); close(err[0]); return @{@"error_code": @"permissions"};
+    }
     if (cancellable) @synchronized (workerLock) { worker = child; if (cancelling) signalChild(child, SIGTERM, YES); }
-    NSMutableData *data = [NSMutableData new]; NSUInteger stderrBytes = 0;
+    NSMutableData *data = [NSMutableData new], *diagnostics = [NSMutableData new]; NSUInteger stderrBytes = 0;
     double deadline = NSProcessInfo.processInfo.systemUptime + (cancellable ? 65.0 : 12.0);
     BOOL exited = NO, invalid = NO; int status = 0;
     while (NSProcessInfo.processInfo.systemUptime < deadline) {
@@ -82,6 +103,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [data appendBytes:buffer length:(NSUInteger)count];
         }
         while ((count = read(err[0], buffer, sizeof(buffer))) > 0) {
+            if (diagnostics.length < 4096) [diagnostics appendBytes:buffer length:MIN((NSUInteger)count, 4096 - diagnostics.length)];
             stderrBytes += (NSUInteger)count; if (stderrBytes > 65536) { invalid = YES; break; }
         }
         if (invalid) break;
@@ -101,6 +123,9 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     close(out[0]); close(err[0]);
     if (cancellable) @synchronized (workerLock) { if (worker == child) worker = 0; }
     id report = invalid ? nil : [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+    saveInvocation(@{@"phase": @"finished", @"bytes": @(data.length), @"invalid": @(invalid),
+        @"child_exited": @(exited), @"wait_status": @(status),
+        @"stderr": [[NSString alloc] initWithData:diagnostics encoding:NSUTF8StringEncoding] ?: @""}, cancellable);
     return [report isKindOfClass:NSDictionary.class] ? report : @{@"error_code": @"transport"};
 }
 
@@ -114,6 +139,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = NWText(@"bt.title");
+    if (!lastReport && !busy) {
+        NSData *saved = [NSUserDefaults.standardUserDefaults dataForKey:reportKey];
+        id report = saved ? [NSJSONSerialization JSONObjectWithData:saved options:0 error:NULL] : nil;
+        if ([report isKindOfClass:NSDictionary.class]) lastReport = report;
+    }
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 65;
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
     self.address = [UITextField new]; self.address.placeholder = @"AA:BB:CC:DD:EE:FF";
@@ -169,6 +199,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if (!self.capabilities) content.secondaryText = NWText(@"bt.checking");
         else if (self.capabilities[@"error_code"]) content.secondaryText = NWText([@"bt.error." stringByAppendingString:self.capabilities[@"error_code"]]);
         else content.secondaryText = NWText([self.capabilities[@"supported"] boolValue] ? @"bt.ready" : @"bt.error.unsupported");
+        if (lastReport && !busy) content.secondaryText = reportText(lastReport);
     } else if (index.section == 1) {
         self.address.translatesAutoresizingMaskIntoConstraints = NO; [cell.contentView addSubview:self.address];
         UILayoutGuide *guide = cell.contentView.layoutMarginsGuide;
@@ -183,8 +214,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     } else if (!lastReport) content.text = NWText(@"bt.empty");
     else if (index.row == 0) {
         NSString *code = lastReport[@"error_code"];
-        if (code) content.text = NWText([@"bt.error." stringByAppendingString:code]);
-        else content.text = [NSString stringWithFormat:NWText(@"bt.summary"), [lastReport[@"echo_replies_verified"] unsignedIntegerValue], [lastReport[@"echo_requests_submitted"] unsignedIntegerValue]];
+        content.text = reportText(lastReport);
         if ([lastReport[@"service_restored"] boolValue]) content.secondaryText = NWText(@"bt.restored");
         content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
     } else {
@@ -223,15 +253,28 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     if (!workerLock) workerLock = [NSObject new];
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
     [NSUserDefaults.standardUserDefaults setObject:address forKey:@"NukeWirelessBluetoothTarget"];
     background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ cancelWorker(); }];
     [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
+    [self refresh:nil];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSDictionary *report = invoke(@[@"--ping", address], YES);
+        NSData *saved = [NSJSONSerialization dataWithJSONObject:report options:0 error:NULL];
+        if (saved) {
+            [NSUserDefaults.standardUserDefaults setObject:saved forKey:reportKey];
+            [NSUserDefaults.standardUserDefaults synchronize];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             lastReport = report; busy = NO;
             if (background != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:background]; background = UIBackgroundTaskInvalid; }
             [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
+            [self refresh:nil];
+            if (self.view.window && self.navigationController.topViewController == self) {
+                [self.tableView layoutIfNeeded];
+                [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:3]
+                    atScrollPosition:UITableViewScrollPositionTop animated:YES];
+            }
             UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.finished"));
         });
     });
