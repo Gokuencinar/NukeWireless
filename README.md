@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev42 instalado / trabajador app26:** Bluetooth añade Catálogo aleatorio,
+con Apple, Google y Microsoft. Cada marca tiene seis modelos; se generan tres
+distintos por pulsación, con una combinación diferente de la anterior y nuevas
+identidades locales NWLab. Es una simulación visual dentro de la app. Compilación,
+simulador y paquete verificados; falta la aceptación manual del catálogo en el
+iPhone. Véase [catálogo local](docs/BLUETOOTH-CATALOG-DEV42.md).
+
 **Dev41 instalado / trabajador app26:** Bluetooth organiza sus acciones en
 Exploración, Windows, Apple y Android. Cada plataforma muestra los modos de uno
 y tres dispositivos, sus modelos y la duración de 10 s. Añade ayuda en la barra
