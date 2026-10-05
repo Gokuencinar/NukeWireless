@@ -170,3 +170,26 @@
 
 "tabs.wifi" = "Wi-Fi";
 "tabs.hotspot" = "Hotspot";
+
+// Bluetooth grouped interface
+"bt.ui.explore" = "Explore";
+"bt.ui.windows" = "Windows · Swift Pair";
+"bt.ui.apple" = "Apple · Proximity";
+"bt.ui.android" = "Android · Fast Pair";
+"bt.ui.single" = "One device";
+"bt.ui.multiple" = "Three devices";
+"bt.ui.swift_single" = "NWLab";
+"bt.ui.apple_single" = "AirPods Pro";
+"bt.ui.android_single" = "Pixel Buds";
+"bt.ui.windows_multiple" = "NWLab keyboard, mouse and audio";
+"bt.ui.apple_multiple" = "AirPods Pro, Pro 2 and Max";
+"bt.ui.android_multiple" = "Pixel Buds, Buds A and Sony XM4";
+"bt.ui.duration" = "10 s";
+"bt.ui.capabilities" = "BLE capabilities";
+"bt.ui.capabilities_hint" = "Read supported controller features";
+"bt.ui.scan_hint" = "Nearby devices and signal strength";
+"bt.ui.active" = "In progress";
+"bt.ui.last_result" = "Last activity";
+"bt.ui.emission_hint" = "10-second emissions. Turn off Bluetooth in iPhone Settings to emit; you can stop sooner.";
+"bt.ui.help_title" = "Using Bluetooth";
+"bt.ui.help" = "Scan: turn on Bluetooth and allow access. Only devices advertising BLE are shown.\n\nCapabilities and emissions: turn off Bluetooth in iPhone Settings. Keep Bluetooth enabled on the receiver.\n\nChoose one or three devices for a platform. Emissions last 10 seconds. Stop ends the emission and restores Bluetooth.\n\nWindows requires Swift Pair enabled. These announcements do not implement accessory pairing, and reception does not guarantee a system notification.";

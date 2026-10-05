@@ -51,6 +51,7 @@ struct RegressionTabs: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         results.append(checkUI(5))
                         snapshot("bluetooth.png")
+                        snapshot("bluetooth-dark.png", dark: true)
                         results.append(checkUI(4))
                         results.append(checkUI(2))
                         results.append(checkBLEUI())
@@ -64,9 +65,12 @@ struct RegressionTabs: View {
             }
         }
     }
-    private func snapshot(_ name: String) {
+    private func snapshot(_ name: String, dark: Bool = false) {
         guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
             .flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) else { return }
+        let previousStyle = window.overrideUserInterfaceStyle
+        if dark { window.overrideUserInterfaceStyle = .dark; window.layoutIfNeeded() }
+        defer { window.overrideUserInterfaceStyle = previousStyle }
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }

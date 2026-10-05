@@ -170,3 +170,26 @@
 
 "tabs.wifi" = "Wi-Fi";
 "tabs.hotspot" = "Punto de acceso";
+
+// Bluetooth grouped interface
+"bt.ui.explore" = "Exploración";
+"bt.ui.windows" = "Windows · Swift Pair";
+"bt.ui.apple" = "Apple · Proximidad";
+"bt.ui.android" = "Android · Fast Pair";
+"bt.ui.single" = "Un dispositivo";
+"bt.ui.multiple" = "Tres dispositivos";
+"bt.ui.swift_single" = "NWLab";
+"bt.ui.apple_single" = "AirPods Pro";
+"bt.ui.android_single" = "Pixel Buds";
+"bt.ui.windows_multiple" = "NWLab: teclado, ratón y audio";
+"bt.ui.apple_multiple" = "AirPods Pro, Pro 2 y Max";
+"bt.ui.android_multiple" = "Pixel Buds, Buds A y Sony XM4";
+"bt.ui.duration" = "10 s";
+"bt.ui.capabilities" = "Capacidades BLE";
+"bt.ui.capabilities_hint" = "Consulta las funciones del controlador";
+"bt.ui.scan_hint" = "Dispositivos cercanos y señal";
+"bt.ui.active" = "En curso";
+"bt.ui.last_result" = "Última actividad";
+"bt.ui.emission_hint" = "Emisiones de 10 s. Apaga Bluetooth en Ajustes del iPhone para emitir; puedes detenerlas antes.";
+"bt.ui.help_title" = "Cómo usar Bluetooth";
+"bt.ui.help" = "Escáner: activa Bluetooth y concede el permiso. Solo aparecen dispositivos que anuncian BLE.\n\nCapacidades y emisiones: apaga Bluetooth en Ajustes del iPhone. Mantén Bluetooth activado en el receptor.\n\nElige uno o tres dispositivos de una plataforma. La emisión dura 10 segundos. Detener finaliza la emisión y restaura Bluetooth.\n\nWindows requiere Swift Pair activado. Estos anuncios no implementan el emparejamiento del accesorio y su recepción no garantiza un aviso del sistema.";

@@ -59,4 +59,5 @@ xcrun simctl terminate "$device" app.nukewireless.ui-regression
 cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
 cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"
+cp "$container/Documents/bluetooth-dark.png" "$out/$language-bluetooth-dark.png"
 done
