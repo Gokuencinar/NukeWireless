@@ -3,6 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/audit
 python3 scripts/language_catalog.py build/audit
+clang -Wall -Wextra -Werror tests/test_device_catalog.c -o build/audit/test_device_catalog
+build/audit/test_device_catalog
 clang -Wall -Wextra -Werror src/NWPolicy.c tests/test_policy.c -o build/audit/test_policy
 build/audit/test_policy
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/test_resources.m -o build/audit/test_resources
@@ -15,7 +17,7 @@ xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=16.3 -isysroot "$s
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
-  src/NukeWirelessInfo.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
+  src/NukeWirelessInfo.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target 16.3 --target-device iphone --target-device ipad

@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 @_silgen_name("NWBluetoothUIRegressionCheck")
 func checkBluetoothUI() -> Int32
+@_silgen_name("NWBluetoothCatalogUIRegressionPresent")
+func presentCatalog(_ platform: Int32) -> Int32
 
 @_silgen_name("NWBLEUIRegressionCheck")
 func checkBLEUI() -> Int32
@@ -60,10 +62,8 @@ struct RegressionTabs: View {
                                 results.append(checkUI(2))
                                 results.append(checkBLEUI())
                                 results.append(checkBluetoothUI())
-                                let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0, 0, 0, 0]]
-                                let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                                    .appendingPathComponent("ui-regression.json")
-                                try? JSONSerialization.data(withJSONObject: report).write(to: file)
+                                results.append(presentCatalog(0))
+                                captureCatalog(0)
                             }
                         }
                     }
@@ -74,6 +74,24 @@ struct RegressionTabs: View {
     private func setDark(_ dark: Bool) {
         for window in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }) {
             window.overrideUserInterfaceStyle = dark ? .dark : .light
+        }
+    }
+    private func captureCatalog(_ platform: Int32) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            snapshot("catalog-\(platform).png")
+            if platform < 2 {
+                results.append(presentCatalog(platform + 1))
+                captureCatalog(platform + 1)
+            } else {
+                setDark(true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    snapshot("catalog-dark.png")
+                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 11]
+                    let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("ui-regression.json")
+                    try? JSONSerialization.data(withJSONObject: report).write(to: file)
+                }
+            }
         }
     }
     private func snapshot(_ name: String) {

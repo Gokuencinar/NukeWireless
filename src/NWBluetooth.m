@@ -4,6 +4,7 @@
 #import "NWResources.h"
 #import "NWScanBridge.h"
 #import "NWMainTabs.h"
+#import "NWBluetoothCatalog.h"
 #include <spawn.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -214,7 +215,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 
 // Stable action identifiers keep presentation groups separate from worker commands.
 static NSInteger menuAction(NSIndexPath *index) {
-    if (index.section == 0) return index.row + 1;
+    if (index.section == 0) return index.row == 2 ? 9 : index.row + 1;
     if (index.section >= 1 && index.section <= 3)
         return index.row == 0 ? index.section + 2 : index.section + 5;
     return -1;
@@ -318,7 +319,7 @@ static UILabel *durationBadge(BOOL enabled) {
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 6; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     (void)table;
-    if (section <= 3) return 2;
+    if (section <= 3) return section == 0 ? 3 : 2;
     if (section == 4) return busy ? 2 : 0;
     return lastReport ? 1 + reportRows(lastReport).count : 0;
 }
@@ -350,7 +351,13 @@ static UILabel *durationBadge(BOOL enabled) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (action >= 6 && action <= 8) {
+    if (action == 9) {
+        content.text = NWText(@"bt.catalog.title"); content.secondaryText = NWText(@"bt.catalog.menu_hint");
+        content.image = [UIImage systemImageNamed:@"shuffle"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.accessibilityIdentifier = @"nw.bluetooth.catalog";
+        cell.selectionStyle = busy ? UITableViewCellSelectionStyleNone : UITableViewCellSelectionStyleDefault;
+    } else if (action >= 6 && action <= 8) {
         content.text = NWText(@"bt.ui.multiple");
         content.secondaryText = NWText(@[@"bt.ui.windows_multiple", @"bt.ui.apple_multiple", @"bt.ui.android_multiple"][action-6]);
         content.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
@@ -432,7 +439,7 @@ static UILabel *durationBadge(BOOL enabled) {
         tint = enabled ? NWAccentColor() : UIColor.tertiaryLabelColor;
         cell.accessibilityTraits |= UIAccessibilityTraitButton;
         if (!enabled) cell.accessibilityTraits |= UIAccessibilityTraitNotEnabled;
-        if (action >= 3) {
+        if (action >= 3 && action <= 8) {
             content.image = [UIImage systemImageNamed:action >= 6 ? @"square.stack.3d.up" : @"play.circle.fill"];
             cell.accessoryView = durationBadge(enabled);
             NSString *platform = NWText(@[@"bt.ui.windows", @"bt.ui.apple", @"bt.ui.android"][index.section-1]);
@@ -448,6 +455,10 @@ static UILabel *durationBadge(BOOL enabled) {
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
     [table deselectRowAtIndexPath:index animated:YES];
     NSInteger action = menuAction(index);
+    if (action == 9) {
+        if (!busy) [self.navigationController pushViewController:NWBluetoothCatalogController() animated:YES];
+        return;
+    }
     if (action == 1 && !busy) {
         [self.navigationController pushViewController:NWBLEController() animated:YES]; return;
     }
@@ -550,7 +561,12 @@ int NWBluetoothUIRegressionCheck(void) {
         [controller loadViewIfNeeded];
         if ([controller numberOfSectionsInTableView:controller.tableView] != 6 ||
             [controller tableView:controller.tableView numberOfRowsInSection:4] != 0 ||
-            [controller tableView:controller.tableView numberOfRowsInSection:0] != 2) return 42;
+            [controller tableView:controller.tableView numberOfRowsInSection:0] != 3) return 42;
+        NSIndexPath *catalog = [NSIndexPath indexPathForRow:2 inSection:0];
+        UITableViewCell *catalogCell = [controller tableView:controller.tableView cellForRowAtIndexPath:catalog];
+        if (catalogCell.selectionStyle != UITableViewCellSelectionStyleDefault || catalogCell.accessoryView ||
+            ![((UIListContentConfiguration *)catalogCell.contentConfiguration).text isEqual:NWText(@"bt.catalog.title")]) return 46;
+        if (NWBluetoothCatalogUIRegressionCheck()) return 47;
         for (NSInteger section=1; section<=3; section++) {
             if ([controller tableView:controller.tableView numberOfRowsInSection:section] != 2) return 43;
             for (NSInteger row=0; row<2; row++) {

@@ -193,3 +193,14 @@
 "bt.ui.emission_hint" = "Emisiones de 10 s. Apaga Bluetooth en Ajustes del iPhone para emitir; puedes detenerlas antes.";
 "bt.ui.help_title" = "Cómo usar Bluetooth";
 "bt.ui.help" = "Escáner: activa Bluetooth y concede el permiso. Solo aparecen dispositivos que anuncian BLE.\n\nCapacidades y emisiones: apaga Bluetooth en Ajustes del iPhone. Mantén Bluetooth activado en el receptor.\n\nElige uno o tres dispositivos de una plataforma. La emisión dura 10 segundos. Detener finaliza la emisión y restaura Bluetooth.\n\nWindows requiere Swift Pair activado. Estos anuncios no implementan el emparejamiento del accesorio y su recepción no garantiza un aviso del sistema.";
+
+"bt.catalog.title" = "Catálogo aleatorio";
+"bt.catalog.menu_hint" = "Apple, Google y Microsoft · simulación local";
+"bt.catalog.platform" = "Marca";
+"bt.catalog.selection" = "Modelos generados";
+"bt.catalog.hint" = "Elige una marca para explorar su catálogo.";
+"bt.catalog.generate" = "Generar tres modelos";
+"bt.catalog.generate_hint" = "Una combinación nueva en cada pulsación";
+"bt.catalog.generated" = "Tres modelos nuevos generados";
+"bt.catalog.identity" = "ID de simulación: %@";
+"bt.catalog.local_only" = "Simulación local. Los modelos solo se muestran en NukeWireless; no se emiten anuncios Bluetooth ni avisos de emparejamiento.";

@@ -193,3 +193,14 @@
 "bt.ui.emission_hint" = "10-second emissions. Turn off Bluetooth in iPhone Settings to emit; you can stop sooner.";
 "bt.ui.help_title" = "Using Bluetooth";
 "bt.ui.help" = "Scan: turn on Bluetooth and allow access. Only devices advertising BLE are shown.\n\nCapabilities and emissions: turn off Bluetooth in iPhone Settings. Keep Bluetooth enabled on the receiver.\n\nChoose one or three devices for a platform. Emissions last 10 seconds. Stop ends the emission and restores Bluetooth.\n\nWindows requires Swift Pair enabled. These announcements do not implement accessory pairing, and reception does not guarantee a system notification.";
+
+"bt.catalog.title" = "Random catalog";
+"bt.catalog.menu_hint" = "Apple, Google and Microsoft · local simulation";
+"bt.catalog.platform" = "Brand";
+"bt.catalog.selection" = "Generated models";
+"bt.catalog.hint" = "Choose a brand to explore its catalog.";
+"bt.catalog.generate" = "Generate three models";
+"bt.catalog.generate_hint" = "A new combination on every tap";
+"bt.catalog.generated" = "Three new models generated";
+"bt.catalog.identity" = "Simulation ID: %@";
+"bt.catalog.local_only" = "Local simulation. These models are displayed only in NukeWireless; no Bluetooth advertisements or pairing alerts are emitted.";
