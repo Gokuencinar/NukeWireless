@@ -6,12 +6,15 @@
 
 // SwiftUI force-casts its three original hosts during selection. Keep those
 // hosts and its delegate intact; a presentation bar routes native selections
-// and a separately contained navigation stack provides the Bluetooth tab.
+// and a navigation stack contained in the Wi-Fi host provides Bluetooth.
+// Adding it directly to UITabBarController also appends it to SwiftUI's array.
 @interface NWMainTabs : NSObject <UITabBarDelegate>
 @property(nonatomic, weak) UITabBarController *owner;
 @property(nonatomic, strong) UITabBar *bar;
 @property(nonatomic, strong) UINavigationController *bluetooth;
 @property(nonatomic) BOOL bluetoothSelected;
+@property(nonatomic, weak) UIView *suppressedPanel;
+@property(nonatomic) BOOL panelWasHidden;
 - (void)selectTag:(NSInteger)tag;
 - (void)style;
 @end
@@ -36,28 +39,38 @@ static char mainTabsKey;
     UITabBarController *tab = self.owner;
     if (!tab || tag < 0 || tag > 3) return;
     BOOL wantsBluetooth = tag == 3;
+    BOOL wasBluetooth = self.bluetoothSelected;
+    self.bluetoothSelected = wantsBluetooth;
+    if (wantsBluetooth) tab.selectedIndex = 0;
     if (wantsBluetooth && !self.bluetooth) {
+        UIViewController *host = tab.viewControllers.firstObject;
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:NWBluetoothController()];
         self.bluetooth = nav;
-        [tab addChildViewController:nav];
+        [host addChildViewController:nav];
         nav.view.hidden = YES; nav.view.translatesAutoresizingMaskIntoConstraints = NO;
-        nav.view.backgroundColor = NWCanvasColor(); [tab.view addSubview:nav.view];
+        nav.view.backgroundColor = NWCanvasColor(); [host.view addSubview:nav.view];
         [NSLayoutConstraint activateConstraints:@[
-            [nav.view.topAnchor constraintEqualToAnchor:tab.view.topAnchor],
-            [nav.view.leadingAnchor constraintEqualToAnchor:tab.view.leadingAnchor],
-            [nav.view.trailingAnchor constraintEqualToAnchor:tab.view.trailingAnchor],
+            [nav.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
+            [nav.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
+            [nav.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor],
             [nav.view.bottomAnchor constraintEqualToAnchor:tab.tabBar.topAnchor]
         ]];
-        [nav didMoveToParentViewController:tab]; [self style];
+        [nav didMoveToParentViewController:host]; [self style];
     }
-    if (wantsBluetooth != self.bluetoothSelected) {
-        self.bluetoothSelected = wantsBluetooth;
-        [self.bluetooth beginAppearanceTransition:wantsBluetooth animated:NO];
+    if (wantsBluetooth != wasBluetooth) {
         self.bluetooth.view.hidden = !wantsBluetooth;
+        [self.bluetooth beginAppearanceTransition:wantsBluetooth animated:NO];
         [self.bluetooth endAppearanceTransition];
     }
-    if (wantsBluetooth) [tab.view bringSubviewToFront:self.bluetooth.view];
-    else tab.selectedIndex = (NSUInteger)tag;
+    if (wantsBluetooth) {
+        [self.bluetooth.view.superview bringSubviewToFront:self.bluetooth.view];
+        UIView *panel = [tab.view viewWithTag:90122];
+        if (panel != self.suppressedPanel) { self.suppressedPanel = panel; self.panelWasHidden = panel.hidden; }
+        panel.hidden = YES;
+    } else {
+        self.suppressedPanel.hidden = self.panelWasHidden; self.suppressedPanel = nil;
+        tab.selectedIndex = (NSUInteger)tag;
+    }
     for (UITabBarItem *item in self.bar.items) if (item.tag == tag) self.bar.selectedItem = item;
     [tab.view bringSubviewToFront:tab.tabBar];
 }
@@ -96,7 +109,10 @@ void NWPrepareMainTabs(UITabBarController *tab) {
     }
     if (!tabs.bluetoothSelected) {
         for (UITabBarItem *item in tabs.bar.items) if (item.tag == (NSInteger)tab.selectedIndex) tabs.bar.selectedItem = item;
-    } else [tab.view bringSubviewToFront:tabs.bluetooth.view];
+    } else {
+        [tabs.bluetooth.view.superview bringSubviewToFront:tabs.bluetooth.view];
+        [tab.view viewWithTag:90122].hidden = YES;
+    }
     [tab.tabBar bringSubviewToFront:tabs.bar]; [tab.view bringSubviewToFront:tab.tabBar];
 }
 void NWStyleMainTabs(UITabBarController *tab) { [(NWMainTabs *)objc_getAssociatedObject(tab, &mainTabsKey) style]; }
@@ -107,9 +123,10 @@ int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
     if (selectBluetooth) {
         [tabs selectTag:3]; [tab.view layoutIfNeeded];
         if (!tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 3 || !tabs.bluetooth.view.window || tabs.bluetooth.view.hidden) return 21;
-        if (tabs.bluetooth.parentViewController != tab || tabs.bluetooth.viewControllers.count != 1 ||
+        if (tab.viewControllers.count != 3 || tabs.bluetooth.parentViewController != tab.viewControllers.firstObject || tabs.bluetooth.viewControllers.count != 1 ||
             ![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 22;
-        if (CGRectGetMaxY(tabs.bluetooth.view.frame) > CGRectGetMinY(tab.tabBar.frame) + 1) return 23;
+        CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
+        if (CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1) return 23;
     } else {
         [tabs selectTag:0];
         if (tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 0 || !tabs.bluetooth.view.hidden || tab.selectedIndex != 0) return 24;
