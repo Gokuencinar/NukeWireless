@@ -25,10 +25,8 @@ static NSObject *workerLock;
 static NSDictionary *lastReport;
 static BOOL readingLE;
 static BOOL labRunning;
-static BOOL operationBlocked(void) { return busy || NWBulkBusy(); }
-
 static BOOL labOperation(NSString *operation) {
-    return [operation isEqual:@"le_advertising_test"] || [operation isEqual:@"le_manufacturer_test"] || [operation isEqual:@"le_rotation_test"] || [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"] || [operation isEqual:@"le_fast_pair_test"];
+    return [operation isEqual:@"le_advertising_test"] || [operation isEqual:@"le_manufacturer_test"] || [operation isEqual:@"le_rotation_test"] || [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"] || [operation isEqual:@"le_fast_pair_test"] || [operation isEqual:@"le_multi_windows_test"] || [operation isEqual:@"le_multi_apple_test"] || [operation isEqual:@"le_multi_android_test"];
 }
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
@@ -60,7 +58,7 @@ static NSString *reportText(NSDictionary *report) {
         return NWText([report[@"advertising_stopped_acknowledged"] boolValue] &&
             [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] ?
             @"bt.lab.stopped" : @"bt.lab.stop_unconfirmed");
-    if (!code && [report[@"operation"] isEqual:@"le_rotation_test"])
+    if (!code && ([report[@"operation"] isEqual:@"le_rotation_test"]))
         return NWText([report[@"controller_advertising_acknowledged"] boolValue] &&
             [report[@"advertising_stopped_acknowledged"] boolValue] &&
             [report[@"acknowledged_sequence_count"] unsignedIntegerValue] == 10 ? @"bt.lab.rotation_accepted" : @"bt.lab.incomplete");
@@ -330,29 +328,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         stop.enabled = !stopping; stop.tintColor = UIColor.systemRedColor;
         stop.accessibilityIdentifier = @"nw.bluetooth.stop";
         self.navigationItem.rightBarButtonItem = stop;
-    } else if (lastReport) {
-        UIBarButtonItem *share = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"square.and.arrow.up"]
-            style:UIBarButtonItemStylePlain target:self action:@selector(exportReport)];
-        share.accessibilityLabel = NWText(@"bt.report.export");
-        share.accessibilityIdentifier = @"nw.bluetooth.export";
-        self.navigationItem.rightBarButtonItem = share;
     } else self.navigationItem.rightBarButtonItem = nil;
-}
-- (void)exportReport {
-    if (busy || !lastReport || self.presentedViewController) return;
-    NSDictionary *snapshot = @{@"schema_version": @1, @"report": lastReport};
-    NSData *data = [NSJSONSerialization dataWithJSONObject:snapshot options:NSJSONWritingPrettyPrinted error:NULL];
-    if (!data) return;
-    NSString *name = [NSString stringWithFormat:@"NukeWireless-Bluetooth-%@.json", NSUUID.UUID.UUIDString];
-    NSURL *url = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:name]];
-    if (![data writeToURL:url options:NSDataWritingAtomic error:NULL]) return;
-    UIActivityViewController *share = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
-    share.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItem;
-    share.completionWithItemsHandler = ^(UIActivityType activity, BOOL completed, NSArray *items, NSError *error) {
-        (void)activity; (void)completed; (void)items; (void)error;
-        [NSFileManager.defaultManager removeItemAtURL:url error:NULL];
-    };
-    [self presentViewController:share animated:YES completion:nil];
 }
 - (void)stopCurrentOperation {
     if (!busy || cancellationRequested()) return;
@@ -387,7 +363,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 5; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; if (section == 0) return 9;
+    (void)table; if (section == 0) return 12;
     if (section == 2) return 2;
     if (section == 3) return busy ? 2 : 1;
     if (section == 4) return 1 + reportRows(lastReport).count;
@@ -405,7 +381,14 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     NWStyleCell(cell); UIListContentConfiguration *content = [cell defaultContentConfiguration];
     content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    if (index.section == 0 && index.row == 8) {
+    if (index.section == 0 && index.row >= 9 && index.row <= 11) {
+        content.text = NWText(@[@"bt.lab.multi_windows_title", @"bt.lab.multi_apple_title", @"bt.lab.multi_android_title"][index.row-9]);
+        content.secondaryText = NWText(@"bt.lab.multi_menu");
+        content.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
+        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
+            [self.capabilities[@"supports_le_multi_device_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+        content.textProperties.color = NWAccentColor();
+    } else if (index.section == 0 && index.row == 8) {
         content.text = NWText(@"bt.lab.android_title");
         content.secondaryText = NWText(@"bt.lab.android_menu");
         content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
@@ -498,19 +481,6 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
                 [lastReport[@"acknowledged_sequence_count"] unsignedIntegerValue]]];
             [details addObject:NWText(@"bt.lab.rotation_receiver")];
         }
-        if (labOperation(lastReport[@"operation"])) {
-            if (lastReport[@"duration_seconds"] && lastReport[@"interval_ms"])
-                [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.plan"),
-                    [lastReport[@"duration_seconds"] doubleValue], [lastReport[@"interval_ms"] doubleValue]]];
-            if (lastReport[@"advertising_elapsed_seconds"])
-                [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.elapsed"),
-                    [lastReport[@"advertising_elapsed_seconds"] doubleValue]]];
-            if (lastReport[@"app_cancel_to_report_seconds"])
-                [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.cancel_elapsed"),
-                    [lastReport[@"app_cancel_to_report_seconds"] doubleValue]]];
-            [details addObject:NWText(@"bt.lab.rf_unverified")];
-        }
-        if ([lastReport[@"wifi_scan_active_at_start"] boolValue]) [details addObject:NWText(@"bt.report.wifi_parallel")];
         NSNumber *interval = lastReport[@"interval_ms"];
         if (!interval && lastReport[@"interval_seconds"]) interval = @([lastReport[@"interval_seconds"] doubleValue] * 1000);
         if (lastReport[@"requested_count"] && interval)
@@ -576,6 +546,12 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
             [self runArguments:@[@"--le-fast-pair-test"] operation:@"le_fast_pair_test"];
         return;
     }
+    if (index.section == 0 && index.row >= 9 && index.row <= 11) {
+        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_multi_device_test"] boolValue])
+            [self runArguments:@[@[@"--le-multi-windows-test", @"--le-multi-apple-test", @"--le-multi-android-test"][index.row-9]]
+                operation:@[@"le_multi_windows_test", @"le_multi_apple_test", @"le_multi_android_test"][index.row-9]];
+        return;
+    }
     if (index.section != 3) return;
     if (index.row) { [self stopCurrentOperation]; return; }
     if (busy || ![self.capabilities[@"supported"] boolValue]) return;
@@ -610,7 +586,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [self presentViewController:confirm animated:YES completion:nil];
 }
 - (void)begin:(NSString *)address {
-    if (operationBlocked()) {
+    if (busy || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil]; return;
@@ -633,14 +609,13 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     [self runArguments:arguments operation:nil];
 }
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation {
-    if (operationBlocked()) {
+    if (busy || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil]; return;
     }
     if (!workerLock) workerLock = [NSObject new];
     @synchronized (workerLock) { cancelling = NO; worker = 0; }
-    BOOL wifiScanActive = NWScanBusy();
     readingLE = [operation isEqual:@"le_capabilities"]; labRunning = labOperation(operation);
     [self.view endEditing:YES];
     busy = YES; lastReport = nil; [self.address resignFirstResponder];
@@ -651,7 +626,6 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSMutableDictionary *report = [invoke(arguments, YES) mutableCopy];
         if (operation) report[@"operation"] = operation;
-        report[@"wifi_scan_active_at_start"] = @(wifiScanActive);
         NSData *saved = [NSJSONSerialization dataWithJSONObject:report options:0 error:NULL];
         if (saved) {
             [NSUserDefaults.standardUserDefaults setObject:saved forKey:reportKey];
@@ -687,7 +661,6 @@ int NWBluetoothUIRegressionCheck(void) {
     @try {
         @synchronized (workerLock) { cancelling = NO; }
         busy = NO;
-        if (!NWScanBusy() || operationBlocked()) return 39;
         NSMutableString *bitmap = [NSMutableString new];
         for (NSUInteger i = 0; i < 64; ++i) [bitmap appendString:@"ff"];
         NSDictionary *commands = @{@"opcode": @0x1002, @"hci_status": @0, @"return_data_hex": bitmap};
@@ -788,7 +761,7 @@ int NWBluetoothUIRegressionCheck(void) {
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone || ![content.text isEqual:NWText(@"bt.stopping")]) return 26;
         [controller stopCurrentOperation]; // A repeated tap cannot restart or re-enable anything.
         busy = NO; [controller refresh:nil];
-        if (![controller.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.export"]) return 27;
+        if (controller.navigationItem.rightBarButtonItem) return 27;
         lastReport = @{@"operation": @"le_advertising_test", @"error_code": @"cancelled",
             @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
             @"advertising_set_removed": @YES, @"service_restored": @YES};
@@ -827,19 +800,16 @@ int NWBluetoothUIRegressionCheck(void) {
         busy = YES;
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:androidButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 38;
-        busy = NO;
-        lastReport = @{@"operation": @"le_fast_pair_test", @"duration_seconds": @10,
-            @"interval_ms": @100, @"advertising_elapsed_seconds": @3.25, @"app_cancel_to_report_seconds": @0.5,
-            @"wifi_scan_active_at_start": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.secondaryText containsString:NWText(@"bt.lab.rf_unverified")] ||
-            ![content.secondaryText containsString:NWText(@"bt.report.wifi_parallel")] ||
-            ![content.secondaryText containsString:[NSString stringWithFormat:NWText(@"bt.lab.elapsed"),3.25]]) return 40;
-        [controller refresh:nil];
-        if (![controller.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.export"]) return 41;
-        lastReport = nil; [controller refresh:nil];
-        if (controller.navigationItem.rightBarButtonItem) return 42;
+        busy = NO; controller.capabilities = @{};
+        NSIndexPath *sequenceButton = [NSIndexPath indexPathForRow:9 inSection:0];
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 39;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_multi_device_test": @YES};
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_multi_windows_test") || !NWScanBusy()) return 40;
+        busy = YES;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
         return 0;
     } @finally {
         NWEndWiFiScanUITest();

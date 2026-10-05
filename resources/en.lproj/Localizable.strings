@@ -192,9 +192,8 @@
 "bt.lab.android_menu" = "Fixed Pixel Buds laboratory advertisement. 100 ms interval; can be stopped early. Requires Bluetooth off in Settings.";
 "bt.lab.android_receiver" = "No Android receiver available: the Fast Pair prompt remains unverified. This tests discovery advertising only; it cannot pair a real accessory.";
 
-"bt.report.export" = "Export Bluetooth report";
-"bt.lab.plan" = "Limit: %.0f s · Interval: %.1f ms";
-"bt.lab.elapsed" = "Worker-measured advertising: %.2f s";
-"bt.lab.cancel_elapsed" = "Stop to report: %.2f s";
-"bt.lab.rf_unverified" = "Radio reception is not verified by this iPhone; an independent receiver is required.";
-"bt.report.wifi_parallel" = "This diagnostic started while the Wi-Fi scan was active.";
+"bt.error.advertising_sets" = "The controller does not support three simultaneous advertising sets.";
+"bt.lab.multi_windows_title" = "Windows: three devices (10 s)";
+"bt.lab.multi_apple_title" = "Apple: three models (10 s)";
+"bt.lab.multi_android_title" = "Android: three models (10 s)";
+"bt.lab.multi_menu" = "Three independent advertisements active during emission. Requires three controller sets. Tap Stop to finish early.";

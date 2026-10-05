@@ -232,7 +232,7 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL manufacturer, BOOL rotating, BOOL swiftPair, BOOL applePairing, BOOL fastPair) {
+static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL manufacturer, BOOL rotating, BOOL swiftPair, BOOL applePairing, BOOL fastPair, NSUInteger multiPlatform) {
     // Reject invalid options before guard, lock acquisition or service changes.
     if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
     NSDictionary *guard = NWBTVerifyBluetoothOff();
@@ -287,7 +287,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
             else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : lab ?
-                (fastPair ? NWBTAdvertiseFastPairLab() : applePairing ? NWBTAdvertiseApplePairingLab() : swiftPair ? NWBTAdvertiseSwiftPairLab() : rotating ? NWBTAdvertiseRotatingLab() : manufacturer ? NWBTAdvertiseManufacturerLab() : NWBTAdvertiseLab()) : NWBTReadLECapabilities()) mutableCopy];
+                (multiPlatform ? NWBTAdvertiseMultiDeviceLab(multiPlatform) : fastPair ? NWBTAdvertiseFastPairLab() : applePairing ? NWBTAdvertiseApplePairingLab() : swiftPair ? NWBTAdvertiseSwiftPairLab() : rotating ? NWBTAdvertiseRotatingLab() : manufacturer ? NWBTAdvertiseManufacturerLab() : NWBTAdvertiseLab()) : NWBTReadLECapabilities()) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -338,7 +338,9 @@ int main(int argc, char **argv) {
         BOOL swiftPair = argc == 2 && !strcmp(argv[1], "--le-swift-pair-test");
         BOOL applePairing = argc == 2 && !strcmp(argv[1], "--le-apple-pairing-test");
         BOOL fastPair = argc == 2 && !strcmp(argv[1], "--le-fast-pair-test");
-        lab = lab || manufacturer || rotating || swiftPair || applePairing || fastPair;
+        NSUInteger multiPlatform = argc!=2 ? 0 : !strcmp(argv[1], "--le-multi-windows-test") ? 1 :
+            !strcmp(argv[1], "--le-multi-apple-test") ? 2 : !strcmp(argv[1], "--le-multi-android-test") ? 3 : 0;
+        lab = lab || manufacturer || rotating || swiftPair || applePairing || fastPair || multiPlatform;
         // callerAllowed below admits only root or the exact installed app parent.
         recordAppRun = recordAppRun || capabilities || lab;
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
@@ -360,7 +362,7 @@ int main(int argc, char **argv) {
                 alarm(0);
                 return printReport(errorReport(@"transport"));
             }
-            NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair, applePairing, fastPair) mutableCopy];
+            NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, manufacturer, rotating, swiftPair, applePairing, fastPair, multiPlatform) mutableCopy];
             finishAppControl(report, &monitor);
             alarm(0); return printReport(report);
         }
@@ -373,7 +375,7 @@ int main(int argc, char **argv) {
                 @"supports_app_cancel_channel": @YES,
                 @"supports_le_advertising_test": @YES, @"supports_le_manufacturer_test": @YES,
                 @"supports_le_rotation_test": @YES, @"supports_le_swift_pair_test": @YES,
-                @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES});
+                @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES, @"supports_le_multi_device_test": @YES});
         }
         if (!milliseconds && ((argc != 3 && argc != 5) || strcmp(argv[1], "--ping"))) return printReport(errorReport(@"arguments"));
         NSUInteger count = NWBT_DEFAULT_COUNT, intervalMS = milliseconds ? NWBT_DEFAULT_INTERVAL_MS : NWBT_DEFAULT_INTERVAL;
@@ -397,7 +399,7 @@ int main(int argc, char **argv) {
             alarm(0);
             return printReport(errorReport(@"transport"));
         }
-        NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO, NO, NO) mutableCopy];
+        NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, NO, NO, NO, NO) mutableCopy];
         finishAppControl(report, &monitor);
         alarm(0); return printReport(report);
     }

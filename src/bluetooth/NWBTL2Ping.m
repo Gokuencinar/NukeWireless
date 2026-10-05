@@ -249,7 +249,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         @"service_uuid": rotating ? @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C22" : @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"connection_commands_submitted": @0,
-        @"duration_seconds": @10, @"interval_ms": @1000} mutableCopy];
+        @"duration_seconds": @10, @"interval_ms": @1000, @"requested_tx_power_dbm": @20} mutableCopy];
     if (swiftPair) {
         [report removeObjectForKey:@"service_uuid"];
         report[@"manufacturer_company_id"] = @6;
@@ -306,8 +306,11 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         if (fastPair) NWBTLabFastPairParameters(parameters); else if (swiftPair) NWBTLabSwiftPairParameters(parameters); else NWBTLabParameters(parameters);
         NSUInteger size = fastPair ? NWBTLabFastPairData(data) : applePairing ? NWBTLabApplePairingData(data) : swiftPair ? NWBTLabSwiftPairData(data) : rotating ? NWBTLabRotatingData(data, 0) : manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
         NWBTLabEnable(enable, 1);
-        if (!session.error && !NWBTCancelled)
-            configured = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO] != nil;
+        if (!session.error && !NWBTCancelled) {
+            NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO];
+            configured = reply != nil;
+            if (reply.length == 7) report[@"selected_tx_power_dbm"] = @((int8_t)((const uint8_t *)reply.bytes)[6]);
+        }
         if (configured && !session.error && !NWBTCancelled) {
             NSData *initial = [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
             if (initial && rotating) [sequences addObject:@0];
@@ -365,6 +368,91 @@ NSDictionary *NWBTAdvertiseSwiftPairLab(void) { return NWBTAdvertiseLabVariant(N
 NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVariant(NO, NO, NO, YES, NO); }
 
 NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(NO, NO, NO, NO, YES); }
+
+NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
+    if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
+    NSDictionary *error = NWBTNativeGuard(); if (error) return error;
+    uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    if (!channel) return error;
+    NWBTLabSession *session = [NWBTLabSession new];
+    session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
+    NSMutableArray *handles = [NSMutableArray new], *powers = [NSMutableArray new];
+    NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
+        @"queries": session.queries, @"advertisement_variant": @[@"multi_windows", @"multi_apple", @"multi_android"][platform-1],
+        @"models": @[@[@"NWLab Keyboard", @"NWLab Mouse", @"NWLab Audio"], @[@"AirPods Pro", @"AirPods Pro 2", @"AirPods Max"], @[@"Pixel Buds", @"Pixel Buds A", @"Sony WH-1000XM4"]][platform-1],
+        @"duration_seconds": @10, @"interval_ms": @100, @"requested_tx_power_dbm": @20,
+        @"requested_advertising_sets": @3, @"address_rotation": @NO, @"pairing_supported": @NO,
+        @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
+        @"advertising_stopped_acknowledged": @NO, @"advertising_set_removed": @NO,
+        @"connection_commands_submitted": @0, @"selected_tx_power_dbm_by_set": powers} mutableCopy];
+    BOOL enableSubmitted = NO; double started = 0;
+    @try {
+        session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
+        if (!session.ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
+        for (unsigned i=0;i<32;i++) {
+            if (![session.ring read]) break;
+            if (i==31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
+        }
+        if (session.ring.error) session.error = session.ring.error;
+        NSData *limit = session.error ? nil : [session command:0x203b parameters:[NSData data] phase:@"set_capacity" cleanup:NO];
+        if (limit.length != 7) { report[@"error"] = session.error ?: @"Advertising set capacity unavailable."; return report; }
+        unsigned supported = ((const uint8_t *)limit.bytes)[6];
+        report[@"supported_advertising_sets"] = @(supported);
+        if (supported < NWBT_LAB_PLATFORM_COUNT) {
+            report[@"error_code"] = @"advertising_sets";
+            report[@"error"] = @"The controller cannot support three simultaneous advertising sets.";
+            return report;
+        }
+        for (unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled;i++) {
+            uint8_t params[25], data[35]; NWBTLabFastPairParameters(params);
+            params[0] = NWBT_LAB_HANDLE+i; params[10] = 1; // Per-set static random address.
+            // Include the attempted handle in cleanup even after a lost completion.
+            [handles addObject:@(params[0])];
+            NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:params length:25]
+                phase:[NSString stringWithFormat:@"parameters_%u",i] cleanup:NO];
+            if (!reply) break;
+            [powers addObject:@((int8_t)((const uint8_t *)reply.bytes)[6])];
+            uint8_t address[7]; NWBTLabDeviceAddress(address,(unsigned)platform,i);
+            if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
+                phase:[NSString stringWithFormat:@"address_%u",i] cleanup:NO]) break;
+            size_t length = NWBTLabMultiDeviceData(data,(unsigned)platform,i);
+            data[0] = params[0];
+            [session command:0x2037 parameters:[NSData dataWithBytes:data length:length]
+                phase:[NSString stringWithFormat:@"data_%u",i] cleanup:NO];
+        }
+        if (handles.count==NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled) {
+            uint8_t enable[14]; NWBTLabMultiEnable(enable,1); enableSubmitted = YES;
+            NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:14] phase:@"enable" cleanup:NO];
+            report[@"controller_advertising_acknowledged"] = @(reply != nil);
+            if (reply) { started=now(); double deadline=started+10.0;
+                while (!session.error && !NWBTCancelled && now()<deadline) usleep(20000);
+            }
+        }
+    } @finally {
+        if (started) report[@"advertising_elapsed_seconds"] = @(now()-started);
+        NSString *original = session.error; session.error = nil;
+        BOOL clean = YES;
+        if (enableSubmitted) {
+            uint8_t stop[14]; NWBTLabMultiEnable(stop,0);
+            clean = [session command:0x2039 parameters:[NSData dataWithBytes:stop length:14] phase:@"disable" cleanup:YES] != nil;
+            report[@"advertising_stopped_acknowledged"] = @(clean);
+        }
+        BOOL removed = handles.count>0;
+        for (NSNumber *value in handles) {
+            uint8_t handle=value.unsignedCharValue; session.error=nil;
+            if (![session command:0x203c parameters:[NSData dataWithBytes:&handle length:1]
+                phase:[NSString stringWithFormat:@"remove_%u",handle] cleanup:YES]) removed=NO;
+        }
+        report[@"advertising_set_removed"] = @(removed);
+        report[@"local_hci_commands_submitted"] = @(session.commands);
+        if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
+        else if (original || !clean || (handles.count && !removed)) report[@"error"] = original ?: @"Advertising cleanup incomplete.";
+        else if (![report[@"controller_advertising_acknowledged"] boolValue] && !report[@"error"])
+            report[@"error"] = @"Multi-platform advertisements were not enabled.";
+        NWBTCloseNativeChannel(channel);
+    }
+    return report;
+}
 
 @interface NWBTPingSession : NSObject
 @property(nonatomic, strong) NWBTRing *hci, *acl;

@@ -6,7 +6,7 @@ int main(void) {
     uint8_t p[25], data[35], enable[6];
     NWBTLabParameters(p);
     assert(p[0]==NWBT_LAB_HANDLE && p[1]==0x10 && p[2]==0);
-    assert((p[3] | p[4]<<8 | p[5]<<16)==1600 && p[9]==7 && p[10]==0 && p[19]==0);
+    assert((p[3] | p[4]<<8 | p[5]<<16)==1600 && p[9]==7 && p[10]==0 && p[19]==20);
     size_t n=NWBTLabData(data); assert(n==32 && data[3]==28);
     for (size_t offset=4; offset<n;) { assert(data[offset]>0 && offset+data[offset]+1<=n); offset+=data[offset]+1; }
     n=NWBTLabManufacturerData(data); assert(n==35 && data[3]==31);
@@ -61,7 +61,7 @@ int main(void) {
     uint8_t appleCopy[35]; memcpy(appleCopy,data,sizeof data);
     assert(NWBTLabApplePairingData(data)==35 && !memcmp(data,appleCopy,sizeof data));
     NWBTLabFastPairParameters(p);
-    assert(p[1]==0x10 && p[2]==0 && p[10]==0 && p[19]==0);
+    assert(p[1]==0x10 && p[2]==0 && p[10]==0 && p[19]==20);
     assert((p[3] | p[4]<<8 | p[5]<<16)==160 && !memcmp(p+3,p+6,3));
     n=NWBTLabFastPairData(data); assert(n==18 && data[3]==14);
     unsigned services=0;
@@ -77,6 +77,26 @@ int main(void) {
     assert(services==1);
     uint8_t googleCopy[35]; memcpy(googleCopy,data,sizeof data);
     assert(NWBTLabFastPairData(data)==18 && !memcmp(data,googleCopy,sizeof data));
+    uint8_t addr[3][7];
+    for(unsigned platform=1;platform<=3;platform++) {
+        for(unsigned model=0;model<3;model++) {
+            n=NWBTLabMultiDeviceData(data,platform,model);assert(n>4 && n<=35 && (size_t)data[3]+4==n && data[0]==NWBT_LAB_HANDLE+model);
+            for(size_t offset=4;offset<n;) { assert(data[offset]>0 && offset+data[offset]+1<=n); offset+=data[offset]+1; }
+            assert(NWBTLabDeviceAddress(addr[model],platform,model)==7 && (addr[model][6]&0xc0)==0xc0);
+            if(platform==2) { const uint16_t ids[]={0x200e,0x2014,0x200a};assert((data[11] | data[12]<<8)==ids[model]); }
+            if(platform==3) { const uint8_t ids[][3]={{0xcd,0x82,0x56},{0,0,0x47},{0x14,0,0x45}};assert(!memcmp(data+15,ids[model],3)); }
+        }
+        assert(memcmp(addr[0]+1,addr[1]+1,6) && memcmp(addr[1]+1,addr[2]+1,6));
+    }
+    assert(!NWBTLabMultiDeviceData(data,0,0) && !NWBTLabMultiDeviceData(data,1,3));
+    assert(!NWBTLabDeviceAddress(addr[0],4,0));
+    uint8_t multiple[14];
+    assert(NWBTLabMultiEnable(multiple,1)==14 && multiple[0]==1 && multiple[1]==3);
+    for(unsigned i=0;i<3;i++) assert(multiple[2+i*4]==NWBT_LAB_HANDLE+i &&
+        (multiple[3+i*4] | multiple[4+i*4]<<8)==1000 && multiple[5+i*4]==0);
+    NWBTLabMultiEnable(multiple,0);
+    for(unsigned i=0;i<3;i++) assert(multiple[0]==0 && multiple[3+i*4]==0 && multiple[4+i*4]==0);
+    assert(NWBTLabReplySize(0x203b)==2 && NWBTLabReplySize(0x203a)==0);
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
     assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);

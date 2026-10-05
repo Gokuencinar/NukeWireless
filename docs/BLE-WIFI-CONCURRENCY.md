@@ -1,13 +1,11 @@
-# Bluetooth durante el escaneo Wi-Fi (dev38)
+# Bluetooth durante Wi-Fi y anuncios de varios modelos (dev38/app22)
 
-El escaneo Wi-Fi/LAN ya no bloquea el ping, las consultas del controlador ni las pruebas de anuncios BLE. Tampoco bloquea el escáner BLE de CoreBluetooth. Se retiraron cuatro dependencias artificiales de NWScanBusy; continúan la exclusión entre operaciones Bluetooth, el bloqueo durante operaciones de bloqueo Wi-Fi y las condiciones de acceso al controlador.
+Se eliminaron cuatro restricciones de NWScanBusy para permitir ping, consultas, anuncios y escáner BLE mientras continúa el escaneo LAN. Se conserva la exclusión Bluetooth y durante bloqueos.
 
-El escáner LAN utiliza interfaces de red y su estado/cola independiente; no comparte el transporte HCI ni el canal de cancelación del trabajador Bluetooth. Los callbacks se serializan en el hilo principal y las operaciones de radio continúan en el trabajador. Compartir el chip puede afectar rendimiento; no se promete ausencia de interferencia ni se modifican parámetros del Wi-Fi.
+Tres modos separados de 10 segundos: Windows anuncia NWLab Keyboard, NWLab Mouse y NWLab Audio; Apple anuncia AirPods Pro (200E), AirPods Pro 2 Lightning (2014) y AirPods Max (200A); Android anuncia Pixel Buds (CD8256), Pixel Buds A (000047) y Sony WH-1000XM4 (140045). Cada modo utiliza tres conjuntos activos con direcciones static-random distintas y fijas; no alterna perfiles ni rota identidades durante el ensayo. Son anuncios de descubrimiento, sin emparejamiento real.
 
-Mejoras de laboratorio: el informe muestra duración configurada, intervalo, tiempo de emisión medido por el trabajador, latencia de cancelación y si el escaneo Wi-Fi estaba activo al iniciar. El botón Compartir exporta el informe completo a JSON, conservando respuestas HCI y errores; el archivo temporal se elimina al cerrar la hoja. La interfaz distingue ACK del controlador y recepción RF independiente.
+El controlador se consulta mediante LE Read Number of Supported Advertising Sets antes de configurar. Con menos de tres conjuntos, se rechaza la prueba sin emisión ni alternancia encubierta. Se solicitan +20 dBm, máximo del parámetro estándar HCI; el valor realmente elegido queda en el registro interno. Cadencia 100 ms por conjunto, límite de controlador 10 s y Detener conservados. Se desactivan y retiran todos los conjuntos en la recuperación.
 
-No se aumenta la potencia RF ni se amplían duración o tasas de emisión. Permanecen los perfiles fijos y el límite de diez segundos, Detener y recuperación independiente. Estas mejoras permiten medir y comparar resultados, sin implementar jamming, saturación ni desconexión de conexiones ajenas.
+No se añaden pantallas de diagnóstico ni exportación. Fixtures de Wi-Fi activo y framing de las tres identidades verifican el cambio en el simulador y C. Los avisos Apple/Android quedan sin verificar si no hay receptores. AirPods 4 no se etiqueta con un identificador no contrastado.
 
-Verificación automática: fixtures del estado LAN mantienen NWScanning durante las pruebas Bluetooth y durante el ciclo real de la interfaz BLE con un central simulado. Esos fixtures no se incluyen en el binario instalado. También se comprueban el bloqueo Bluetooth, el botón Detener y la exportación disponible solo con informe y sin trabajo activo.
-
-El usuario está ausente: no se pedirá desbloqueo ni una prueba manual. La instalación y la carga se comprobarán si SSH y el estado del dispositivo lo permiten; no se afirmará una prueba física simultánea Wi-Fi/Bluetooth sin evidencia.
+Fuentes: ESP32-TOOLS Modern dc59cd372530d17633efd20b8a2421c3e60cfdfe (Model IDs Google), AppleJuice app.py y myhomeiot/esphome-components examples/ble_gateway/airpods.yaml (200E/2014/200A), Bluetooth Core HCI LE Set Extended Advertising Parameters, Set Advertising Set Random Address y Read Number of Supported Advertising Sets.
