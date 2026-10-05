@@ -62,7 +62,9 @@ static char mainTabsKey;
             [nav.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
             [nav.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
             [nav.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor],
-            [nav.view.bottomAnchor constraintEqualToAnchor:tab.tabBar.topAnchor]
+            // The native selection may not have attached the host to tab.view
+            // yet. Keep constraints inside the host's hierarchy.
+            [nav.view.bottomAnchor constraintEqualToAnchor:host.view.safeAreaLayoutGuide.bottomAnchor]
         ]];
         [nav didMoveToParentViewController:host]; [self style];
     }

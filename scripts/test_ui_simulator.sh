@@ -5,6 +5,17 @@ sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 arch="$(uname -m)"
 out="$PWD/build/ui"
 mkdir -p "$out/UIRegression.app/Frameworks"
+collect_ui_artifacts() {
+  if [ -n "${container:-}" ]; then
+    for path in "$container"/Documents/*.png "$container"/Documents/*.json; do
+      if [ -f "$path" ]; then cp "$path" "$out/"; fi
+    done
+  fi
+  for path in "$HOME"/Library/Logs/DiagnosticReports/UIRegression*.ips; do
+    if [ -f "$path" ]; then cp "$path" "$out/"; fi
+  done
+}
+trap collect_ui_artifacts EXIT
 xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3 -isysroot "$sdk" \
   -Wall -Wextra -Werror -fobjc-arc -fblocks -fPIC -O2 -dynamiclib -DNW_UI_TESTING \
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \

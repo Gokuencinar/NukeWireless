@@ -14,6 +14,7 @@ jobs:
       - name: SwiftUI tab navigation regression
         run: bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: nuke-wireless-development
           path: |
@@ -24,4 +25,6 @@ jobs:
             build/ui/*-wifi.png
             build/ui/*-info.png
             build/ui/*-bluetooth.png
+            build/ui/*.json
+            build/ui/*.ips
           retention-days: 7
