@@ -33,8 +33,14 @@
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated]; NWStyleNavigationBar(self.navigationController.navigationBar);
 }
+- (void)traitCollectionDidChange:(UITraitCollection *)previous {
+    [super traitCollectionDidChange:previous];
+    if (!self.isViewLoaded || ![self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous]) return;
+    dispatch_async(dispatch_get_main_queue(), ^{ [self refresh:nil]; });
+}
 - (void)refresh:(NSNotification *)notification {
     (void)notification;
+    NWStyleNavigationBar(self.navigationController.navigationBar);
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
     [self.tableView reloadData];
 }
@@ -102,7 +108,7 @@
     } else {
         NSDictionary *model = self.models[index.row];
         content.text = model[@"name"];
-        content.secondaryText = [NSString stringWithFormat:NWText(@"bt.catalog.identity"), model[@"identity"]];
+        content.secondaryText = [NSString stringWithFormat:NWText(@"bt.catalog.identity"), [model[@"identity"] substringToIndex:14]];
         content.image = [UIImage systemImageNamed:@"cube.transparent"];
         cell.accessibilityIdentifier = [NSString stringWithFormat:@"nw.catalog.model.%ld", (long)index.row];
     }
