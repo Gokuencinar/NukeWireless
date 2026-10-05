@@ -13,8 +13,6 @@
 @property(nonatomic, strong) UITabBar *bar;
 @property(nonatomic, strong) UINavigationController *bluetooth;
 @property(nonatomic) BOOL bluetoothSelected;
-@property(nonatomic, weak) UIView *suppressedPanel;
-@property(nonatomic) BOOL panelWasHidden;
 - (void)selectTag:(NSInteger)tag;
 - (void)style;
 @end
@@ -75,11 +73,12 @@ static char mainTabsKey;
     }
     if (wantsBluetooth) {
         [self.bluetooth.view.superview bringSubviewToFront:self.bluetooth.view];
-        UIView *panel = [tab.view viewWithTag:90122];
-        if (panel != self.suppressedPanel) { self.suppressedPanel = panel; self.panelWasHidden = panel.hidden; }
-        panel.hidden = YES;
+        [tab.view viewWithTag:90122].hidden = YES;
     } else {
-        self.suppressedPanel.hidden = self.panelWasHidden; self.suppressedPanel = nil;
+        // The pinned legacy appearance hook shows this panel only at index 0.
+        // Restore that policy even if Bluetooth was entered from Info/Hotspot,
+        // or the panel was created after the asynchronous native selection.
+        [tab.view viewWithTag:90122].hidden = tag != 0;
         tab.selectedIndex = (NSUInteger)tag;
     }
     for (UITabBarItem *item in self.bar.items) if (item.tag == tag) self.bar.selectedItem = item;
@@ -136,23 +135,30 @@ int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs || tabs.bar.items.count != 4 || tabs.bar.superview != tab.tabBar) return 20;
     if (selectBluetooth) {
+        if (![tab.view viewWithTag:90122]) {
+            UIView *panel = [UIView new]; panel.tag = 90122;
+            panel.hidden = tab.selectedIndex != 0; [tab.view addSubview:panel];
+        }
         [tabs selectTag:3]; [tab.view layoutIfNeeded];
         // UIKit attaches the newly selected host at the next transition. The
         // delayed stability check verifies window attachment and geometry.
-        if (!tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 3 || tabs.bluetooth.view.hidden) return 21;
+        if (!tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 3 || tabs.bluetooth.view.hidden ||
+            ![tab.view viewWithTag:90122].hidden) return 21;
         if (tab.viewControllers.count != 3 || tabs.bluetooth.parentViewController != tab.viewControllers.firstObject ||
             tabs.bluetooth.viewControllers.count != 1) return 22;
     } else {
         [tabs selectTag:1]; [tabs selectTag:2];
         [tabs selectTag:0];
-        if (tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 0 || !tabs.bluetooth.view.hidden || tab.selectedIndex != 0) return 24;
+        if (tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 0 || !tabs.bluetooth.view.hidden || tab.selectedIndex != 0 ||
+            [tab.view viewWithTag:90122].hidden) return 24;
     }
     return 0;
 }
 int NWMainTabsStabilityCheck(UITabBarController *tab) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs.bluetoothSelected || tab.selectedIndex != 0 || tab.viewControllers.count != 3 ||
-        !tabs.bluetooth.view.window || tabs.bluetooth.view.hidden || tabs.bar.selectedItem.tag != 3) return 25;
+        !tabs.bluetooth.view.window || tabs.bluetooth.view.hidden || tabs.bar.selectedItem.tag != 3 ||
+        ![tab.view viewWithTag:90122].hidden) return 25;
     if (![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 26;
     CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
     return CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1 ? 23 : 0;
