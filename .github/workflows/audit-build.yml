@@ -22,9 +22,7 @@ jobs:
             build/audit/build-manifest.json
             build/audit/NukeLaunch.storyboardc/
             build/audit/NWBootPic.png
-            build/ui/*-wifi.png
-            build/ui/*-info.png
-            build/ui/*-bluetooth.png
+            build/ui/*.png
             build/ui/*.json
             build/ui/*.ips
           retention-days: 7
