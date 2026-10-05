@@ -9,6 +9,10 @@ NSString *NWBulkTitle(void);
 BOOL NWRefreshScan(void);
 void NWConfirmBulk(UIViewController *presenter);
 BOOL NWCanRestartForLanguage(void);
+#ifdef NW_UI_TESTING
+void NWBeginWiFiScanUITest(void);
+void NWEndWiFiScanUITest(void);
+#endif
 // Presentation-only copies. Never expose native mutable devices to the browser.
 NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void);
 uint64_t NWDeviceGeneration(void);

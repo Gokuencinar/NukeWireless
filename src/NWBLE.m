@@ -87,7 +87,7 @@
         UIApplication.sharedApplication.applicationState != UIApplicationStateActive) {
         [self saveDiagnostics:@"waiting_for_active_view"]; return;
     }
-    if (NWBluetoothBusy() || NWScanBusy() || NWBulkBusy()) {
+    if (NWBluetoothBusy() || NWBulkBusy()) {
         self.requested = NO; self.status = NWText(@"bt.error.busy"); [self refreshRows]; return;
     }
     self.scanning = YES; self.status = NWText(@"ble.scanning");
@@ -184,7 +184,7 @@
     }
     if (index.section == 0) {
         if (self.requested || self.scanning) { [self stop]; return; }
-        if (NWBluetoothBusy() || NWScanBusy() || NWBulkBusy()) {
+        if (NWBluetoothBusy() || NWBulkBusy()) {
             self.status = NWText(@"bt.error.busy"); [self refreshRows]; return;
         }
         [self.records removeAllObjects]; self.discoveries = 0; self.submitted = NO;
@@ -233,7 +233,8 @@ UIViewController *NWBLEController(void) { return [NWBLEViewController new]; }
     (void)services; (void)options; self.starts++; self.scanning = YES;
 }
 @end
-int NWBLEUIRegressionCheck(void) {
+static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
+    if (!NWScanBusy()) return 9;
     NWBLEViewController *controller = [NWBLEViewController new];
     [controller loadViewIfNeeded];
     if (controller.central || controller.scanning || controller.rows.count) return 1;
@@ -264,5 +265,10 @@ int NWBLEUIRegressionCheck(void) {
     if (fixture.isScanning || controller.requested || controller.scanning) return 8;
     [controller.view removeFromSuperview]; controller.central = nil;
     return 0;
+}
+int NWBLEUIRegressionCheck(void) {
+    NWBeginWiFiScanUITest();
+    @try { return NWBLEWhileWiFiScanUIRegressionCheck(); }
+    @finally { NWEndWiFiScanUITest(); }
 }
 #endif

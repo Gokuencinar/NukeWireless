@@ -103,7 +103,7 @@
 "bt.error.arguments" = "The Bluetooth request is invalid.";
 "bt.error.permissions" = "The Bluetooth helper could not be accessed. Reinstall the module to restore its signature and permissions.";
 "bt.error.bluetooth_off" = "Turn Bluetooth off in iPhone Settings before starting the diagnostic.";
-"bt.error.busy" = "Wait for the current diagnostic, scan, or blocking operation to finish.";
+"bt.error.busy" = "Wait for the current Bluetooth or blocking operation to finish.";
 "bt.error.service" = "The Bluetooth service state could not be checked.";
 "bt.error.exclusive" = "Exclusive Bluetooth controller access could not be obtained.";
 "bt.error.recovery" = "Bluetooth service restoration has not been confirmed. Independent recovery remains active; wait a few seconds before retrying.";
@@ -191,3 +191,10 @@
 "bt.lab.android_title" = "Android: Fast Pair (10 s)";
 "bt.lab.android_menu" = "Fixed Pixel Buds laboratory advertisement. 100 ms interval; can be stopped early. Requires Bluetooth off in Settings.";
 "bt.lab.android_receiver" = "No Android receiver available: the Fast Pair prompt remains unverified. This tests discovery advertising only; it cannot pair a real accessory.";
+
+"bt.report.export" = "Export Bluetooth report";
+"bt.lab.plan" = "Limit: %.0f s · Interval: %.1f ms";
+"bt.lab.elapsed" = "Worker-measured advertising: %.2f s";
+"bt.lab.cancel_elapsed" = "Stop to report: %.2f s";
+"bt.lab.rf_unverified" = "Radio reception is not verified by this iPhone; an independent receiver is required.";
+"bt.report.wifi_parallel" = "This diagnostic started while the Wi-Fi scan was active.";

@@ -387,3 +387,9 @@ void NWInstallScanHooks(void) {
     NSLog(@"Nuke Wireless: native scan hooks start=%d callbacks=%d/%d/%d", oldStart != NULL,
           oldFound != NULL, oldFinished != NULL, oldFailed != NULL);
 }
+
+#ifdef NW_UI_TESTING
+static NWScanState uiTestSavedScanState;
+void NWBeginWiFiScanUITest(void) { uiTestSavedScanState = state; state.phase = NWScanning; }
+void NWEndWiFiScanUITest(void) { state = uiTestSavedScanState; }
+#endif
