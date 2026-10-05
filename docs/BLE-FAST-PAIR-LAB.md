@@ -15,3 +15,13 @@ Fuentes primarias:
 Pruebas: framing AD y orden de bytes del Model ID, intervalo 100 ms, dirección sin rotación, modo no conectable, duración de controlador 10 s y disponibilidad/bloqueo de la fila en español e inglés. Se conservan la firma y permisos existentes.
 
 La prueba Apple anterior confirmó la cancelación desde la app en 2,277 s de emisión y 0,512 s desde Detener hasta el informe, con desactivación, retirada del anuncio y recuperación del servicio reconocidas. La laptop no recibió el paquete Apple en la captura; no hay prueba de recepción ni de aviso Apple.
+
+## Verificación física dev37/app21
+
+Instalado en iPhone XS / iOS 16.3.1 / RootHide, tras compilaciones CI ef2a125. Las pruebas nativas, interfaz en español/inglés y las siete comprobaciones del paquete pasaron. Se conserva la firma `me.midnightchips.harpy-reloaded`.
+
+La laptop Windows recibió cuatro anuncios con Service Data FE2C `cd8256` y RSSI de −40 a −43 dBm. El ensayo se inició desde la app (UID 501) y se canceló mediante Detener: 3,293604 s de emisión y 0,493590 s de solicitud a informe. Parámetros, datos, activación, desactivación y retirada recibieron HCI Command Complete con status 0; el servicio Bluetooth se restauró. El usuario confirmó el mensaje de parada.
+
+No hay un teléfono Android receptor: el aviso Fast Pair sigue sin verificar. El helper no interpreta un ACK como prueba de recepción; la evidencia RF pertenece al receptor independiente. No se ha verificado con un analizador de radio el instante exacto del último paquete.
+
+Copias anteriores en el iPhone: `/var/mobile/Documents/NukeWireless-dev36-backup.deb` y `/var/mobile/Documents/NukeWireless-Bluetooth-app20-backup.deb`.
