@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app25"
+#define NWBT_VERSION @"0.0.3~app26"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.
@@ -16,11 +16,7 @@ FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadSkywalkController(void);
 // Five allowlisted local HCI reads, bounded to twelve seconds. Requires the
 // runner's exclusive ownership and recovery; does not enable radio operations.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTReadLECapabilities(void);
-// Fixed nonconnectable NWLab announcement, 1 second interval, 10 second
-// controller duration. Runner owns exclusive transport and service recovery.
-FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseLab(void);
-FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseManufacturerLab(void);
-FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseRotatingLab(void);
+// Finite discovery profiles; runner owns exclusive transport and recovery.
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseSwiftPairLab(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseApplePairingLab(void);
 FOUNDATION_EXPORT NSDictionary<NSString *, id> *NWBTAdvertiseFastPairLab(void);

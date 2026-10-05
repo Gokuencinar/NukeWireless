@@ -236,7 +236,9 @@ NSDictionary *NWBTReadLECapabilities(void) {
 }
 @end
 
-static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, BOOL swiftPair, BOOL applePairing, BOOL fastPair) {
+static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
+    if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
+    BOOL swiftPair=platform==1, applePairing=platform==2, fastPair=platform==3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
@@ -244,14 +246,12 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
     double advertisingStarted = 0;
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
-        @"queries": session.queries, @"advertisement_name": fastPair || applePairing || (manufacturer && !swiftPair) ? @"" : @"NWLab",
-        @"advertisement_variant": fastPair ? @"fast_pair" : applePairing ? @"apple_pairing" : swiftPair ? @"swift_pair" : rotating ? @"rotating_manufacturer" : manufacturer ? @"manufacturer" : @"service_name",
-        @"service_uuid": rotating ? @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C22" : @"7AD172A1-6D8C-4D0A-9BEA-8D8F3B5C9C21",
+        @"queries": session.queries, @"advertisement_name": fastPair || applePairing ? @"" : @"NWLab",
+        @"advertisement_variant": fastPair ? @"fast_pair" : applePairing ? @"apple_pairing" : @"swift_pair",
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"connection_commands_submitted": @0,
-        @"duration_seconds": @10, @"interval_ms": @1000, @"requested_tx_power_dbm": @20} mutableCopy];
+        @"duration_seconds": @10, @"interval_ms": @100, @"requested_tx_power_dbm": @20} mutableCopy];
     if (swiftPair) {
-        [report removeObjectForKey:@"service_uuid"];
         report[@"manufacturer_company_id"] = @6;
         report[@"manufacturer_data_hex"] = @"0300804e574c6162";
         report[@"interval_ms"] = @152.5;
@@ -259,12 +259,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         report[@"pairing_supported"] = @NO;
         report[@"windows_notification_verified"] = @NO;
     }
-    if (manufacturer) {
-        report[@"manufacturer_company_id"] = @65535;
-        report[@"manufacturer_data_hex"] = rotating ? @"4e57526f0100" : @"4e574c616201";
-    }
     if (applePairing) {
-        [report removeObjectForKey:@"service_uuid"];
         uint8_t frame[35]; size_t length = NWBTLabApplePairingData(frame);
         NSMutableString *hex = [NSMutableString new];
         for (size_t offset = 8; offset < length; ++offset) [hex appendFormat:@"%02x", frame[offset]];
@@ -287,13 +282,6 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         report[@"address_rotation"] = @NO;
         report[@"pairing_supported"] = @NO;
     }
-    NSMutableArray *sequences = [NSMutableArray new];
-    if (rotating) {
-        report[@"acknowledged_sequences"] = sequences;
-        report[@"requested_sequence_count"] = @NWBT_LAB_ROTATION_COUNT;
-        report[@"payload_update_interval_ms"] = @1000;
-        report[@"address_rotation"] = @NO;
-    }
     BOOL configured = NO, enableSubmitted = NO;
     @try {
         session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
@@ -304,9 +292,9 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         }
         if (session.ring.error) session.error = session.ring.error;
         uint8_t parameters[25], data[35], enable[6];
-        if (fastPair || applePairing) NWBTLabFastPairParameters(parameters); else if (swiftPair) NWBTLabSwiftPairParameters(parameters); else NWBTLabParameters(parameters);
+        if (fastPair || applePairing) NWBTLabFastPairParameters(parameters); else NWBTLabSwiftPairParameters(parameters);
         if (fastPair || applePairing) parameters[10] = 1;
-        NSUInteger size = fastPair ? NWBTLabFastPairData(data) : applePairing ? NWBTLabApplePairingData(data) : swiftPair ? NWBTLabSwiftPairData(data) : rotating ? NWBTLabRotatingData(data, 0) : manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
+        NSUInteger size = fastPair ? NWBTLabFastPairData(data) : applePairing ? NWBTLabApplePairingData(data) : NWBTLabSwiftPairData(data);
         NWBTLabEnable(enable, 1);
         if (!session.error && !NWBTCancelled) {
             NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO];
@@ -324,25 +312,15 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
             }
         }
         if (configured && !session.error && !NWBTCancelled) {
-            NSData *initial = [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
-            if (initial && rotating) [sequences addObject:@0];
+            [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
         }
         if (configured && !session.error && !NWBTCancelled) {
             enableSubmitted = YES;
             NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
             report[@"controller_advertising_acknowledged"] = @(reply != nil);
             if (reply) advertisingStarted = now();
-            double deadline = now() + 10.0, nextUpdate = now() + 1.0;
-            unsigned sequence = 1;
+            double deadline = now() + 10.0;
             while (reply && !session.error && now() < deadline && !NWBTCancelled) {
-                if (rotating && sequence < NWBT_LAB_ROTATION_COUNT && now() >= nextUpdate) {
-                    size = NWBTLabRotatingData(data, sequence);
-                    NSString *phase = [NSString stringWithFormat:@"data_sequence_%u", sequence];
-                    if ([session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:phase cleanup:NO])
-                        [sequences addObject:@(sequence++)];
-                    // Schedule from completion: a slow controller never causes a burst.
-                    nextUpdate = now() + 1.0;
-                }
                 usleep(20000);
             }
         }
@@ -364,7 +342,6 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
                 @([session command:0x203c parameters:[NSData dataWithBytes:&handle length:1] phase:@"remove" cleanup:YES] != nil);
         }
         report[@"local_hci_commands_submitted"] = @(session.commands);
-        if (rotating) report[@"acknowledged_sequence_count"] = @(sequences.count);
         if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
         else if (originalError || session.error) report[@"error"] = originalError ?: session.error;
         else if (![report[@"controller_advertising_acknowledged"] boolValue]) report[@"error"] = @"Lab advertisement was not enabled.";
@@ -373,13 +350,10 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
     return report;
 }
 
-NSDictionary *NWBTAdvertiseLab(void) { return NWBTAdvertiseLabVariant(NO, NO, NO, NO, NO); }
-NSDictionary *NWBTAdvertiseManufacturerLab(void) { return NWBTAdvertiseLabVariant(YES, NO, NO, NO, NO); }
-NSDictionary *NWBTAdvertiseRotatingLab(void) { return NWBTAdvertiseLabVariant(YES, YES, NO, NO, NO); }
-NSDictionary *NWBTAdvertiseSwiftPairLab(void) { return NWBTAdvertiseLabVariant(NO, NO, YES, NO, NO); }
-NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVariant(NO, NO, NO, YES, NO); }
+NSDictionary *NWBTAdvertiseSwiftPairLab(void) { return NWBTAdvertiseLabVariant(1); }
+NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVariant(2); }
 
-NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(NO, NO, NO, NO, YES); }
+NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(3); }
 
 NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
     if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};

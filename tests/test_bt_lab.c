@@ -7,34 +7,7 @@ int main(void) {
     NWBTLabParameters(p);
     assert(p[0]==NWBT_LAB_HANDLE && p[1]==0x10 && p[2]==0);
     assert((p[3] | p[4]<<8 | p[5]<<16)==1600 && p[9]==7 && p[10]==0 && p[19]==20);
-    size_t n=NWBTLabData(data); assert(n==32 && data[3]==28);
-    for (size_t offset=4; offset<n;) { assert(data[offset]>0 && offset+data[offset]+1<=n); offset+=data[offset]+1; }
-    n=NWBTLabManufacturerData(data); assert(n==35 && data[3]==31);
-    unsigned manufacturers=0, names=0;
-    for (size_t offset=4; offset<n;) {
-        assert(data[offset]>0 && offset+data[offset]+1<=n);
-        if (data[offset+1]==0xff) {
-            manufacturers++;
-            assert(data[offset]==9 && data[offset+2]==0xff && data[offset+3]==0xff);
-            assert(!memcmp(data+offset+4,"NWLab\1",6));
-        }
-        if (data[offset+1]==9) names++;
-        offset+=data[offset]+1;
-    }
-    assert(manufacturers==1 && names==0);
-    for (unsigned sequence=0; sequence<NWBT_LAB_ROTATION_COUNT; ++sequence) {
-        n=NWBTLabRotatingData(data,sequence);
-        assert(n==35 && data[3]==31 && data[9]==0x22);
-        assert(data[25]==9 && data[26]==0xff && data[27]==0xff && data[28]==0xff);
-        assert(!memcmp(data+29,"NWRo\1",5) && data[34]==sequence);
-        for (size_t offset=4; offset<n;) {
-            assert(data[offset]>0 && offset+data[offset]+1<=n);
-            offset+=data[offset]+1;
-        }
-    }
-    uint8_t original[35];memcpy(original,data,sizeof data);
-    assert(NWBTLabRotatingData(data,NWBT_LAB_ROTATION_COUNT)==0);
-    assert(NWBTLabRotatingData(data,~0u)==0 && !memcmp(data,original,sizeof data));
+    size_t n; uint8_t original[35];
     NWBTLabSwiftPairParameters(p);
     assert(p[1]==0x10 && p[2]==0 && p[10]==0); // No connection or identity rotation.
     assert((p[3] | p[4]<<8 | p[5]<<16)==244 && !memcmp(p+3,p+6,3));
