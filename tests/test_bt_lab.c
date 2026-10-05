@@ -80,7 +80,7 @@ int main(void) {
     uint8_t addr[3][7];
     for(unsigned platform=1;platform<=3;platform++) {
         for(unsigned model=0;model<3;model++) {
-            n=NWBTLabMultiDeviceData(data,platform,model);assert(n>4 && n<=35 && (size_t)data[3]+4==n && data[0]==NWBT_LAB_HANDLE+model);
+            n=NWBTLabMultiDeviceData(data,platform,model);assert(n>4 && n<=35 && (size_t)data[3]+4==n && data[0]==NWBT_LAB_MULTI_HANDLE+model && data[0]<=0xef);
             for(size_t offset=4;offset<n;) { assert(data[offset]>0 && offset+data[offset]+1<=n); offset+=data[offset]+1; }
             assert(NWBTLabDeviceAddress(addr[model],platform,model)==7 && (addr[model][6]&0xc0)==0xc0);
             if(platform==2) { const uint16_t ids[]={0x200e,0x2014,0x200a};assert((data[11] | data[12]<<8)==ids[model]); }
@@ -92,7 +92,7 @@ int main(void) {
     assert(!NWBTLabDeviceAddress(addr[0],4,0));
     uint8_t multiple[14];
     assert(NWBTLabMultiEnable(multiple,1)==14 && multiple[0]==1 && multiple[1]==3);
-    for(unsigned i=0;i<3;i++) assert(multiple[2+i*4]==NWBT_LAB_HANDLE+i &&
+    for(unsigned i=0;i<3;i++) assert(multiple[2+i*4]==NWBT_LAB_MULTI_HANDLE+i && multiple[2+i*4]<=0xef &&
         (multiple[3+i*4] | multiple[4+i*4]<<8)==1000 && multiple[5+i*4]==0);
     NWBTLabMultiEnable(multiple,0);
     for(unsigned i=0;i<3;i++) assert(multiple[0]==0 && multiple[3+i*4]==0 && multiple[4+i*4]==0);

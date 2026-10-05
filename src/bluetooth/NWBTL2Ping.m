@@ -405,7 +405,7 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
         }
         for (unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled;i++) {
             uint8_t params[25], data[35]; NWBTLabFastPairParameters(params);
-            params[0] = NWBT_LAB_HANDLE+i; params[10] = 1; // Per-set static random address.
+            params[0] = NWBT_LAB_MULTI_HANDLE+i; params[10] = 1; // Per-set static random address.
             // Include the attempted handle in cleanup even after a lost completion.
             [handles addObject:@(params[0])];
             NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:params length:25]

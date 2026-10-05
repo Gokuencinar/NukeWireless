@@ -92,13 +92,14 @@ static inline size_t NWBTLabFastPairData(uint8_t p[35]) {
     return sizeof advertisement + 4;
 }
 #define NWBT_LAB_PLATFORM_COUNT 3
+#define NWBT_LAB_MULTI_HANDLE 0xe0
 static inline size_t NWBTLabMultiDeviceData(uint8_t p[35], unsigned platform, unsigned model) {
     if (platform<1 || platform>3 || model>=3) return 0;
     if (platform==1) {
         const char *names[]={"NWLab Keyboard","NWLab Mouse","NWLab Audio"};
         size_t length=strlen(names[model]); memset(p,0,35);
         const uint8_t head[]={2,1,6,0,0xff,6,0,3,0,0x80};
-        p[0]=NWBT_LAB_HANDLE+model;p[1]=3;p[2]=1;p[3]=10+length;
+        p[0]=NWBT_LAB_MULTI_HANDLE+model;p[1]=3;p[2]=1;p[3]=10+length;
         memcpy(p+4,head,sizeof head);p[7]=6+length;memcpy(p+14,names[model],length);
         return 14+length;
     }
@@ -110,18 +111,18 @@ static inline size_t NWBTLabMultiDeviceData(uint8_t p[35], unsigned platform, un
         const uint8_t models[3][3]={{0xcd,0x82,0x56},{0,0,0x47},{0x14,0,0x45}};
         length=NWBTLabFastPairData(p);memcpy(p+15,models[model],3);
     }
-    p[0]=NWBT_LAB_HANDLE+model;return length;
+    p[0]=NWBT_LAB_MULTI_HANDLE+model;return length;
 }
 static inline size_t NWBTLabDeviceAddress(uint8_t p[7], unsigned platform, unsigned model) {
     if(platform<1 || platform>3 || model>=3) return 0;
     // Separate lab static-random identities, unchanged for the whole emission.
-    const uint8_t address[]={NWBT_LAB_HANDLE+model,model+1,0,platform,0x57,0x4e,0xc2};
+    const uint8_t address[]={NWBT_LAB_MULTI_HANDLE+model,model+1,0,platform,0x57,0x4e,0xc2};
     memcpy(p,address,sizeof address);return sizeof address;
 }
 static inline size_t NWBTLabMultiEnable(uint8_t p[14], int enabled) {
     memset(p, 0, 14); p[0] = enabled ? 1 : 0; p[1] = NWBT_LAB_PLATFORM_COUNT;
     for (unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT;i++) {
-        p[2+i*4] = NWBT_LAB_HANDLE+i;
+        p[2+i*4] = NWBT_LAB_MULTI_HANDLE+i;
         if (enabled) { p[3+i*4]=0xe8; p[4+i*4]=3; }
     }
     return 14;
