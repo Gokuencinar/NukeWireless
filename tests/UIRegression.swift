@@ -47,15 +47,15 @@ struct RegressionTabs: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     results.append(checkUI(1))
                     snapshot("info.png")
-                    selection = 0
+                    results.append(checkUI(3))
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        results.append(checkUI(2))
-                        results.append(checkUI(3))
+                        results.append(checkUI(5))
                         snapshot("bluetooth.png")
                         results.append(checkUI(4))
+                        results.append(checkUI(2))
                         results.append(checkBLEUI())
                         results.append(checkBluetoothUI())
-                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0, 0, 0]]
+                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0, 0, 0, 0]]
                         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                             .appendingPathComponent("ui-regression.json")
                         try? JSONSerialization.data(withJSONObject: report).write(to: file)

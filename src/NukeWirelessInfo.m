@@ -729,6 +729,7 @@ int NWUIRegressionCheck(int phase) {
         if (![config.text isEqualToString:NWText(@"language.title")]) return 17;
     } else if (phase == 2 && tab.selectedIndex != 0) return 11;
     else if (phase == 3 || phase == 4) return NWMainTabsRegressionCheck(tab, phase == 3);
+    else if (phase == 5) return NWMainTabsStabilityCheck(tab);
     return 0;
 }
 #endif

@@ -39,6 +39,15 @@ static char mainTabsKey;
     UITabBarController *tab = self.owner;
     if (!tab || tag < 0 || tag > 3) return;
     BOOL wantsBluetooth = tag == 3;
+    NSUInteger nativeIndex = wantsBluetooth ? 0 : (NSUInteger)tag;
+    UIViewController *nativeHost = tab.viewControllers[nativeIndex];
+    id<UITabBarControllerDelegate> delegate = tab.delegate;
+    if ([delegate respondsToSelector:@selector(tabBarController:shouldSelectViewController:)] &&
+        ![delegate tabBarController:tab shouldSelectViewController:nativeHost]) {
+        NSInteger oldTag = self.bluetoothSelected ? 3 : (NSInteger)tab.selectedIndex;
+        for (UITabBarItem *item in self.bar.items) if (item.tag == oldTag) self.bar.selectedItem = item;
+        return;
+    }
     BOOL wasBluetooth = self.bluetoothSelected;
     self.bluetoothSelected = wantsBluetooth;
     if (wantsBluetooth) tab.selectedIndex = 0;
@@ -73,6 +82,10 @@ static char mainTabsKey;
     }
     for (UITabBarItem *item in self.bar.items) if (item.tag == tag) self.bar.selectedItem = item;
     [tab.view bringSubviewToFront:tab.tabBar];
+    // Keep SwiftUI's selection binding aligned with UIKit. Only the three
+    // original hosts ever reach its delegate, including Bluetooth's underlay.
+    if ([delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
+        [delegate tabBarController:tab didSelectViewController:nativeHost];
 }
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     (void)tabBar; [self selectTag:item.tag];
@@ -128,9 +141,15 @@ int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
         CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
         if (CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1) return 23;
     } else {
+        [tabs selectTag:1]; [tabs selectTag:2];
         [tabs selectTag:0];
         if (tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 0 || !tabs.bluetooth.view.hidden || tab.selectedIndex != 0) return 24;
     }
     return 0;
+}
+int NWMainTabsStabilityCheck(UITabBarController *tab) {
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    return tabs.bluetoothSelected && tab.selectedIndex == 0 && tab.viewControllers.count == 3 &&
+        tabs.bluetooth.view.window && !tabs.bluetooth.view.hidden && tabs.bar.selectedItem.tag == 3 ? 0 : 25;
 }
 #endif
