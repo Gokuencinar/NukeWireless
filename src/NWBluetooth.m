@@ -501,13 +501,13 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
         if (labOperation(lastReport[@"operation"])) {
             if (lastReport[@"duration_seconds"] && lastReport[@"interval_ms"])
                 [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.plan"),
-                    [lastReport[@"duration_seconds"] doubleValue], [lastReport[@"interval_ms"] doubleValue]];
+                    [lastReport[@"duration_seconds"] doubleValue], [lastReport[@"interval_ms"] doubleValue]]];
             if (lastReport[@"advertising_elapsed_seconds"])
                 [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.elapsed"),
-                    [lastReport[@"advertising_elapsed_seconds"] doubleValue]];
+                    [lastReport[@"advertising_elapsed_seconds"] doubleValue]]];
             if (lastReport[@"app_cancel_to_report_seconds"])
                 [details addObject:[NSString stringWithFormat:NWText(@"bt.lab.cancel_elapsed"),
-                    [lastReport[@"app_cancel_to_report_seconds"] doubleValue]];
+                    [lastReport[@"app_cancel_to_report_seconds"] doubleValue]]];
             [details addObject:NWText(@"bt.lab.rf_unverified")];
         }
         if ([lastReport[@"wifi_scan_active_at_start"] boolValue]) [details addObject:NWText(@"bt.report.wifi_parallel")];
