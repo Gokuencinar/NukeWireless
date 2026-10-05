@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-#define NWBT_VERSION @"0.0.3~app24"
+#define NWBT_VERSION @"0.0.3~app25"
 #import "../NWBluetoothLimits.h"
 
 // Passive capability inspection; this entry point sends no Bluetooth packets.

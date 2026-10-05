@@ -1,4 +1,4 @@
-# Bluetooth durante Wi-Fi y anuncios de varios modelos (dev38/app22)
+# Bluetooth durante Wi-Fi y anuncios de varios modelos (dev38/app25)
 
 Se eliminaron cuatro restricciones de NWScanBusy para permitir ping, consultas, anuncios y escáner BLE mientras continúa el escaneo LAN. Se conserva la exclusión Bluetooth y durante bloqueos.
 
@@ -9,3 +9,11 @@ El controlador se consulta mediante LE Read Number of Supported Advertising Sets
 No se añaden pantallas de diagnóstico ni exportación. Fixtures de Wi-Fi activo y framing de las tres identidades verifican el cambio en el simulador y C. Los avisos Apple/Android quedan sin verificar si no hay receptores. AirPods 4 no se etiqueta con un identificador no contrastado.
 
 Fuentes: ESP32-TOOLS Modern dc59cd372530d17633efd20b8a2421c3e60cfdfe (Model IDs Google), AppleJuice app.py y myhomeiot/esphome-components examples/ble_gateway/airpods.yaml (200E/2014/200A), Bluetooth Core HCI LE Set Extended Advertising Parameters, Set Advertising Set Random Address y Read Number of Supported Advertising Sets.
+
+## Correcciones del controlador y recepción
+
+Los handles de los conjuntos son E0/E1/E2 (rango HCI válido hasta EF). El firmware del XS rechazó la activación agrupada de tres conjuntos con estado 0x12; app24 los activa individualmente y los mantiene activos simultáneamente. La captura Windows recibió las tres identidades de laboratorio y los tres nombres. El controlador confirmó seis conjuntos disponibles, seleccionó +12 dBm en ese ensayo, desactivó y eliminó los tres conjuntos y restauró el servicio. La potencia seleccionada puede variar; solicitar +20 dBm no prueba que se emita a +20 dBm ni mide la potencia radiada.
+
+App25 cambia los anuncios individuales Apple y Android a direcciones static-random de laboratorio fijas, iguales a la primera identidad de su modo múltiple, evitando reutilizar la dirección pública del iPhone. Apple individual pasa de 1000 a 100 ms. Android individual y múltiple incluyen AD Tx Power Level con el valor firmado seleccionado por el controlador. Ese valor es una referencia de potencia HCI, no una calibración de distancia GFPS a 0 metros. La calibración de proximidad sigue requiriendo medición RSSI a un metro en el receptor Android y puede verse sustituida por la configuración del modelo almacenada por Google.
+
+Fuentes de requisitos: [configuración GFPS](https://developers.google.com/nearby/fast-pair/specifications/configuration), [calibración de potencia y proximidad](https://developers.google.com/nearby/fast-pair/materials-and-technical-notes), [supresión y configuración de notificaciones](https://developers.google.com/nearby/fast-pair/fast-pair-faq), [requisitos del receptor Android](https://support.google.com/android/answer/16885780?hl=en). La aparición de una tarjeta en Apple o Android requiere una comprobación independiente en esos receptores. No se implementan claves de accesorio, emparejamiento, estado de propietario ni anuncios que hagan fallar el sistema.

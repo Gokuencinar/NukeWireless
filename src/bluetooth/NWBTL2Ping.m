@@ -273,6 +273,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         report[@"apple_product_id"] = @0x200e;
         report[@"apple_product_name"] = @"AirPods Pro";
         report[@"apple_notification_verified"] = @NO;
+        report[@"interval_ms"] = @100;
         report[@"address_rotation"] = @NO;
         report[@"pairing_supported"] = @NO;
     }
@@ -303,13 +304,24 @@ static NSDictionary *NWBTAdvertiseLabVariant(BOOL manufacturer, BOOL rotating, B
         }
         if (session.ring.error) session.error = session.ring.error;
         uint8_t parameters[25], data[35], enable[6];
-        if (fastPair) NWBTLabFastPairParameters(parameters); else if (swiftPair) NWBTLabSwiftPairParameters(parameters); else NWBTLabParameters(parameters);
+        if (fastPair || applePairing) NWBTLabFastPairParameters(parameters); else if (swiftPair) NWBTLabSwiftPairParameters(parameters); else NWBTLabParameters(parameters);
+        if (fastPair || applePairing) parameters[10] = 1;
         NSUInteger size = fastPair ? NWBTLabFastPairData(data) : applePairing ? NWBTLabApplePairingData(data) : swiftPair ? NWBTLabSwiftPairData(data) : rotating ? NWBTLabRotatingData(data, 0) : manufacturer ? NWBTLabManufacturerData(data) : NWBTLabData(data);
         NWBTLabEnable(enable, 1);
         if (!session.error && !NWBTCancelled) {
             NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:parameters length:25] phase:@"parameters" cleanup:NO];
             configured = reply != nil;
             if (reply.length == 7) report[@"selected_tx_power_dbm"] = @((int8_t)((const uint8_t *)reply.bytes)[6]);
+        }
+        if (configured && !session.error && !NWBTCancelled && (fastPair || applePairing)) {
+            uint8_t address[7]; NWBTLabDeviceAddress(address, applePairing ? 2 : 3, 0);
+            address[0] = NWBT_LAB_HANDLE;
+            [session command:0x2035 parameters:[NSData dataWithBytes:address length:7] phase:@"address" cleanup:NO];
+            if (fastPair) {
+                size = NWBTLabFastPairPower(data, [report[@"selected_tx_power_dbm"] intValue]);
+                if (!size) session.error = @"Selected transmit power cannot be encoded.";
+                report[@"tx_power_ad_source"] = @"controller_selected_uncalibrated";
+            }
         }
         if (configured && !session.error && !NWBTCancelled) {
             NSData *initial = [session command:0x2037 parameters:[NSData dataWithBytes:data length:size] phase:@"data" cleanup:NO];
@@ -416,6 +428,11 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
             if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
                 phase:[NSString stringWithFormat:@"address_%u",i] cleanup:NO]) break;
             size_t length = NWBTLabMultiDeviceData(data,(unsigned)platform,i);
+            if (platform==3) {
+                length = NWBTLabFastPairPower(data,(int8_t)((const uint8_t *)reply.bytes)[6]);
+                if (!length) { session.error = @"Selected transmit power cannot be encoded."; break; }
+                report[@"tx_power_ad_source"] = @"controller_selected_uncalibrated";
+            }
             data[0] = params[0];
             [session command:0x2037 parameters:[NSData dataWithBytes:data length:length]
                 phase:[NSString stringWithFormat:@"data_%u",i] cleanup:NO];

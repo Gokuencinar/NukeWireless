@@ -77,6 +77,17 @@ int main(void) {
     assert(services==1);
     uint8_t googleCopy[35]; memcpy(googleCopy,data,sizeof data);
     assert(NWBTLabFastPairData(data)==18 && !memcmp(data,googleCopy,sizeof data));
+    const int powers[]={-127,-12,0,8,12,20};
+    for(unsigned i=0;i<sizeof powers/sizeof powers[0];i++) {
+        NWBTLabFastPairData(data);
+        assert(NWBTLabFastPairPower(data,powers[i])==21 && data[3]==17);
+        assert(data[18]==2 && data[19]==0x0a && (int8_t)data[20]==powers[i]);
+        assert(!memcmp(data+4,googleCopy+4,14));
+        for(size_t offset=4;offset<21;) { assert(data[offset]>0 && offset+data[offset]+1<=21); offset+=data[offset]+1; }
+    }
+    NWBTLabFastPairData(data);memcpy(original,data,sizeof data);
+    assert(!NWBTLabFastPairPower(data,-128) && !NWBTLabFastPairPower(data,127));
+    assert(!memcmp(original,data,sizeof data));
     uint8_t addr[3][7];
     for(unsigned platform=1;platform<=3;platform++) {
         for(unsigned model=0;model<3;model++) {

@@ -91,6 +91,13 @@ static inline size_t NWBTLabFastPairData(uint8_t p[35]) {
     memcpy(p + 4, advertisement, sizeof advertisement);
     return sizeof advertisement + 4;
 }
+static inline size_t NWBTLabFastPairPower(uint8_t p[35], int power) {
+    // AD Tx Power Level uses signed dBm. Use the controller's selected power,
+    // never the requested maximum; this is not a GFPS distance calibration.
+    if (power < -127 || power > 20 || p[3] != 14) return 0;
+    p[18] = 2; p[19] = 0x0a; p[20] = (uint8_t)(int8_t)power; p[3] = 17;
+    return 21;
+}
 #define NWBT_LAB_PLATFORM_COUNT 3
 #define NWBT_LAB_MULTI_HANDLE 0xe0
 static inline size_t NWBTLabMultiDeviceData(uint8_t p[35], unsigned platform, unsigned model) {
