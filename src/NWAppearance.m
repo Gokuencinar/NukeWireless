@@ -54,6 +54,7 @@ void NWStyleCell(UITableViewCell *cell) {
     cell.backgroundConfiguration = background; cell.tintColor = NWAccentColor();
 }
 void NWStyleNavigationBar(UINavigationBar *bar) {
+    if (!bar) return;
     UINavigationBarAppearance *appearance = [UINavigationBarAppearance new];
     [appearance configureWithDefaultBackground];
     appearance.backgroundColor = NWCanvasColor();
