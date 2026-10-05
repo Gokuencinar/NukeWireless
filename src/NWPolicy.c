@@ -24,6 +24,9 @@ bool NWScanRetryAllowed(const NWScanState *s, double now, unsigned retries, unsi
     return !retries && queueIdle && !NWStateBusy(s) &&
         (s->phase == NWFailed || (s->phase == NWComplete && !rows)) && now - s->progress >= 2;
 }
+bool NWScanEmptyQueueExpired(const NWScanState *s, double now, bool startReturned, bool queueIdle, unsigned peers) {
+    return s->phase == NWScanning && startReturned && queueIdle && !peers && now - s->progress >= 5;
+}
 // Host-order IPv4 values. Fail closed when the current network is unknown.
 bool NWEligibleAddress(uint32_t ip, uint32_t local, uint32_t mask, uint32_t gateway, const uint8_t mac[6]) {
     uint32_t hostmask = ~mask;

@@ -10,5 +10,6 @@ bool NWStateFinish(NWScanState *state, uint64_t generation, bool success);
 bool NWStateExpired(const NWScanState *state, double now);
 bool NWScanInterfaceReady(uint32_t local, uint32_t mask);
 bool NWScanRetryAllowed(const NWScanState *state, double now, unsigned retries, unsigned rows, bool queueIdle);
+bool NWScanEmptyQueueExpired(const NWScanState *state, double now, bool startReturned, bool queueIdle, unsigned peers);
 bool NWEligibleAddress(uint32_t ip, uint32_t local, uint32_t mask, uint32_t gateway, const uint8_t mac[6]);
 double NWPacketInterval(double value);

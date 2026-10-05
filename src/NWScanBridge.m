@@ -35,6 +35,8 @@ static __weak NWLegacyScanner *activeScanner;
 static NSString *recoveryNetwork;
 static unsigned recoveryRetries;
 static double networkReadySince;
+static NSObject *activeStartToken;
+static BOOL nativeStartReturned;
 static void (*oldStart)(id, SEL);
 extern void NWInvokeRefresh(void *adapter, const void *entry);
 static void notify(void) { [NSNotificationCenter.defaultCenter postNotificationName:NWStateChanged object:nil]; }
@@ -64,6 +66,11 @@ static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
         break;
     }
     freeifaddrs(first);
+}
+static unsigned peerDeviceCount(uint32_t local) {
+    unsigned count = 0;
+    for (NSString *ip in devices) if (ipv4(ip) != local) ++count;
+    return count;
 }
 static uint32_t configurationGateway(void) {
     static void *framework;
@@ -131,7 +138,12 @@ static void armWatchdog(uint64_t generation) {
     [watchdog invalidate];
     watchdog = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
         if (state.generation != generation || !NWStateBusy(&state)) { [timer invalidate]; return; }
-        if (NWStateExpired(&state, CACurrentMediaTime())) {
+        double now = CACurrentMediaTime(); BOOL expired = NWStateExpired(&state, now);
+        if (!expired && nativeStartReturned && !activeScanner.queue.operationCount) {
+            uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+            expired = NWScanEmptyQueueExpired(&state, now, YES, YES, peerDeviceCount(local));
+        }
+        if (expired) {
             NWLegacyScanner *scanner = activeScanner;
             finish(generation, NO, 1);
             // Native stop waits for operations. Never run that wait on main.
@@ -195,10 +207,12 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     if (scanner.enableHotspot || ![adapter isKindOfClass:NSClassFromString(@"_TtC13HarpyReloaded10LanScanner")]) {
         oldStart(scanner, sel); return;
     }
+    NSObject *token = [NSObject new];
     onMain(^{
         BOOL pending = state.phase == NWStarting && adapter == wifiAdapter;
         wifiAdapter = adapter;
         activeScanner = scanner;
+        activeStartToken = token; nativeStartReturned = NO;
         if (!pending) NWStateBegin(&state, CACurrentMediaTime());
         state.phase = NWScanning; state.progress = CACurrentMediaTime();
         devices = [NSMutableDictionary new]; scanNetwork = networkIdentity();
@@ -211,6 +225,9 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
         NSLog(@"Nuke Wireless: native scan start failed (%@)", exception.name);
         onMain(^{ if (adapter == wifiAdapter) finish(state.generation, NO, 1); });
     }
+    // An empty native queue does not necessarily publish its completion. Do
+    // not infer a stalled start until the synchronous setup has returned.
+    onMain(^{ if (activeStartToken == token) nativeStartReturned = YES; });
 }
 BOOL NWScanBusy(void) { return NWStateBusy(&state); }
 void NWReconcileDeviceStates(void) {
@@ -292,7 +309,7 @@ void NWMaintainWiFiScan(void) {
     if (now - networkReadySince < 2 || activeScanner.queue.operationCount || NWScanBusy()) return;
     BOOL movedNetwork = state.phase == NWComplete && scanNetwork && ![scanNetwork isEqual:network];
     if ((!recoveryRetries && movedNetwork) ||
-        NWScanRetryAllowed(&state, now, recoveryRetries, (unsigned)devices.count, YES)) {
+        NWScanRetryAllowed(&state, now, recoveryRetries, peerDeviceCount(local), YES)) {
         if (refreshScan(NO)) ++recoveryRetries;
     }
 }

@@ -25,6 +25,13 @@ int main(void) {
     assert(NWScanRetryAllowed(&state, 403, 0, 1, true));
     state.phase = NWScanning;
     assert(!NWScanRetryAllowed(&state, 403, 0, 0, true));
+    assert(NWScanEmptyQueueExpired(&state, 405, true, true, 0));
+    assert(!NWScanEmptyQueueExpired(&state, 404, true, true, 0));
+    assert(!NWScanEmptyQueueExpired(&state, 405, false, true, 0));
+    assert(!NWScanEmptyQueueExpired(&state, 405, true, false, 0));
+    assert(!NWScanEmptyQueueExpired(&state, 405, true, true, 1));
+    state.phase = NWStarting;
+    assert(!NWScanEmptyQueueExpired(&state, 405, true, true, 0));
     assert(NWScanInterfaceReady(0xc0a80114, 0xffffff00));
     assert(NWScanInterfaceReady(0x0a201234, 0xffff0000));
     assert(!NWScanInterfaceReady(0, 0xffffff00));
