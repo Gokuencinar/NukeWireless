@@ -70,14 +70,9 @@
 "browser.copyHint" = "Tap to copy the IP address.";
 "browser.copied" = "IP address copied";
 "bt.title" = "Bluetooth";
-"bt.intro" = "Classic Bluetooth ping";
+"bt.intro" = "Bluetooth tools";
 "bt.checking" = "Checking the Bluetooth module…";
 "bt.ready" = "Module available for this iPhone.";
-"bt.address" = "Bluetooth address (BR/EDR)";
-"bt.prepare" = "Use an accessory you own. Disconnect it from other devices, put it in pairing mode, and turn Bluetooth off in iPhone Settings before starting.";
-"bt.limits" = "Small pings with automatic Bluetooth service restoration and cancellation.";
-"bt.start" = "Send pings";
-"bt.running" = "Diagnostic in progress…";
 "bt.cancel" = "Cancel and restore Bluetooth";
 "bt.stop" = "Stop";
 "bt.lab.apple_title" = "Apple: BLE test (10 s)";
@@ -90,16 +85,11 @@
 "bt.lab.stop_help" = "You can stop this test from the navigation bar. Advertising also ends automatically after 10 seconds. Notifications already received must be dismissed on the receiving device.";
 "bt.results" = "Results";
 "bt.empty" = "No results yet.";
-"bt.summary" = "%lu of %lu pings answered";
-"bt.sequence" = "Ping %lu";
-"bt.rtt" = "Response in %.2f ms";
-"bt.rejected" = "The accessory rejected the echo.";
 "bt.timeout" = "No response before the deadline.";
 "bt.restored" = "Bluetooth service restored. You can turn it back on in Settings.";
 "bt.finished" = "Bluetooth diagnostic finished.";
 "bt.error.missing" = "Install the NukeWireless Bluetooth Bridge module first.";
 "bt.error.unsupported" = "This transport is only verified and enabled on iPhone XS, iOS 16.3.1, and Dopamine RootHide.";
-"bt.error.address" = "Enter a valid Bluetooth address, with six colon-separated pairs.";
 "bt.error.arguments" = "The Bluetooth request is invalid.";
 "bt.error.permissions" = "The Bluetooth helper could not be accessed. Reinstall the module to restore its signature and permissions.";
 "bt.error.bluetooth_off" = "Turn Bluetooth off in iPhone Settings before starting the diagnostic.";
@@ -112,15 +102,6 @@
 "bt.error.cancelled" = "Diagnostic cancelled.";
 "bt.error.no_echo" = "No valid echo was received. Some accessories do not respond to this diagnostic.";
 "bt.error.transport" = "The Bluetooth transport could not complete the diagnostic.";
-"bt.options" = "Ping options";
-"bt.count" = "Number of pings";
-"bt.options_limits" = "Enter 1–20 pings and 1000–5000 ms between sends. Count × interval must not exceed 20000 ms. Connection and restoration take additional time.";
-"bt.confirm_options" = "Send %lu small pings, %lu ms apart, to this address. Bluetooth will be controlled temporarily and its service restored when finished. Keep your accessory ready.";
-"bt.result_options" = "Requested: %lu pings · Interval: %lu ms";
-"bt.error.options" = "Update the NukeWireless Bluetooth Bridge module to use this interval in milliseconds.";
-"bt.interval_ms" = "Interval (ms)";
-"bt.done" = "Done";
-"bt.error.values" = "Enter a valid count and interval.";
 
 "bt.error.page_timeout" = "The accessory did not respond to the connection attempt (HCI 0x04). If it is connected to your laptop or another device, disconnect it there and retry. You do not need to remove the pairing; if it still does not respond, put it in pairing mode.";
 
@@ -137,7 +118,7 @@
 "ble.start" = "Start BLE scan";
 "ble.stop" = "Stop BLE scan";
 "ble.limits" = "Up to 30 devices, ordered by signal. Stops after 15 seconds, on leaving this screen or when the app enters the background. No connections are made.";
-"ble.identity" = "iOS exposes a device UUID, not its Bluetooth MAC. This UUID cannot be used for L2CAP ping. Only devices advertising BLE are visible; manufacturer data is unauthenticated.";
+"ble.identity" = "iOS exposes a device UUID, not its Bluetooth MAC. Only devices advertising BLE are visible; manufacturer data is unauthenticated.";
 "ble.empty" = "No BLE devices detected.";
 "ble.unnamed" = "Unnamed device";
 "ble.unavailable" = "Unavailable";
@@ -186,3 +167,6 @@
 "bt.lab.multi_apple_title" = "Apple: three models (10 s)";
 "bt.lab.multi_android_title" = "Android: three models (10 s)";
 "bt.lab.multi_menu" = "Three independent advertisements active during emission. Requires three controller sets. Tap Stop to finish early.";
+
+"tabs.wifi" = "Wi-Fi";
+"tabs.hotspot" = "Hotspot";

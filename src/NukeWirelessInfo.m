@@ -7,6 +7,7 @@
 #import "NWAppearance.h"
 #import "NWDeviceBrowser.h"
 #import "NWBluetooth.h"
+#import "NWMainTabs.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <arpa/inet.h>
@@ -18,7 +19,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev39";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev40";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -302,7 +303,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     });
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 6 : (section == 2 ? 6 : 1)); }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 5 : (section == 2 ? 6 : 1)); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
@@ -319,16 +320,16 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title"), NWText(@"bt.title")];
+        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title")];
         NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") :
             (index.row == 4 ? NWText([@"appearance." stringByAppendingString:NWAccentName()]) : nil);
         UITableViewCell *cell = textCell(labels[index.row], detail, YES);
-        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette", @"antenna.radiowaves.left.and.right"];
+        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette"];
         decorateCell(cell, symbols[index.row], NO);
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev39", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev40", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -350,8 +351,6 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
             [self chooseLanguage];
         } else if (index.row == 4) {
             [self.navigationController pushViewController:NWAppearanceSettingsController() animated:YES];
-        } else if (index.row == 5) {
-            [self.navigationController pushViewController:NWBluetoothController() animated:YES];
         }
     } else if (index.section == 2) {
         NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -446,7 +445,7 @@ static UITabBarController *tabForController(UIViewController *controller) {
     return controller.tabBarController;
 }
 static void prepareInfoTab(UITabBarController *tab) {
-    if (!tab || installingUI || tab.selectedIndex != 2 || !tab.selectedViewController) return;
+    if (!tab || installingUI || NWBluetoothTabSelected(tab) || tab.selectedIndex != 2 || !tab.selectedViewController) return;
     UIViewController *host = tab.selectedViewController;
     installingUI = YES;
     UINavigationController *info = objc_getAssociatedObject(host, &infoOverlayKey);
@@ -532,7 +531,7 @@ static void updateRefreshItem(UIView *root) {
 }
 static void updateWiFi(void) {
     UITabBarController *tab = activeTab;
-    if (layingOut || !tab.isViewLoaded || tab.selectedIndex != 0) return;
+    if (layingOut || !tab.isViewLoaded || NWBluetoothTabSelected(tab) || tab.selectedIndex != 0) return;
     layingOut = YES;
     UIView *root = tab.selectedViewController.view;
     normalizeNavigationTitles(root);
@@ -607,7 +606,7 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
-    prepareInfoTab(tab);
+    NWPrepareMainTabs(tab); prepareInfoTab(tab);
     activeTab = tab; installingUI = YES;
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
         UITabBarAppearance *appearance = [UITabBarAppearance new];
@@ -644,7 +643,7 @@ static void applyAppearance(void) {
             [UIView performWithoutAnimation:^{ [table reloadData]; [table layoutIfNeeded]; table.contentOffset = position; }];
         }
     }
-    installUI(tab);
+    NWStyleMainTabs(tab); installUI(tab);
 }
 static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
@@ -656,7 +655,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev39 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev40 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
@@ -674,8 +673,8 @@ __attribute__((constructor)) static void installExtension(void) {
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
-            if (activeTab.selectedIndex == 0 && activeTab.view.window) {
-                NWReconcileDeviceStates(); updateWiFi(); NWRefreshVisibleDeviceBrowser();
+            if (activeTab.selectedIndex == 0 && !NWBluetoothTabSelected(activeTab) && activeTab.view.window) {
+                NWMaintainWiFiScan(); NWReconcileDeviceStates(); updateWiFi(); NWRefreshVisibleDeviceBrowser();
             }
         }];
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -721,7 +720,7 @@ int NWUIRegressionCheck(int phase) {
         if (!info || info.parentViewController != host || !info.view.window) return 6;
         if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
         NWInfoController *content = (NWInfoController *)info.topViewController;
-        if ([content tableView:content.tableView numberOfRowsInSection:1] != 6) return 8;
+        if ([content tableView:content.tableView numberOfRowsInSection:1] != 5) return 8;
         for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
         [host.view layoutIfNeeded];
         if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;
@@ -729,6 +728,7 @@ int NWUIRegressionCheck(int phase) {
         UIListContentConfiguration *config = (UIListContentConfiguration *)language.contentConfiguration;
         if (![config.text isEqualToString:NWText(@"language.title")]) return 17;
     } else if (phase == 2 && tab.selectedIndex != 0) return 11;
+    else if (phase == 3 || phase == 4) return NWMainTabsRegressionCheck(tab, phase == 3);
     return 0;
 }
 #endif

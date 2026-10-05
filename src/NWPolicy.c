@@ -14,6 +14,16 @@ bool NWStateExpired(const NWScanState *s, double now) {
     if (!NWStateBusy(s)) return false;
     return now - s->started > (s->phase == NWStarting ? 5 : 300) || now - s->progress > 45;
 }
+bool NWScanInterfaceReady(uint32_t local, uint32_t mask) {
+    uint32_t hostmask = ~mask;
+    return local && (local >> 24) != 127 && (local >> 16) != 0xa9fe &&
+        (local >> 28) < 14 && mask && !(hostmask & (hostmask + 1)) && hostmask >= 3 &&
+        (local & hostmask) && (local & hostmask) != hostmask;
+}
+bool NWScanRetryAllowed(const NWScanState *s, double now, unsigned retries, unsigned rows, bool queueIdle) {
+    return !retries && queueIdle && !NWStateBusy(s) &&
+        (s->phase == NWFailed || (s->phase == NWComplete && !rows)) && now - s->progress >= 2;
+}
 // Host-order IPv4 values. Fail closed when the current network is unknown.
 bool NWEligibleAddress(uint32_t ip, uint32_t local, uint32_t mask, uint32_t gateway, const uint8_t mac[6]) {
     uint32_t hostmask = ~mask;

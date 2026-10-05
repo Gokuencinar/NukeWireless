@@ -10,7 +10,7 @@ xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
+  src/NukeWirelessInfo.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios16.3-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
@@ -47,4 +47,5 @@ PY
 xcrun simctl terminate "$device" app.nukewireless.ui-regression
 cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
+cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"
 done

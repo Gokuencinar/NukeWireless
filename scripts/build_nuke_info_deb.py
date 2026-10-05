@@ -18,7 +18,7 @@ from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, 
 from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "1.0.25+rh25.5~dev39"
+VERSION = "1.0.25+rh25.5~dev40"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
@@ -65,7 +65,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text())
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev39" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev40" not in library:
         raise ValueError("wrong development library version")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
@@ -84,7 +84,7 @@ def build(source, artifact, output):
         raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.31",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="25.5.40",
                     CFBundleDevelopmentRegion="en", CFBundleLocalizations=["en", "es"],
                     NSBluetoothAlwaysUsageDescription="Scan nearby BLE devices / Escanear dispositivos BLE cercanos.")
     metadata.pop("UILaunchScreen", None)

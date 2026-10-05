@@ -23,4 +23,5 @@ jobs:
             build/audit/NWBootPic.png
             build/ui/*-wifi.png
             build/ui/*-info.png
+            build/ui/*-bluetooth.png
           retention-days: 7

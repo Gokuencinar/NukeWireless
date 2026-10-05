@@ -31,6 +31,10 @@ static NSTimer *watchdog;
 static BOOL bulkBusy;
 static NSUInteger bulkFailures;
 static NSString *scanNetwork;
+static __weak NWLegacyScanner *activeScanner;
+static NSString *recoveryNetwork;
+static unsigned recoveryRetries;
+static double networkReadySince;
 static void (*oldStart)(id, SEL);
 extern void NWInvokeRefresh(void *adapter, const void *entry);
 static void notify(void) { [NSNotificationCenter.defaultCenter postNotificationName:NWStateChanged object:nil]; }
@@ -115,6 +119,7 @@ static void (*oldProgress)(id, SEL, float, NSInteger);
 static void finish(uint64_t generation, BOOL success, int status) {
     if (success && ![scanNetwork isEqualToString:networkIdentity()]) success = NO;
     if (!NWStateFinish(&state, generation, success)) return;
+    state.progress = CACurrentMediaTime();
     [watchdog invalidate]; watchdog = nil;
     if (!success) scanNetwork = nil;
     NSLog(@"Nuke Wireless: scan %llu ended (%@), %lu rows", (unsigned long long)generation,
@@ -126,7 +131,12 @@ static void armWatchdog(uint64_t generation) {
     [watchdog invalidate];
     watchdog = [NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
         if (state.generation != generation || !NWStateBusy(&state)) { [timer invalidate]; return; }
-        if (NWStateExpired(&state, CACurrentMediaTime())) finish(generation, NO, 1);
+        if (NWStateExpired(&state, CACurrentMediaTime())) {
+            NWLegacyScanner *scanner = activeScanner;
+            finish(generation, NO, 1);
+            // Native stop waits for operations. Never run that wait on main.
+            if (scanner) dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ [scanner stop]; });
+        }
     }];
 }
 static void foundDevice(id adapter, SEL sel, id device) {
@@ -188,6 +198,7 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     onMain(^{
         BOOL pending = state.phase == NWStarting && adapter == wifiAdapter;
         wifiAdapter = adapter;
+        activeScanner = scanner;
         if (!pending) NWStateBegin(&state, CACurrentMediaTime());
         state.phase = NWScanning; state.progress = CACurrentMediaTime();
         devices = [NSMutableDictionary new]; scanNetwork = networkIdentity();
@@ -252,11 +263,14 @@ static const uint8_t *appExecutableBase(void) {
     }
     return NULL;
 }
-BOOL NWRefreshScan(void) {
+static BOOL refreshScan(BOOL manual) {
     if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
+    // Native start stops a previous queue synchronously; wait for it to drain.
+    if (activeScanner.queue.operationCount) return NO;
     const uint8_t *base = appExecutableBase();
     static const uint8_t prologue[] = {0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
+    if (manual) recoveryRetries = 0;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
     // The pinned Swift refresh clears Published.devices and schedules its scanner.
@@ -264,6 +278,23 @@ BOOL NWRefreshScan(void) {
     // to a different thread or replacing its delegate.
     NWInvokeRefresh((__bridge void *)wifiAdapter, base + 0xc5a8);
     return YES;
+}
+BOOL NWRefreshScan(void) { return refreshScan(YES); }
+void NWMaintainWiFiScan(void) {
+    if (!NSThread.isMainThread || !wifiAdapter || bulkBusy ||
+        UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    if (!NWScanInterfaceReady(local, mask)) { networkReadySince = 0; return; }
+    double now = CACurrentMediaTime(); NSString *network = networkIdentity();
+    BOOL changed = ![recoveryNetwork isEqual:network];
+    if (changed) { recoveryNetwork = network; recoveryRetries = 0; networkReadySince = now; }
+    if (!networkReadySince) networkReadySince = now;
+    if (now - networkReadySince < 2 || activeScanner.queue.operationCount || NWScanBusy()) return;
+    BOOL movedNetwork = state.phase == NWComplete && scanNetwork && ![scanNetwork isEqual:network];
+    if ((!recoveryRetries && movedNetwork) ||
+        NWScanRetryAllowed(&state, now, recoveryRetries, (unsigned)devices.count, YES)) {
+        if (refreshScan(NO)) ++recoveryRetries;
+    }
 }
 NSString *NWScanSummary(void) {
     NSString *message = state.phase == NWIdle ? NWText(@"scan.waiting") :
