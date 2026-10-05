@@ -4,6 +4,20 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev40 instalado / trabajador app26:** barra principal con Wi-Fi, Punto de acceso,
+Bluetooth e Información. El ping se retira de la interfaz. Bluetooth conserva
+escáner BLE, capacidades y los seis perfiles de anuncios, con Detener. Wi-Fi
+añade un único reintento automático tras un resultado vacío o fallido, esperando
+una interfaz válida y la finalización de la cola anterior. El aislamiento de
+clientes en algunas redes universitarias puede impedir descubrir otros equipos;
+no se ha comprobado la configuración de la red eduroam del usuario. Compilación,
+regresiones del simulador y paquete verificados; falta confirmar la apertura y
+el escaneo en frío en el iPhone. Véase
+[pestaña Bluetooth y recuperación Wi-Fi](docs/BLUETOOTH-TAB-AND-WIFI-RECOVERY.md)
+para los detalles y el alcance de la validación.
+
+### Historial de candidatas
+
 **Nueva candidata dev25 / app10:** en **Información → Bluetooth** la cantidad
 y el intervalo se escriben en campos numéricos, con teclado y botón **Hecho**.
 Intervalo en milisegundos enteros (1000–5000 ms), incluido por ejemplo 1500 ms;
