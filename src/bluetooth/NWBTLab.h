@@ -75,6 +75,21 @@ static inline size_t NWBTLabApplePairingData(uint8_t p[35]) {
     memcpy(p + 4, advertisement, sizeof advertisement);
     return 35;
 }
+static inline void NWBTLabFastPairParameters(uint8_t p[25]) {
+    NWBTLabParameters(p);
+    // Google discoverable-provider cadence: 160 * 0.625 ms = 100 ms.
+    p[3] = p[6] = 0xa0; p[4] = p[7] = p[5] = p[8] = 0;
+}
+static inline size_t NWBTLabFastPairData(uint8_t p[35]) {
+    // Fixed Pixel Buds model fixture from Modern; discovery only, no GATT pairing.
+    const uint8_t advertisement[] = {
+        2, 1, 6, 3, 3, 0x2c, 0xfe, 6, 0x16, 0x2c, 0xfe, 0xcd, 0x82, 0x56
+    };
+    memset(p, 0, 35);
+    p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1; p[3] = sizeof advertisement;
+    memcpy(p + 4, advertisement, sizeof advertisement);
+    return sizeof advertisement + 4;
+}
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {
     memset(p, 0, 6); p[0] = enable ? 1 : 0; p[1] = 1; p[2] = NWBT_LAB_HANDLE;
     if (enable) { p[3] = 0xe8; p[4] = 3; } // Controller stops after 10 seconds.

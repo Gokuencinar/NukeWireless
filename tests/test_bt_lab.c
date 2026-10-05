@@ -60,6 +60,23 @@ int main(void) {
     assert(data[10]==7 && (data[11] | data[12]<<8)==0x200e);
     uint8_t appleCopy[35]; memcpy(appleCopy,data,sizeof data);
     assert(NWBTLabApplePairingData(data)==35 && !memcmp(data,appleCopy,sizeof data));
+    NWBTLabFastPairParameters(p);
+    assert(p[1]==0x10 && p[2]==0 && p[10]==0 && p[19]==0);
+    assert((p[3] | p[4]<<8 | p[5]<<16)==160 && !memcmp(p+3,p+6,3));
+    n=NWBTLabFastPairData(data); assert(n==18 && data[3]==14);
+    unsigned services=0;
+    for (size_t offset=4; offset<n;) {
+        assert(data[offset]>0 && offset+data[offset]+1<=n && data[offset+1]!=0xff);
+        if (data[offset+1]==0x16) {
+            services++;
+            assert(data[offset]==6 && data[offset+2]==0x2c && data[offset+3]==0xfe);
+            assert(data[offset+4]==0xcd && data[offset+5]==0x82 && data[offset+6]==0x56);
+        }
+        offset+=data[offset]+1;
+    }
+    assert(services==1);
+    uint8_t googleCopy[35]; memcpy(googleCopy,data,sizeof data);
+    assert(NWBTLabFastPairData(data)==18 && !memcmp(data,googleCopy,sizeof data));
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
     assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);

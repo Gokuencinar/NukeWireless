@@ -187,3 +187,7 @@
 "ble.no" = "No";
 "ble.none" = "Not advertised";
 "ble.details" = "UUID: %@\nSignal: %@\nManufacturer: %@\nAdvertised services: %@\nConnectable: %@\nLast seen: %.1f s ago\nManufacturer data: %@";
+
+"bt.lab.android_title" = "Android: Fast Pair (10 s)";
+"bt.lab.android_menu" = "Fixed Pixel Buds laboratory advertisement. 100 ms interval; can be stopped early. Requires Bluetooth off in Settings.";
+"bt.lab.android_receiver" = "No Android receiver available: the Fast Pair prompt remains unverified. This tests discovery advertising only; it cannot pair a real accessory.";

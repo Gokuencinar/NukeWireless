@@ -8,7 +8,7 @@ from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.3~app20'
+VERSION = '0.0.3~app21'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,

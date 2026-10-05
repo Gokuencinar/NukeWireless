@@ -187,3 +187,7 @@
 "ble.no" = "No";
 "ble.none" = "No anunciado";
 "ble.details" = "UUID: %@\nSeñal: %@\nFabricante: %@\nServicios anunciados: %@\nConectable: %@\nÚltima detección: hace %.1f s\nDatos del fabricante: %@";
+
+"bt.lab.android_title" = "Android: Fast Pair (10 s)";
+"bt.lab.android_menu" = "Anuncio fijo Pixel Buds de laboratorio. Intervalo de 100 ms; puede detenerse antes. Requiere Bluetooth apagado en Ajustes.";
+"bt.lab.android_receiver" = "Sin receptor Android disponible: el aviso Fast Pair sigue sin verificar. Solo se prueba el anuncio; no permite emparejar un accesorio real.";
