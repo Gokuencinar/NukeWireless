@@ -3,6 +3,7 @@
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import "NWScanBridge.h"
+#import "NWMainTabs.h"
 #include <spawn.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -261,6 +262,17 @@ static UILabel *durationBadge(BOOL enabled) {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(backgrounded:) name:UIApplicationDidEnterBackgroundNotification object:nil];
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
+- (void)traitCollectionDidChange:(UITraitCollection *)previous {
+    [super traitCollectionDidChange:previous];
+    if (!self.isViewLoaded || ![self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previous]) return;
+    // UIKit updates the surrounding native bars during the same trait change.
+    // Restyle after that transition so their cached colors match the table.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NWStyleNavigationBar(self.navigationController.navigationBar);
+        NWStyleMainTabs(self.tabBarController);
+        [self refresh:nil];
+    });
+}
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated]; NWStyleNavigationBar(self.navigationController.navigationBar);
     [self refresh:nil];
@@ -277,6 +289,7 @@ static UILabel *durationBadge(BOOL enabled) {
 - (void)refresh:(NSNotification *)notification {
     (void)notification; [self.tableView reloadData];
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
+    self.navigationItem.leftBarButtonItem.tintColor = NWAccentColor();
     self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
     self.navigationItem.hidesBackButton = busy;
     self.navigationItem.leftBarButtonItem.enabled = !busy;

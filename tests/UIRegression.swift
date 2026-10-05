@@ -51,26 +51,34 @@ struct RegressionTabs: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         results.append(checkUI(5))
                         snapshot("bluetooth.png")
-                        snapshot("bluetooth-dark.png", dark: true)
-                        results.append(checkUI(4))
-                        results.append(checkUI(2))
-                        results.append(checkBLEUI())
-                        results.append(checkBluetoothUI())
-                        let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0, 0, 0, 0]]
-                        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                            .appendingPathComponent("ui-regression.json")
-                        try? JSONSerialization.data(withJSONObject: report).write(to: file)
+                        setDark(true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            snapshot("bluetooth-dark.png")
+                            setDark(false)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                results.append(checkUI(4))
+                                results.append(checkUI(2))
+                                results.append(checkBLEUI())
+                                results.append(checkBluetoothUI())
+                                let report: [String: Any] = ["results": results, "passed": results == [0, 0, 0, 0, 0, 0, 0, 0]]
+                                let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                                    .appendingPathComponent("ui-regression.json")
+                                try? JSONSerialization.data(withJSONObject: report).write(to: file)
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    private func snapshot(_ name: String, dark: Bool = false) {
+    private func setDark(_ dark: Bool) {
+        for window in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }) {
+            window.overrideUserInterfaceStyle = dark ? .dark : .light
+        }
+    }
+    private func snapshot(_ name: String) {
         guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
             .flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) else { return }
-        let previousStyle = window.overrideUserInterfaceStyle
-        if dark { window.overrideUserInterfaceStyle = .dark; window.layoutIfNeeded() }
-        defer { window.overrideUserInterfaceStyle = previousStyle }
         let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }

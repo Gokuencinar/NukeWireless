@@ -22,6 +22,13 @@ static char mainTabsKey;
     UITabBarAppearance *appearance = [UITabBarAppearance new];
     [appearance configureWithOpaqueBackground]; appearance.backgroundColor = NWCanvasColor();
     appearance.shadowColor = [NWAccentColor() colorWithAlphaComponent:0.18];
+    UIColor *normal = [UIColor.secondaryLabelColor resolvedColorWithTraitCollection:self.bar.traitCollection];
+    UIColor *selected = [NWAccentColor() resolvedColorWithTraitCollection:self.bar.traitCollection];
+    for (UITabBarItemAppearance *item in @[appearance.stackedLayoutAppearance,
+        appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance]) {
+        item.normal.iconColor = normal; item.normal.titleTextAttributes = @{NSForegroundColorAttributeName:normal};
+        item.selected.iconColor = selected; item.selected.titleTextAttributes = @{NSForegroundColorAttributeName:selected};
+    }
     self.bar.standardAppearance = appearance; self.bar.scrollEdgeAppearance = appearance;
     self.bar.tintColor = NWAccentColor(); self.bar.backgroundColor = NWCanvasColor();
     self.bar.items[0].title = NWText(@"tabs.wifi");

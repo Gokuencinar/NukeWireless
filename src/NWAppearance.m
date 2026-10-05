@@ -58,8 +58,9 @@ void NWStyleNavigationBar(UINavigationBar *bar) {
     [appearance configureWithDefaultBackground];
     appearance.backgroundColor = NWCanvasColor();
     appearance.shadowColor = [NWAccentColor() colorWithAlphaComponent:0.18];
-    appearance.titleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor};
-    appearance.largeTitleTextAttributes = @{NSForegroundColorAttributeName:UIColor.labelColor,
+    UIColor *titleColor = [UIColor.labelColor resolvedColorWithTraitCollection:bar.traitCollection];
+    appearance.titleTextAttributes = @{NSForegroundColorAttributeName:titleColor};
+    appearance.largeTitleTextAttributes = @{NSForegroundColorAttributeName:titleColor,
         NSFontAttributeName:[[UIFontMetrics metricsForTextStyle:UIFontTextStyleLargeTitle] scaledFontForFont:
             [UIFont systemFontOfSize:34 weight:UIFontWeightBold]]};
     bar.standardAppearance = appearance; bar.scrollEdgeAppearance = appearance;
