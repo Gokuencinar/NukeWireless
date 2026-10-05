@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev41 instalado / trabajador app26:** Bluetooth organiza sus acciones en
+Exploración, Windows, Apple y Android. Cada plataforma muestra los modos de uno
+y tres dispositivos, sus modelos y la duración de 10 s. Añade ayuda en la barra
+superior, acciones desactivadas atenuadas y contraste corregido al cambiar al
+modo oscuro. Compilación, simulador y paquete verificados; falta confirmar la
+apertura manual en el iPhone. Véase [interfaz Bluetooth](docs/BLUETOOTH-UI-DEV41.md).
+
 **Dev40 instalado / trabajador app26:** barra principal con Wi-Fi, Punto de acceso,
 Bluetooth e Información. El ping se retira de la interfaz. Bluetooth conserva
 escáner BLE, capacidades y los seis perfiles de anuncios, con Detener. Wi-Fi
