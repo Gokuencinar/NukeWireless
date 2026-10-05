@@ -119,13 +119,11 @@ static inline size_t NWBTLabDeviceAddress(uint8_t p[7], unsigned platform, unsig
     const uint8_t address[]={NWBT_LAB_MULTI_HANDLE+model,model+1,0,platform,0x57,0x4e,0xc2};
     memcpy(p,address,sizeof address);return sizeof address;
 }
-static inline size_t NWBTLabMultiEnable(uint8_t p[14], int enabled) {
-    memset(p, 0, 14); p[0] = enabled ? 1 : 0; p[1] = NWBT_LAB_PLATFORM_COUNT;
-    for (unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT;i++) {
-        p[2+i*4] = NWBT_LAB_MULTI_HANDLE+i;
-        if (enabled) { p[3+i*4]=0xe8; p[4+i*4]=3; }
-    }
-    return 14;
+static inline size_t NWBTLabDeviceEnable(uint8_t p[6], int enabled, unsigned model) {
+    if(model>=NWBT_LAB_PLATFORM_COUNT) return 0;
+    memset(p,0,6);p[0]=enabled ? 1 : 0;p[1]=1;p[2]=NWBT_LAB_MULTI_HANDLE+model;
+    if(enabled) { p[3]=0xe8;p[4]=3; }
+    return 6;
 }
 static inline void NWBTLabEnable(uint8_t p[6], int enable) {
     memset(p, 0, 6); p[0] = enable ? 1 : 0; p[1] = 1; p[2] = NWBT_LAB_HANDLE;

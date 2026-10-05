@@ -421,11 +421,18 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
                 phase:[NSString stringWithFormat:@"data_%u",i] cleanup:NO];
         }
         if (handles.count==NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled) {
-            uint8_t enable[14]; NWBTLabMultiEnable(enable,1); enableSubmitted = YES;
-            NSData *reply = [session command:0x2039 parameters:[NSData dataWithBytes:enable length:14] phase:@"enable" cleanup:NO];
-            report[@"controller_advertising_acknowledged"] = @(reply != nil);
-            if (reply) { started=now(); double deadline=started+10.0;
-                while (!session.error && !NWBTCancelled && now()<deadline) usleep(20000);
+            NSUInteger active=0;
+            for(unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled;i++) {
+                uint8_t enable[6]; NWBTLabDeviceEnable(enable,1,i); enableSubmitted=YES;
+                NSData *reply=[session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
+                if(!reply) break;
+                active++;if(!started) started=now();
+            }
+            report[@"active_set_count"] = @(active);
+            report[@"controller_advertising_acknowledged"] = @(active==NWBT_LAB_PLATFORM_COUNT);
+            if(active==NWBT_LAB_PLATFORM_COUNT) {
+                double deadline=started+10.0;
+                while(!session.error && !NWBTCancelled && now()<deadline) usleep(20000);
             }
         }
     } @finally {
@@ -433,8 +440,10 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
         NSString *original = session.error; session.error = nil;
         BOOL clean = YES;
         if (enableSubmitted) {
-            uint8_t stop[14]; NWBTLabMultiEnable(stop,0);
-            clean = [session command:0x2039 parameters:[NSData dataWithBytes:stop length:14] phase:@"disable" cleanup:YES] != nil;
+            for(unsigned i=0;i<handles.count;i++) {
+                uint8_t stop[6];NWBTLabDeviceEnable(stop,0,i);session.error=nil;
+                if(![session command:0x2039 parameters:[NSData dataWithBytes:stop length:6] phase:@"disable" cleanup:YES]) clean=NO;
+            }
             report[@"advertising_stopped_acknowledged"] = @(clean);
         }
         BOOL removed = handles.count>0;

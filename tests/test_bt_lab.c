@@ -90,12 +90,13 @@ int main(void) {
     }
     assert(!NWBTLabMultiDeviceData(data,0,0) && !NWBTLabMultiDeviceData(data,1,3));
     assert(!NWBTLabDeviceAddress(addr[0],4,0));
-    uint8_t multiple[14];
-    assert(NWBTLabMultiEnable(multiple,1)==14 && multiple[0]==1 && multiple[1]==3);
-    for(unsigned i=0;i<3;i++) assert(multiple[2+i*4]==NWBT_LAB_MULTI_HANDLE+i && multiple[2+i*4]<=0xef &&
-        (multiple[3+i*4] | multiple[4+i*4]<<8)==1000 && multiple[5+i*4]==0);
-    NWBTLabMultiEnable(multiple,0);
-    for(unsigned i=0;i<3;i++) assert(multiple[0]==0 && multiple[3+i*4]==0 && multiple[4+i*4]==0);
+    uint8_t multiple[6];
+    for(unsigned i=0;i<3;i++) {
+        assert(NWBTLabDeviceEnable(multiple,1,i)==6 && multiple[0]==1 && multiple[1]==1);
+        assert(multiple[2]==NWBT_LAB_MULTI_HANDLE+i && multiple[2]<=0xef && (multiple[3] | multiple[4]<<8)==1000 && multiple[5]==0);
+        assert(NWBTLabDeviceEnable(multiple,0,i)==6 && multiple[0]==0 && multiple[3]==0 && multiple[4]==0);
+    }
+    assert(NWBTLabDeviceEnable(multiple,1,3)==0);
     assert(NWBTLabReplySize(0x203b)==2 && NWBTLabReplySize(0x203a)==0);
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
