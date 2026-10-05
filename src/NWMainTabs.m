@@ -140,8 +140,8 @@ int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
         // UIKit attaches the newly selected host at the next transition. The
         // delayed stability check verifies window attachment and geometry.
         if (!tabs.bluetoothSelected || tabs.bar.selectedItem.tag != 3 || tabs.bluetooth.view.hidden) return 21;
-        if (tab.viewControllers.count != 3 || tabs.bluetooth.parentViewController != tab.viewControllers.firstObject || tabs.bluetooth.viewControllers.count != 1 ||
-            ![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 22;
+        if (tab.viewControllers.count != 3 || tabs.bluetooth.parentViewController != tab.viewControllers.firstObject ||
+            tabs.bluetooth.viewControllers.count != 1) return 22;
     } else {
         [tabs selectTag:1]; [tabs selectTag:2];
         [tabs selectTag:0];
@@ -153,6 +153,7 @@ int NWMainTabsStabilityCheck(UITabBarController *tab) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs.bluetoothSelected || tab.selectedIndex != 0 || tab.viewControllers.count != 3 ||
         !tabs.bluetooth.view.window || tabs.bluetooth.view.hidden || tabs.bar.selectedItem.tag != 3) return 25;
+    if (![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 26;
     CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
     return CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1 ? 23 : 0;
 }
