@@ -3,6 +3,7 @@
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import <objc/runtime.h>
+#include <math.h>
 
 // SwiftUI force-casts its three original hosts during selection. Keep those
 // hosts and its delegate intact; a presentation bar routes native selections
@@ -13,11 +14,50 @@
 @property(nonatomic, strong) UITabBar *bar;
 @property(nonatomic, strong) UINavigationController *bluetooth;
 @property(nonatomic) BOOL bluetoothSelected;
+@property(nonatomic) NSUInteger foregroundRestorations;
 - (void)selectTag:(NSInteger)tag;
 - (void)style;
+- (void)restoreBar;
 @end
 static char mainTabsKey;
 @implementation NWMainTabs
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        for (NSString *name in @[UIApplicationWillEnterForegroundNotification, UIApplicationDidBecomeActiveNotification,
+            UISceneWillEnterForegroundNotification, UISceneDidActivateNotification])
+            [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(foreground:) name:name object:nil];
+    }
+    return self;
+}
+- (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
+- (void)restoreBar {
+    UITabBarController *tab = self.owner;
+    if (!tab.isViewLoaded || !self.bar) return;
+    // Keep the native bar for SwiftUI's layout and selection binding. Its
+    // controls are covered by a sibling, so rebuilding its children cannot
+    // paint over our four items or receive their touches/accessibility focus.
+    tab.tabBar.userInteractionEnabled = NO;
+    tab.tabBar.accessibilityElements = nil;
+    tab.tabBar.accessibilityElementsHidden = YES;
+    self.bar.layer.zPosition = MAX(1, tab.tabBar.layer.zPosition + 1);
+    [tab.view bringSubviewToFront:tab.tabBar];
+    [tab.view bringSubviewToFront:self.bar];
+}
+- (void)foreground:(NSNotification *)notification {
+    UITabBarController *tab = self.owner;
+    if (!tab.isViewLoaded) return;
+    if ([notification.object isKindOfClass:UIScene.class] && tab.view.window.windowScene != notification.object) return;
+    self.foregroundRestorations++;
+    NWPrepareMainTabs(tab); [self style];
+    // UIKit/SwiftUI can finish reconstructing their bar after activation.
+    // Reconcile once more on the next main turn without changing selection.
+    __weak NWMainTabs *weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NWMainTabs *tabs = weakSelf;
+        if (tabs.owner.isViewLoaded && tabs.owner.view.window) NWPrepareMainTabs(tabs.owner);
+    });
+}
 - (void)style {
     UITabBarAppearance *appearance = [UITabBarAppearance new];
     [appearance configureWithOpaqueBackground]; appearance.backgroundColor = NWCanvasColor();
@@ -89,11 +129,11 @@ static char mainTabsKey;
         tab.selectedIndex = (NSUInteger)tag;
     }
     for (UITabBarItem *item in self.bar.items) if (item.tag == tag) self.bar.selectedItem = item;
-    [tab.view bringSubviewToFront:tab.tabBar];
     // Keep SwiftUI's selection binding aligned with UIKit. Only the three
     // original hosts ever reach its delegate, including Bluetooth's underlay.
     if ([delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
         [delegate tabBarController:tab didSelectViewController:nativeHost];
+    [self restoreBar];
 }
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     (void)tabBar; [self selectTag:item.tag];
@@ -118,15 +158,14 @@ void NWPrepareMainTabs(UITabBarController *tab) {
             item.accessibilityIdentifier = [NSString stringWithFormat:@"nw.tab.%@", tags[i]]; [items addObject:item];
         }
         bar.items = items; bar.itemPositioning = UITabBarItemPositioningFill;
-        bar.translatesAutoresizingMaskIntoConstraints = NO; [tab.tabBar addSubview:bar];
+        bar.translatesAutoresizingMaskIntoConstraints = NO; [tab.view addSubview:bar];
         [NSLayoutConstraint activateConstraints:@[
             [bar.topAnchor constraintEqualToAnchor:tab.tabBar.topAnchor],
             [bar.bottomAnchor constraintEqualToAnchor:tab.tabBar.bottomAnchor],
             [bar.leadingAnchor constraintEqualToAnchor:tab.tabBar.leadingAnchor],
             [bar.trailingAnchor constraintEqualToAnchor:tab.tabBar.trailingAnchor]
         ]];
-        // Expose exactly four items to VoiceOver, rather than both bars.
-        tab.tabBar.accessibilityElements = @[bar]; [tabs style];
+        [tabs style];
     }
     if (!tabs.bluetoothSelected) {
         for (UITabBarItem *item in tabs.bar.items) if (item.tag == (NSInteger)tab.selectedIndex) tabs.bar.selectedItem = item;
@@ -134,13 +173,16 @@ void NWPrepareMainTabs(UITabBarController *tab) {
         [tabs.bluetooth.view.superview bringSubviewToFront:tabs.bluetooth.view];
         [tab.view viewWithTag:90122].hidden = YES;
     }
-    [tab.tabBar bringSubviewToFront:tabs.bar]; [tab.view bringSubviewToFront:tab.tabBar];
+    [tabs restoreBar];
 }
-void NWStyleMainTabs(UITabBarController *tab) { [(NWMainTabs *)objc_getAssociatedObject(tab, &mainTabsKey) style]; }
+void NWStyleMainTabs(UITabBarController *tab) {
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    [tabs style]; [tabs restoreBar];
+}
 #ifdef NW_UI_TESTING
 int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
-    if (!tabs || tabs.bar.items.count != 4 || tabs.bar.superview != tab.tabBar) return 20;
+    if (!tabs || tabs.bar.items.count != 4 || tabs.bar.superview != tab.view) return 20;
     if (selectBluetooth) {
         if (![tab.view viewWithTag:90122]) {
             UIView *panel = [UIView new]; panel.tag = 90122;
@@ -169,5 +211,56 @@ int NWMainTabsStabilityCheck(UITabBarController *tab) {
     if (![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 26;
     CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
     return CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1 ? 23 : 0;
+}
+static NSInteger resumeTag;
+static NSUInteger resumeRestorations;
+static NSArray<UIViewController *> *resumeHosts;
+static id<UITabBarControllerDelegate> resumeDelegate;
+static UIViewController *resumeTop;
+static UIView *resumeNativeContent;
+int NWMainTabsResumePrepare(UITabBarController *tab, NSInteger tag) {
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    if (!tabs || tag < 0 || tag > 3) return 30;
+    [resumeNativeContent removeFromSuperview];
+    [tabs selectTag:tag];
+    if (tag == 3 && tabs.bluetooth.viewControllers.count == 1) {
+        UITableViewController *menu = (UITableViewController *)tabs.bluetooth.topViewController;
+        [menu tableView:menu.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+    }
+    [tab.view layoutIfNeeded];
+    resumeTag = tag; resumeRestorations = tabs.foregroundRestorations;
+    resumeHosts = [tab.viewControllers copy]; resumeDelegate = tab.delegate;
+    resumeTop = tag == 3 ? tabs.bluetooth.topViewController : nil;
+    // Model native controls being restored/reordered. Do not inspect or hook
+    // UIKit's private view classes. A real process background/return follows.
+    resumeNativeContent = [[UIView alloc] initWithFrame:tab.tabBar.bounds];
+    resumeNativeContent.backgroundColor = UIColor.systemRedColor;
+    [tab.tabBar addSubview:resumeNativeContent];
+    for (UIView *child in [tab.tabBar.subviews copy]) [tab.tabBar bringSubviewToFront:child];
+    [tab.view bringSubviewToFront:tab.tabBar];
+    tab.tabBar.userInteractionEnabled = YES;
+    tab.tabBar.accessibilityElementsHidden = NO;
+    return 0;
+}
+int NWMainTabsResumeCheck(UITabBarController *tab) {
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    if (!tabs || tabs.foregroundRestorations <= resumeRestorations || tabs.bar.superview != tab.view ||
+        tabs.bar.items.count != 4 || tabs.bar.selectedItem.tag != resumeTag ||
+        tabs.bluetoothSelected != (resumeTag == 3) || tab.selectedIndex != (NSUInteger)(resumeTag == 3 ? 0 : resumeTag)) return 31;
+    if (![resumeHosts isEqual:tab.viewControllers] || tab.delegate != resumeDelegate ||
+        tab.tabBar.userInteractionEnabled || !tab.tabBar.accessibilityElementsHidden ||
+        tabs.bar.accessibilityElementsHidden || !tabs.bar.userInteractionEnabled) return 32;
+    if (tabs.bar.layer.zPosition <= tab.tabBar.layer.zPosition ||
+        [tab.view.subviews indexOfObject:tabs.bar] <= [tab.view.subviews indexOfObject:tab.tabBar]) return 33;
+    CGRect native = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
+    CGRect presentation = [tabs.bar convertRect:tabs.bar.bounds toView:tab.view];
+    if (fabs(native.origin.x - presentation.origin.x) > 1 || fabs(native.origin.y - presentation.origin.y) > 1 ||
+        fabs(native.size.width - presentation.size.width) > 1 || fabs(native.size.height - presentation.size.height) > 1) return 34;
+    UIColor *background = [tabs.bar.standardAppearance.backgroundColor resolvedColorWithTraitCollection:tabs.bar.traitCollection];
+    if (!background || CGColorGetAlpha(background.CGColor) < 1) return 35;
+    if (resumeTag == 3 && (tabs.bluetooth.topViewController != resumeTop || tabs.bluetooth.view.hidden ||
+        ![tab.view viewWithTag:90122].hidden)) return 36;
+    [resumeNativeContent removeFromSuperview]; resumeNativeContent = nil;
+    return 0;
 }
 #endif

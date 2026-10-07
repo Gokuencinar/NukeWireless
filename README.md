@@ -4,6 +4,11 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev47 / trabajador app28:** la barra de cuatro opciones se separa del contenido
+de la barra nativa para evitar iconos y textos superpuestos al volver del segundo plano.
+Mantiene los tres hosts y el delegado SwiftUI, la pestaña y la navegación Bluetooth.
+Compilación e instalación pendientes. Véase [restauración de pestañas](docs/MAIN-TABS-FOREGROUND-DEV47.md).
+
 **Dev46 instalado / trabajador app28:** los modelos generados con perfil disponible
 permiten emisión individual de 10 s al tocar su tarjeta; Emitir conserva la selección completa.
 Ambas opciones mantienen el catálogo y Detener accesible, sin resultados

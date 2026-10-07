@@ -43,11 +43,42 @@ xcrun simctl bootstatus "$device" -b
 xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
 for language in en es; do
-rm -f "$container/Documents/ui-regression.json"
+rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
 xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language"
 for attempt in $(seq 1 30); do
-  if [ -f "$container/Documents/ui-regression.json" ]; then break; fi
+  if [ -f "$container/Documents/resume-ready-0.json" ]; then break; fi
   sleep 2
+done
+python3 - "$container/Documents/ui-initial.json" <<'PY'
+import json,sys
+with open(sys.argv[1]) as f: result=json.load(f)
+print('Initial navigation regression:', result)
+assert result['passed'], result
+PY
+for phase in 0 1 2 3; do
+  for attempt in $(seq 1 15); do
+    if [ -f "$container/Documents/resume-ready-$phase.json" ]; then break; fi
+    sleep 1
+  done
+  xcrun simctl launch "$device" com.apple.Preferences
+  sleep 3
+  # Bring the same suspended process back, preserving its SwiftUI state.
+  xcrun simctl launch "$device" app.nukewireless.ui-regression
+  for attempt in $(seq 1 20); do
+    if [ -f "$container/Documents/resume-done-$phase.json" ]; then break; fi
+    sleep 1
+  done
+  python3 - "$container/Documents/resume-ready-$phase.json" "$container/Documents/resume-done-$phase.json" <<'PY'
+import json,sys
+with open(sys.argv[1]) as f: before=json.load(f)
+with open(sys.argv[2]) as f: after=json.load(f)
+print('Real background/foreground regression:', before, after)
+assert before['prepared'] and after['result'] == 0 and after['background_seen']
+assert before['pid'] == after['pid'] and before['phase'] == after['phase']
+PY
+  cp "$container/Documents/resume-ready-$phase.json" "$out/$language-resume-ready-$phase.json"
+  cp "$container/Documents/resume-done-$phase.json" "$out/$language-resume-done-$phase.json"
+  cp "$container/Documents/resume-$phase.png" "$out/$language-resume-$phase.png"
 done
 python3 - "$container/Documents/ui-regression.json" <<'PY'
 import json,sys

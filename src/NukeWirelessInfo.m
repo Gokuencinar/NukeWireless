@@ -19,7 +19,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev46";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev47";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -329,7 +329,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev46", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev47", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -655,7 +655,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev46 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev47 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
@@ -689,6 +689,8 @@ __attribute__((constructor)) static void installExtension(void) {
 #ifdef NW_UI_TESTING
 // Only linked into the SwiftUI simulator fixture, never the device package.
 void NWUIRegressionSetLanguage(int spanish) { NWSetLanguage(spanish ? @"es" : @"en"); }
+int NWUIRegressionPrepareResume(int tag) { return NWMainTabsResumePrepare(activeTab, tag); }
+int NWUIRegressionCheckResume(void) { return NWMainTabsResumeCheck(activeTab); }
 int NWUIRegressionCheck(int phase) {
     static NSArray<UIViewController *> *hosts;
     UITabBarController *tab = activeTab;

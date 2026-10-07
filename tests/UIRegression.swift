@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 @_silgen_name("NWBluetoothUIRegressionCheck")
 func checkBluetoothUI() -> Int32
 @_silgen_name("NWBluetoothCatalogUIRegressionPresent")
@@ -16,6 +17,10 @@ func checkBLEUI() -> Int32
 func checkUI(_ phase: Int32) -> Int32
 @_silgen_name("NWUIRegressionSetLanguage")
 func setFixtureLanguage(_ spanish: Int32)
+@_silgen_name("NWUIRegressionPrepareResume")
+func prepareResumeTest(_ tag: Int32) -> Int32
+@_silgen_name("NWUIRegressionCheckResume")
+func checkResumeTest() -> Int32
 
 @main
 struct UIRegressionApp: App {
@@ -29,6 +34,10 @@ struct RegressionTabs: View {
     @State private var selection = 0
     @State private var started = false
     @State private var results: [Int32] = []
+    @State private var resumePhase = -1
+    @State private var didBackground = false
+    @State private var checkingResume = false
+    private let resumeTags: [Int32] = [0, 1, 3, 2]
 
     var body: some View {
         TabView(selection: $selection) {
@@ -73,6 +82,28 @@ struct RegressionTabs: View {
                     }
                 }
             }
+        }.onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .merge(with: NotificationCenter.default.publisher(for: UIScene.didEnterBackgroundNotification))) { _ in
+            if resumePhase >= 0 { didBackground = true }
+        }.onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .merge(with: NotificationCenter.default.publisher(for: UIScene.didActivateNotification))) { _ in
+            guard resumePhase >= 0, didBackground, !checkingResume else { return }
+            checkingResume = true
+            let phase = resumePhase
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                let check = checkResumeTest()
+                results.append(check)
+                snapshot("resume-\(phase).png")
+                writeReport(["phase": phase, "tag": resumeTags[phase], "result": check,
+                             "background_seen": didBackground, "pid": ProcessInfo.processInfo.processIdentifier],
+                            "resume-done-\(phase).json")
+                if phase < 3 { prepareResume(phase + 1) }
+                else {
+                    resumePhase = -1
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 26,
+                                 "real_background_cycles": 4], "ui-regression.json")
+                }
+            }
         }
     }
     private func setDark(_ dark: Bool) {
@@ -106,12 +137,27 @@ struct RegressionTabs: View {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 18]
-                    let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ui-regression.json")
-                    try? JSONSerialization.data(withJSONObject: report).write(to: file)
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 18], "ui-initial.json")
+                    guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                        .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
+                    root.dismiss(animated: false) { prepareResume(0) }
                 }
             }
         }
+    }
+    private func prepareResume(_ phase: Int) {
+        resumePhase = phase; didBackground = false; checkingResume = false
+        setDark(phase < 2)
+        let result = prepareResumeTest(resumeTags[phase])
+        results.append(result)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            writeReport(["phase": phase, "tag": resumeTags[phase], "prepared": result == 0,
+                         "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
+        }
+    }
+    private func writeReport(_ report: [String: Any], _ name: String) {
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(name)
+        try? JSONSerialization.data(withJSONObject: report).write(to: file)
     }
     private func snapshot(_ name: String) {
         guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
