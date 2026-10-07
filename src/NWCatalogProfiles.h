@@ -6,13 +6,16 @@
 // Research fixtures, not proof that a receiver displays a pairing notification.
 // Apple: esphome-components/examples/ble_gateway/airpods.yaml (2002/200F),
 // plus the existing app26 fixtures (200E/2014/200A).
-// Google: ESP32-TOOLS-MODERN dc59cd3 BLESpam.cpp (CD8256/000047).
+// Google/Samsung: Xtreme-Apps 1e423683, protocols/fastpair.c and easysetup.c.
+// Galaxy Buds2 Pro: BLE-Payloads afccfb8, complete manufacturer capture.
 static inline uint32_t NWCatalogProfileID(unsigned platform, unsigned model) {
-    static const uint32_t ids[2][NW_CATALOG_MODELS] = {
+    static const uint32_t ids[NW_CATALOG_PLATFORMS][NW_CATALOG_MODELS] = {
         {0x2002, 0x200f, 0x200e, 0x2014, 0x200a, 0},
-        {0xcd8256, 0x000047, 0, 0, 0, 0}
+        {0x92bbbd, 0x8b66ab, 0x9adb11, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0},
+        {0xb8b905, 0xd30704, 0x850116, 0x3f6718, 0xeaaa17, 0xab0c46}
     };
-    return platform < 2 && model < NW_CATALOG_MODELS ? ids[platform][model] : 0;
+    return platform < NW_CATALOG_PLATFORMS && model < NW_CATALOG_MODELS ? ids[platform][model] : 0;
 }
 static inline int NWCatalogProfileAvailable(unsigned platform, unsigned model) {
     // Swift Pair carries a display name, not a registered product/model ID.

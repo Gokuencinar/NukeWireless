@@ -55,9 +55,9 @@ static inline void NWBTLabFastPairParameters(uint8_t p[25]) {
     p[3] = p[6] = 0xa0; p[4] = p[7] = p[5] = p[8] = 0;
 }
 static inline size_t NWBTLabFastPairData(uint8_t p[35]) {
-    // Fixed Pixel Buds model fixture from Modern; discovery only, no GATT pairing.
+    // Pixel Buds model fixture from Xtreme-Apps 1e423683; discovery only, no GATT pairing.
     const uint8_t advertisement[] = {
-        2, 1, 6, 3, 3, 0x2c, 0xfe, 6, 0x16, 0x2c, 0xfe, 0xcd, 0x82, 0x56
+        2, 1, 6, 3, 3, 0x2c, 0xfe, 6, 0x16, 0x2c, 0xfe, 0x92, 0xbb, 0xbd
     };
     memset(p, 0, 35);
     p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1; p[3] = sizeof advertisement;
@@ -88,7 +88,7 @@ static inline size_t NWBTLabMultiDeviceData(uint8_t p[35], unsigned platform, un
         const uint16_t products[]={0x200e,0x2014,0x200a};
         length=NWBTLabApplePairingData(p);p[11]=products[model]&0xff;p[12]=products[model]>>8;
     } else {
-        const uint8_t models[3][3]={{0xcd,0x82,0x56},{0,0,0x47},{0x14,0,0x45}};
+        const uint8_t models[3][3]={{0x92,0xbb,0xbd},{0x8b,0x66,0xab},{0x01,0xee,0xb4}};
         length=NWBTLabFastPairData(p);memcpy(p+15,models[model],3);
     }
     p[0]=NWBT_LAB_MULTI_HANDLE+model;return length;
@@ -112,6 +112,20 @@ static inline size_t NWBTLabCatalogData(uint8_t p[35], unsigned platform, unsign
         p[15] = product >> 16; p[16] = product >> 8; p[17] = product;
         return length;
     }
+    if (platform == 3) {
+        // Complete EasySetup manufacturer AD, no truncated second AD segment.
+        // Buds2 Pro uses its captured body; other variants use the research body.
+        const uint8_t advertisement[] = {
+            27, 0xff, 0x75, 0, 0x42, 0x09, 0x81, 0x02, 0x14, 0x15, 0x03, 0x21, 0x01, 0x09,
+            0, 0, 0x01, 0, 0x06, 0x3c, 0x94, 0x8e, 0, 0, 0, 0, 0xc7, 0
+        };
+        memset(p, 0, 35); p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1; p[3] = sizeof advertisement;
+        memcpy(p + 4, advertisement, sizeof advertisement);
+        uint32_t product = NWCatalogProfileID(platform, model);
+        p[18] = product >> 16; p[19] = product >> 8; p[21] = product;
+        if (model == 5) { p[24] = 0xdd; p[25] = 0x0a; p[30] = 0xa7; }
+        return sizeof advertisement + 4;
+    }
     const char *name = NWCatalogModel(platform, model);
     size_t length = strlen(name);
     // Nonconnectable discovery: omit optional Flags to fit the complete name.
@@ -121,6 +135,13 @@ static inline size_t NWBTLabCatalogData(uint8_t p[35], unsigned platform, unsign
     p[3] = (uint8_t)(7 + length); p[4] = (uint8_t)(6 + length);
     p[5] = 0xff; p[6] = 6; p[8] = 3; p[10] = 0x80;
     memcpy(p + 11, name, length); return 11 + length;
+}
+static inline size_t NWBTLabCatalogAddress(uint8_t p[7], unsigned platform, unsigned model, unsigned slot) {
+    if (!NWCatalogProfileAvailable(platform, model) || slot >= NW_CATALOG_SELECTION) return 0;
+    // Stable lab identity per model across generations; handle is only a local slot.
+    // Distinct namespace from the legacy slot identities, no address rotation.
+    const uint8_t address[] = {NWBT_LAB_MULTI_HANDLE + slot, model + 1, 0x43, platform, 0x57, 0x4e, 0xc2};
+    memcpy(p, address, sizeof address); return sizeof address;
 }
 static inline size_t NWBTLabDeviceEnable(uint8_t p[6], int enabled, unsigned model) {
     if(model>=NWBT_LAB_PLATFORM_COUNT) return 0;

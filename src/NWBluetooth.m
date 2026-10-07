@@ -465,7 +465,7 @@ static UILabel *durationBadge(BOOL enabled) {
     NSInteger action = menuAction(index);
     if (action == 9) {
         if (!busy) {
-            BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_test"] boolValue];
+            BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_identity_v2"] boolValue];
             __weak NWBluetoothViewController *weakSelf = self;
             UIViewController *catalog = NWBluetoothCatalogControllerWithEmitter(available, ^(NSUInteger platform, NSArray<NSNumber *> *models) {
                 [weakSelf emitCatalogPlatform:platform models:models];
@@ -507,7 +507,7 @@ static UILabel *durationBadge(BOOL enabled) {
 }
 - (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models {
     if (busy || NWBulkBusy() || ![self.capabilities[@"supported"] boolValue] ||
-        ![self.capabilities[@"supports_le_catalog_test"] boolValue] || platform >= 3 ||
+        ![self.capabilities[@"supports_le_catalog_identity_v2"] boolValue] || platform >= NW_CATALOG_PLATFORMS ||
         models.count < 1 || models.count > NW_CATALOG_SELECTION) return;
     unsigned selected[3]; NSMutableArray *indices = [NSMutableArray new];
     for (NSUInteger i = 0; i < models.count; ++i) {
@@ -716,7 +716,7 @@ int NWBluetoothUIRegressionCheck(void) {
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
         busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
         [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
         UIViewController *catalogScreen = navigation.topViewController;
@@ -736,9 +736,15 @@ int NWBluetoothUIRegressionCheck(void) {
         busy = NO; controller.capabilities = @{@"supported": @YES};
         [controller emitCatalogPlatform:0 models:@[@0]];
         if (capturedCatalogArguments) return 48;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
-        [controller emitCatalogPlatform:1 models:@[@2]];
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES};
+        [controller emitCatalogPlatform:1 models:@[@3]];
         if (capturedCatalogArguments) return 49;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
+        [controller emitCatalogPlatform:0 models:@[@0]];
+        if (capturedCatalogArguments) return 51; // app27 must not use the corrected identity table.
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_identity_v2": @YES};
+        [controller emitCatalogPlatform:3 models:@[@5, @2, @0]];
+        if (![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"3", @"5,2,0"]]) return 52;
         lastReport = @{@"operation": @"le_catalog_test", @"error_code": @"cancelled",
             @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
             @"advertising_set_removed": @YES, @"service_restored": @YES};

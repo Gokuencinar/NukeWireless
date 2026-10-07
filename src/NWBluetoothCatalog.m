@@ -15,12 +15,13 @@
 - (void)generateModels;
 - (void)platformChanged:(UISegmentedControl *)sender;
 - (NSArray<NSNumber *> *)emissionModels;
+- (NSString *)profileIdentity:(unsigned)model;
 @end
 
 @implementation NWBluetoothCatalogViewController
 - (instancetype)init {
     self = [super initWithStyle:UITableViewStyleInsetGrouped];
-    if (self) { _previousRanks = [@[@(-1), @(-1), @(-1)] mutableCopy]; [self generateModels]; }
+    if (self) { _previousRanks = [NSMutableArray new]; for (unsigned i = 0; i < NW_CATALOG_PLATFORMS; ++i) [_previousRanks addObject:@(-1)]; [self generateModels]; }
     return self;
 }
 - (void)viewDidLoad {
@@ -51,7 +52,7 @@
 }
 - (void)generateModels {
     if (NWBluetoothBusy()) return;
-    if (self.platform >= 3) return;
+    if (self.platform >= NW_CATALOG_PLATFORMS) return;
     int previous = self.previousRanks[self.platform].intValue;
     unsigned rank = NWCatalogNextRank(arc4random_uniform(previous < 0 ? NW_CATALOG_COMBINATIONS : NW_CATALOG_COMBINATIONS - 1), previous);
     unsigned selected[NW_CATALOG_SELECTION];
@@ -68,9 +69,16 @@
 }
 - (void)platformChanged:(UISegmentedControl *)sender {
     if (NWBluetoothBusy()) return;
-    if (sender.selectedSegmentIndex < 0 || sender.selectedSegmentIndex >= 3 ||
+    if (sender.selectedSegmentIndex < 0 || sender.selectedSegmentIndex >= NW_CATALOG_PLATFORMS ||
         (NSUInteger)sender.selectedSegmentIndex == self.platform) return;
     self.platform = (NSUInteger)sender.selectedSegmentIndex; [self generateModels];
+}
+- (NSString *)profileIdentity:(unsigned)model {
+    if (!NWCatalogProfileAvailable((unsigned)self.platform, model)) return NWText(@"bt.catalog.profile_unavailable");
+    if (self.platform == 2) return @"Swift Pair · Display Name";
+    uint32_t product = NWCatalogProfileID((unsigned)self.platform, model);
+    if (self.platform == 0) return [NSString stringWithFormat:@"Apple · 0x%04X", (unsigned)product];
+    return [NSString stringWithFormat:@"%@ · %06X", self.platform == 1 ? @"Fast Pair" : @"EasySetup", (unsigned)product];
 }
 - (NSArray<NSNumber *> *)emissionModels {
     NSMutableArray *models = [NSMutableArray new];
@@ -93,7 +101,7 @@
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     NWStyleCell(cell); cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (index.section == 0 && index.row == 0) {
-        UISegmentedControl *platform = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft"]];
+        UISegmentedControl *platform = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft", @"Samsung"]];
         platform.selectedSegmentIndex = self.platform;
         platform.enabled = !NWBluetoothBusy();
         platform.accessibilityIdentifier = @"nw.catalog.platform";
@@ -134,10 +142,10 @@
     } else {
         NSDictionary *model = self.models[index.row];
         content.text = model[@"name"];
-        content.secondaryText = [NSString stringWithFormat:@"%@\n%@",
-            [NSString stringWithFormat:NWText(@"bt.catalog.identity"), [model[@"identity"] substringToIndex:14]],
-            NWText(NWCatalogProfileAvailable((unsigned)self.platform, [model[@"model"] unsignedIntValue]) ?
-                @"bt.catalog.profile_available" : @"bt.catalog.profile_unavailable")];
+        unsigned modelIndex = [model[@"model"] unsignedIntValue];
+        content.secondaryText = NWCatalogProfileAvailable((unsigned)self.platform, modelIndex) ?
+            [NSString stringWithFormat:@"%@\n%@", [self profileIdentity:modelIndex], NWText(@"bt.catalog.profile_available")] :
+            NWText(@"bt.catalog.profile_unavailable");
         content.image = [UIImage systemImageNamed:@"cube.transparent"];
         cell.accessibilityIdentifier = [NSString stringWithFormat:@"nw.catalog.model.%ld", (long)index.row];
     }
@@ -163,7 +171,7 @@ UIViewController *NWBluetoothCatalogControllerWithEmitter(BOOL available,
 
 #ifdef NW_UI_TESTING
 int NWBluetoothCatalogUIRegressionPresent(int platform) {
-    if (platform < 0 || platform >= 3) return 1;
+    if (platform < 0 || platform >= NW_CATALOG_PLATFORMS) return 1;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
@@ -191,8 +199,8 @@ int NWBluetoothCatalogUIRegressionPresent(int platform) {
 int NWBluetoothCatalogUIRegressionCheck(void) {
     NWBluetoothCatalogViewController *controller = [NWBluetoothCatalogViewController new];
     [controller loadViewIfNeeded];
-    for (NSUInteger platform = 0; platform < 3; ++platform) {
-        UISegmentedControl *selector = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft"]];
+    for (NSUInteger platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
+        UISegmentedControl *selector = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft", @"Samsung"]];
         selector.selectedSegmentIndex = platform;
         [controller platformChanged:selector];
         if (controller.platform != platform || controller.models.count != 3) return 1;
@@ -207,7 +215,7 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
                 UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:
                     [NSIndexPath indexPathForRow:row inSection:1]];
                 UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
-                if (![content.text isEqual:after[row]] || ![content.secondaryText containsString:@"NWLab-"] ||
+                if (![content.text isEqual:after[row]] || ![content.secondaryText containsString:[controller profileIdentity:[controller.models[row][@"model"] unsignedIntValue]]] ||
                     cell.selectionStyle != UITableViewCellSelectionStyleNone) return 4;
                 BOOL belongs = NO;
                 for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model)
@@ -224,7 +232,7 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
     __block NSUInteger calls = 0, emittedPlatform = NSNotFound; __block NSArray *emitted = nil;
     controller.emissionAvailable = YES;
     controller.emit = ^(NSUInteger platform, NSArray<NSNumber *> *models) { calls++; emittedPlatform = platform; emitted = models; };
-    for (NSUInteger platform = 0; platform < 3; ++platform) {
+    for (NSUInteger platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
         controller.platform = platform;
         for (unsigned rank = 0; rank < NW_CATALOG_COMBINATIONS; ++rank) {
             unsigned selected[3]; NWCatalogCombination(rank, selected);

@@ -61,7 +61,7 @@ cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
 cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"
 cp "$container/Documents/bluetooth-dark.png" "$out/$language-bluetooth-dark.png"
-for snapshot in catalog-0 catalog-1 catalog-2 catalog-dark; do
+for snapshot in catalog-0 catalog-1 catalog-2 catalog-3 catalog-dark; do
   cp "$container/Documents/$snapshot.png" "$out/$language-$snapshot.png"
 done
 done

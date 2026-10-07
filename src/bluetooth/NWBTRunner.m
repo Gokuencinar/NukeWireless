@@ -340,7 +340,7 @@ int main(int argc, char **argv) {
         NSUInteger catalogPlatform = 0; NSArray<NSNumber *> *catalogModels = nil;
         if (catalog) {
             unsigned selected[NW_CATALOG_SELECTION];
-            if (argc != 4 || strlen(argv[2]) != 1 || argv[2][0] < '0' || argv[2][0] > '2')
+            if (argc != 4 || strlen(argv[2]) != 1 || argv[2][0] < '0' || argv[2][0] >= '0' + NW_CATALOG_PLATFORMS)
                 return printReport(errorReport(@"arguments"));
             catalogPlatform = (NSUInteger)(argv[2][0] - '0');
             size_t count = NWCatalogProfileParse(argv[3], (unsigned)catalogPlatform, selected);
@@ -384,7 +384,7 @@ int main(int argc, char **argv) {
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_app_cancel_channel": @YES,
-                @"supports_le_catalog_test": @YES,
+                @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES,
                 @"supports_le_swift_pair_test": @YES,
                 @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES, @"supports_le_multi_device_test": @YES});
         }

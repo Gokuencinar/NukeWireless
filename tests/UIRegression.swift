@@ -79,14 +79,14 @@ struct RegressionTabs: View {
     private func captureCatalog(_ platform: Int32) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             snapshot("catalog-\(platform).png")
-            if platform < 2 {
+            if platform < 3 {
                 results.append(presentCatalog(platform + 1))
                 captureCatalog(platform + 1)
             } else {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 11]
+                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 12]
                     let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                         .appendingPathComponent("ui-regression.json")
                     try? JSONSerialization.data(withJSONObject: report).write(to: file)

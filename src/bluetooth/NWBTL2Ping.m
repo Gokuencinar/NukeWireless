@@ -356,9 +356,9 @@ NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVarian
 NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(3); }
 
 static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber *> *catalogModels) {
-    if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
+    if (platform<1 || platform>(catalogModels ? 4 : 3)) return @{@"error": @"Unknown fixed lab platform."};
     NSUInteger count = catalogModels ? catalogModels.count : NWBT_LAB_PLATFORM_COUNT;
-    unsigned catalogPlatform = platform == 1 ? 2 : platform == 2 ? 0 : 1;
+    unsigned catalogPlatform = platform == 1 ? 2 : platform == 2 ? 0 : platform == 3 ? 1 : 3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
@@ -366,17 +366,24 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableArray *handles = [NSMutableArray new], *powers = [NSMutableArray new];
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_advertising_test",
-        @"queries": session.queries, @"advertisement_variant": @[@"multi_windows", @"multi_apple", @"multi_android"][platform-1],
-        @"models": @[@[@"NWLab Keyboard", @"NWLab Mouse", @"NWLab Audio"], @[@"AirPods Pro", @"AirPods Pro 2", @"AirPods Max"], @[@"Pixel Buds", @"Pixel Buds A", @"Sony WH-1000XM4"]][platform-1],
+        @"queries": session.queries, @"advertisement_variant": @[@"multi_windows", @"multi_apple", @"multi_android", @"catalog_samsung"][platform-1],
+        @"models": @[@[@"NWLab Keyboard", @"NWLab Mouse", @"NWLab Audio"], @[@"AirPods Pro", @"AirPods Pro 2", @"AirPods Max"], @[@"Pixel Buds", @"Pixel Buds A-Series", @"Sony WH-1000XM4"], @[]][platform-1],
         @"duration_seconds": @10, @"interval_ms": @100, @"requested_tx_power_dbm": @20,
         @"requested_advertising_sets": @3, @"address_rotation": @NO, @"pairing_supported": @NO,
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"advertising_set_removed": @NO,
         @"connection_commands_submitted": @0, @"selected_tx_power_dbm_by_set": powers} mutableCopy];
     if (catalogModels) {
-        NSMutableArray *names = [NSMutableArray new];
-        for (NSNumber *model in catalogModels) [names addObject:@(NWCatalogModel(catalogPlatform, model.unsignedIntValue))];
+        NSMutableArray *names = [NSMutableArray new], *identifiers = [NSMutableArray new];
+        for (NSNumber *model in catalogModels) {
+            [names addObject:@(NWCatalogModel(catalogPlatform, model.unsignedIntValue))];
+            [identifiers addObject:catalogPlatform == 2 ? @(NWCatalogModel(catalogPlatform, model.unsignedIntValue)) :
+                [NSString stringWithFormat:catalogPlatform == 0 ? @"%04X" : @"%06X", (unsigned)NWCatalogProfileID(catalogPlatform, model.unsignedIntValue)]];
+        }
         report[@"models"] = names; report[@"catalog_model_indices"] = catalogModels;
+        report[@"model_identifiers"] = identifiers;
+        report[@"model_protocol"] = @[@"apple_proximity", @"google_fast_pair", @"microsoft_swift_pair", @"samsung_easysetup"][catalogPlatform];
+        report[@"address_identity"] = @"stable_per_catalog_model";
         report[@"catalog_platform"] = @(catalogPlatform);
         report[@"advertisement_variant"] = @"catalog_selection";
         report[@"requested_advertising_sets"] = @(count);
@@ -410,7 +417,9 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
                 phase:[NSString stringWithFormat:@"parameters_%u",i] cleanup:NO];
             if (!reply) break;
             [powers addObject:@((int8_t)((const uint8_t *)reply.bytes)[6])];
-            uint8_t address[7]; NWBTLabDeviceAddress(address,(unsigned)platform,i);
+            uint8_t address[7];
+            if (catalogModels) NWBTLabCatalogAddress(address, catalogPlatform, catalogModels[i].unsignedIntValue, i);
+            else NWBTLabDeviceAddress(address, (unsigned)platform, i);
             if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
                 phase:[NSString stringWithFormat:@"address_%u",i] cleanup:NO]) break;
             size_t length = catalogModels ? NWBTLabCatalogData(data, catalogPlatform, catalogModels[i].unsignedIntValue) :
@@ -471,7 +480,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
 NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) { return advertiseMultiDevice(platform, nil); }
 NSDictionary *NWBTAdvertiseCatalogLab(NSUInteger platform, NSArray<NSNumber *> *models) {
     unsigned selected[NW_CATALOG_SELECTION];
-    if (platform >= 3 || models.count < 1 || models.count > NW_CATALOG_SELECTION) return @{@"error_code": @"arguments"};
+    if (platform >= NW_CATALOG_PLATFORMS || models.count < 1 || models.count > NW_CATALOG_SELECTION) return @{@"error_code": @"arguments"};
     for (NSUInteger i = 0; i < models.count; ++i) {
         if (![models[i] isKindOfClass:NSNumber.class] || models[i].integerValue < 0 ||
             models[i].unsignedIntegerValue >= NW_CATALOG_MODELS || models[i].doubleValue != models[i].unsignedIntValue)
@@ -479,7 +488,7 @@ NSDictionary *NWBTAdvertiseCatalogLab(NSUInteger platform, NSArray<NSNumber *> *
         selected[i] = models[i].unsignedIntValue;
     }
     if (!NWCatalogProfileSelection((unsigned)platform, selected, models.count)) return @{@"error_code": @"arguments"};
-    return advertiseMultiDevice(platform == 0 ? 2 : platform == 1 ? 3 : 1, models);
+    return advertiseMultiDevice(platform == 0 ? 2 : platform == 1 ? 3 : platform == 2 ? 1 : 4, models);
 }
 
 @interface NWBTPingSession : NSObject

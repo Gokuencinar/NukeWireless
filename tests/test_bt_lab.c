@@ -43,7 +43,7 @@ int main(void) {
         if (data[offset+1]==0x16) {
             services++;
             assert(data[offset]==6 && data[offset+2]==0x2c && data[offset+3]==0xfe);
-            assert(data[offset+4]==0xcd && data[offset+5]==0x82 && data[offset+6]==0x56);
+            assert(data[offset+4]==0x92 && data[offset+5]==0xbb && data[offset+6]==0xbd);
         }
         offset+=data[offset]+1;
     }
@@ -68,7 +68,7 @@ int main(void) {
             for(size_t offset=4;offset<n;) { assert(data[offset]>0 && offset+data[offset]+1<=n); offset+=data[offset]+1; }
             assert(NWBTLabDeviceAddress(addr[model],platform,model)==7 && (addr[model][6]&0xc0)==0xc0);
             if(platform==2) { const uint16_t ids[]={0x200e,0x2014,0x200a};assert((data[11] | data[12]<<8)==ids[model]); }
-            if(platform==3) { const uint8_t ids[][3]={{0xcd,0x82,0x56},{0,0,0x47},{0x14,0,0x45}};assert(!memcmp(data+15,ids[model],3)); }
+            if(platform==3) { const uint8_t ids[][3]={{0x92,0xbb,0xbd},{0x8b,0x66,0xab},{0x01,0xee,0xb4}};assert(!memcmp(data+15,ids[model],3)); }
         }
         assert(memcmp(addr[0]+1,addr[1]+1,6) && memcmp(addr[1]+1,addr[2]+1,6));
     }
