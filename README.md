@@ -4,11 +4,12 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev45 / trabajador app28:** Emitir mantiene el catálogo, con Detener en la
+**Dev45 instalado / trabajador app28:** Emitir mantiene el catálogo, con Detener en la
 misma pantalla y la barra superior. Los resultados correctos quedan ocultos;
 los fallos y restauraciones incompletas siguen visibles. Menos texto repetido,
-ayuda accesible y sin desplazamientos automáticos. Compilación e instalación
-pendientes; trabajador y perfiles de radio sin cambios.
+ayuda accesible y sin desplazamientos automáticos. Compilación, simulador
+(dieciséis comprobaciones por idioma), siete checks de paquete e instalación
+verificados; aceptación manual pendiente. Trabajador y perfiles de radio sin cambios.
 Véase [usabilidad Bluetooth](docs/BLUETOOTH-USABILITY-DEV45.md).
 
 **Dev44 instalado / trabajador app28:** el catálogo añade Samsung (Galaxy Buds, Live,
