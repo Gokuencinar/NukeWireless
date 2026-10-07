@@ -6,6 +6,8 @@ Dev47 coloca la misma barra de presentación como vista hermana de la barra nati
 
 Se conservan los tres hosts y su delegado, sin añadir controladores al array SwiftUI. La navegación Bluetooth, catálogo individual/conjunto, Detener, recuperación Wi-Fi, firma y permisos se mantienen. El trabajador app28 y los perfiles de radio no cambian.
 
+La revisión de las primeras capturas reveló además un título Wi-Fi oscuro sobre fondo oscuro tras cambiar de apariencia. El estilo de navegación conserva ahora el color dinámico de etiqueta, en vez de resolverlo una sola vez al crear la barra. La regresión de retorno en Wi-Fi comprueba los colores de título normal y grande en el tema actual.
+
 ## Verificación prevista
 
 El simulador conserva las dieciocho comprobaciones de dev46 y añade preparación/retorno de cuatro pestañas, con 26 comprobaciones por idioma. El script abre Ajustes durante tres segundos y vuelve al mismo proceso sin terminarlo. Comprueba notificación real de segundo plano, PID conservado, hosts/delegado/selección intactos, misma navegación del catálogo Bluetooth, geometría, fondo opaco, capa, interacción y accesibilidad. Antes de cada ciclo añade contenido nativo y lo reordena para desafiar el aislamiento visual sin depender de clases privadas. Captura cada retorno, incluyendo Punto de acceso en oscuro como en el informe del usuario.

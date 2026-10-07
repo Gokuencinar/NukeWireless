@@ -218,6 +218,15 @@ static NSArray<UIViewController *> *resumeHosts;
 static id<UITabBarControllerDelegate> resumeDelegate;
 static UIViewController *resumeTop;
 static UIView *resumeNativeContent;
+static UINavigationBar *resumeWiFiBar(UIView *view) {
+    if ([view isKindOfClass:UINavigationBar.class] &&
+        [((UINavigationBar *)view).topItem.title isEqualToString:@"NukeWireless"]) return (UINavigationBar *)view;
+    for (UIView *child in view.subviews) {
+        UINavigationBar *bar = resumeWiFiBar(child);
+        if (bar) return bar;
+    }
+    return nil;
+}
 int NWMainTabsResumePrepare(UITabBarController *tab, NSInteger tag) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs || tag < 0 || tag > 3) return 30;
@@ -260,6 +269,13 @@ int NWMainTabsResumeCheck(UITabBarController *tab) {
     if (!background || CGColorGetAlpha(background.CGColor) < 1) return 35;
     if (resumeTag == 3 && (tabs.bluetooth.topViewController != resumeTop || tabs.bluetooth.view.hidden ||
         ![tab.view viewWithTag:90122].hidden)) return 36;
+    if (resumeTag == 0) {
+        UINavigationBar *bar = resumeWiFiBar(tab.selectedViewController.view);
+        UIColor *expected = [UIColor.labelColor resolvedColorWithTraitCollection:bar.traitCollection];
+        UIColor *title = [bar.standardAppearance.titleTextAttributes[NSForegroundColorAttributeName] resolvedColorWithTraitCollection:bar.traitCollection];
+        UIColor *large = [bar.standardAppearance.largeTitleTextAttributes[NSForegroundColorAttributeName] resolvedColorWithTraitCollection:bar.traitCollection];
+        if (!bar || ![title isEqual:expected] || ![large isEqual:expected]) return 37;
+    }
     [resumeNativeContent removeFromSuperview]; resumeNativeContent = nil;
     return 0;
 }

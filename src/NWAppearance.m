@@ -59,7 +59,7 @@ void NWStyleNavigationBar(UINavigationBar *bar) {
     [appearance configureWithDefaultBackground];
     appearance.backgroundColor = NWCanvasColor();
     appearance.shadowColor = [NWAccentColor() colorWithAlphaComponent:0.18];
-    UIColor *titleColor = [UIColor.labelColor resolvedColorWithTraitCollection:bar.traitCollection];
+    UIColor *titleColor = UIColor.labelColor;
     appearance.titleTextAttributes = @{NSForegroundColorAttributeName:titleColor};
     appearance.largeTitleTextAttributes = @{NSForegroundColorAttributeName:titleColor,
         NSFontAttributeName:[[UIFontMetrics metricsForTextStyle:UIFontTextStyleLargeTitle] scaledFontForFont:
