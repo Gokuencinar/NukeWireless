@@ -9,8 +9,8 @@ Buds2 y Buds2 Pro, con variantes de color), muestra la identidad del protocolo
 y conserva una dirección estable por modelo entre generaciones. Corrige IDs
 Google incorrectos de dev43 y añade Pixel Buds Pro. Emisión acotada con Detener;
 compilación, simulador (doce comprobaciones por idioma), paquete e instalación
-verificados. El reconocimiento en los receptores
-requiere aceptación específica. Véase [identidad de modelos](docs/BLUETOOTH-CATALOG-IDENTITY-DEV44.md).
+verificados. El usuario confirma que Windows muestra Surface Headphones;
+iPhone/iPad y Android siguen pendientes de aceptación específica. Véase [identidad de modelos](docs/BLUETOOTH-CATALOG-IDENTITY-DEV44.md).
 
 **Dev43 instalado / trabajador app27:** el catálogo añade **Emitir N de 3 · 10 s**,
 usando los perfiles disponibles de los modelos seleccionados y regresando al

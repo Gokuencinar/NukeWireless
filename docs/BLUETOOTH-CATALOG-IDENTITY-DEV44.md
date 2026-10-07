@@ -47,3 +47,7 @@ Recuperación: cerrar NukeWireless e instalar conjuntamente `/var/mobile/Documen
 La recepción pasiva en la laptop Windows confirma los doce anuncios seleccionados en cuatro ensayos de diez segundos: AirPods, AirPods Pro, AirPods Pro 2; Pixel Buds, A-Series, Pro; Surface Keyboard, Surface Mouse, Xbox Wireless Controller; Galaxy Buds (White), Buds Live (Black), Buds2 Pro. Coinciden las direcciones y los IDs/nombres recibidos; los cuatro ensayos confirman desactivación, retirada de sets y restauración del servicio. Es inspección del payload recibido, no aceptación de un aviso ni del reconocimiento del sistema en iOS/Android/Windows. Véase el informe `RECEPCION-CATALOGO-DEV44.json` de la entrega.
 
 El primer intento Google, inmediatamente después de restaurar el servicio tras Apple, se rechazó en preflight (`skywalk_registry`) sin emitir ni retirar servicios. Se conserva esa evidencia; los ensayos restantes pasaron dejando tiempo para que el servicio publicase de nuevo la interfaz. No se modificó el guard del trabajador ni se hicieron reinicios generales.
+
+## Aceptación manual parcial
+
+El usuario confirma que Windows muestra **Surface Headphones** al emitir desde el catálogo dev44. Es aceptación manual del nombre interpretado en ese receptor, distinta de la captura pasiva de doce payloads. No se ha especificado la versión de Windows ni el tipo de aviso; no prueba emparejamiento. iPhone/iPad y Android permanecen pendientes de aceptación; Detener antes de diez segundos no se ha confirmado específicamente en dev44.
