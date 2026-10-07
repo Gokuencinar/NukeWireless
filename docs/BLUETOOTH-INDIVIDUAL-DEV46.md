@@ -10,7 +10,7 @@ No cambia el contenido de los perfiles, las identidades, permisos, firma ni pote
 
 El simulador recorre las 80 combinaciones de las cuatro marcas y comprueba que cada tarjeta emite exactamente su modelo, omite los no disponibles y rechaza emisión sin trabajador. El backend simulado verifica la misma pantalla, argumentos de un solo modelo, selección conservada, bloqueo de otra tarjeta mientras está ocupado, Detener desde la barra y final silencioso. Incluye captura de emisión individual y conserva las comprobaciones de dev45.
 
-Compilación, paquete e instalación verificados. Aceptación manual del comportamiento en el teléfono pendiente.
+Compilación, paquete e instalación verificados. Aceptación manual del comportamiento en el teléfono confirmada por el usuario.
 
 ## Entrega verificada
 
@@ -19,3 +19,7 @@ Fuentes `f2cbfddbe8cd7743f5108fe50ab31ff8598de46b`, [CI aprobado](https://github
 Paquete `1.0.25+rh25.5~dev46`, SHA-256 `5b82134511b62584aa24c43961a60cc6b198fd805724668777a07ee3a9f28e56`, validado con siete comprobaciones. app28 conserva los mismos hashes de paquete y fuentes, sin recompilar ni reinstalar. Dpkg confirma dev46/app28 en iPhone11,2/iOS 16.3.1 con clave SSH conocida en 192.168.1.22. Capacidades del trabajador y CodeDirectory `me.midnightchips.harpy-reloaded` verificados; sin nuevos informes de crash relevantes durante la instalación.
 
 Recuperación: cerrar NukeWireless e instalar `/var/mobile/Documents/NukeWireless-dev45-backup.deb` desde el entorno SSH del mismo jailbreak. Copia comprobada por hash antes de instalar. app28 permanece. No requiere respring ni reinicio general.
+
+## Aceptación manual
+
+El usuario respondió «Sí, funciona así» a la comprobación de dev46: tocar ▶ de un modelo disponible hace que solo esa tarjeta indique emisión, conserva abierto el catálogo, permite detener desde la barra superior y no muestra resultado tras detener o terminar correctamente. Esta aceptación corresponde a la interfaz en el iPhone; no demuestra reconocimiento adicional de modelos en los receptores.
