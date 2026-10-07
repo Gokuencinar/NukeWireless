@@ -4,10 +4,11 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev46 / trabajador app28:** cada modelo generado tiene reproducción individual
-durante 10 s al tocar su tarjeta; Emitir conserva la selección completa.
+**Dev46 instalado / trabajador app28:** los modelos generados con perfil disponible
+permiten emisión individual de 10 s al tocar su tarjeta; Emitir conserva la selección completa.
 Ambas opciones mantienen el catálogo y Detener accesible, sin resultados
-de éxito. Compilación e instalación pendientes; radio y trabajador sin cambios.
+de éxito. Compilación, simulador (18 comprobaciones por idioma), siete checks
+de paquete e instalación verificados; aceptación manual pendiente. Radio y trabajador sin cambios.
 Véase [emisión individual](docs/BLUETOOTH-INDIVIDUAL-DEV46.md).
 
 **Dev45 instalado / trabajador app28:** Emitir mantiene el catálogo, con Detener en la
