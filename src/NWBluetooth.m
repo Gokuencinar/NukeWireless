@@ -574,7 +574,7 @@ static UILabel *durationBadge(BOOL enabled) {
     UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.finished"));
 }
 - (void)viewDidDisappear:(BOOL)animated {
-    [super viewDidDisappear:animated]; self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+    [super viewDidDisappear:animated]; self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
 }
 @end
 
