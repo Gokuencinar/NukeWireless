@@ -4,18 +4,21 @@ on:
     branches: [audit-rh25.5]
     paths:
       - 'src/bluetooth/**'
+      - 'src/NWCatalogProfiles.h'
+      - 'src/NWDeviceCatalog.h'
       - 'scripts/build_bluetooth_inspector.sh'
       - 'scripts/bluetooth_manifest.py'
       - 'tests/test_hci_read.c'
       - 'tests/test_bt_lab.c'
       - 'tests/test_bt_control.c'
+      - 'tests/test_catalog_profiles.c'
       - '.github/workflows/bluetooth-inspector.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   compile:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Compile isolated Bluetooth capability library and inspector

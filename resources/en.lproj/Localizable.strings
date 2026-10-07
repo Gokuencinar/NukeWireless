@@ -195,7 +195,7 @@
 "bt.ui.help" = "Scan: turn on Bluetooth and allow access. Only devices advertising BLE are shown.\n\nCapabilities and emissions: turn off Bluetooth in iPhone Settings. Keep Bluetooth enabled on the receiver.\n\nChoose one or three devices for a platform. Emissions last 10 seconds. Stop ends the emission and restores Bluetooth.\n\nWindows requires Swift Pair enabled. These announcements do not implement accessory pairing, and reception does not guarantee a system notification.";
 
 "bt.catalog.title" = "Random catalog";
-"bt.catalog.menu_hint" = "Apple, Google and Microsoft · local simulation";
+"bt.catalog.menu_hint" = "Apple, Google and Microsoft · selection and advertisements";
 "bt.catalog.platform" = "Brand";
 "bt.catalog.selection" = "Generated models";
 "bt.catalog.hint" = "Choose a brand to explore its catalog.";
@@ -204,3 +204,10 @@
 "bt.catalog.generated" = "Three new models generated";
 "bt.catalog.identity" = "Simulation ID: %@";
 "bt.catalog.local_only" = "Local simulation. These models are displayed only in NukeWireless; no Bluetooth advertisements or pairing alerts are emitted.";
+"bt.catalog.emit" = "Advertise %lu of 3 · 10 s";
+"bt.catalog.emit_hint" = "Uses the three selected profiles";
+"bt.catalog.partial" = "Only models with an available profile are advertised";
+"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app27.";
+"bt.catalog.profile_available" = "Advertising profile available";
+"bt.catalog.profile_unavailable" = "Catalog only · unverified profile";
+"bt.catalog.emission_note" = "Manual 10 s advertising, without pairing or guaranteed notifications. NWLab IDs remain local.";

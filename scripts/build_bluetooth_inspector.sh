@@ -12,6 +12,9 @@ rm "$out/test-hci-read"
 clang -std=c11 -Wall -Wextra -Werror tests/test_bt_lab.c -o "$out/test-bt-lab"
 "$out/test-bt-lab"
 rm "$out/test-bt-lab"
+clang -std=c11 -Wall -Wextra -Werror tests/test_catalog_profiles.c -o "$out/test-catalog-profiles"
+"$out/test-catalog-profiles"
+rm "$out/test-catalog-profiles"
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 -fPIC -dynamiclib \

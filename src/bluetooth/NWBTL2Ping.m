@@ -355,8 +355,10 @@ NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVarian
 
 NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(3); }
 
-NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
+static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber *> *catalogModels) {
     if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
+    NSUInteger count = catalogModels ? catalogModels.count : NWBT_LAB_PLATFORM_COUNT;
+    unsigned catalogPlatform = platform == 1 ? 2 : platform == 2 ? 0 : 1;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
@@ -371,6 +373,14 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
         @"transmission_verified": @NO, @"controller_advertising_acknowledged": @NO,
         @"advertising_stopped_acknowledged": @NO, @"advertising_set_removed": @NO,
         @"connection_commands_submitted": @0, @"selected_tx_power_dbm_by_set": powers} mutableCopy];
+    if (catalogModels) {
+        NSMutableArray *names = [NSMutableArray new];
+        for (NSNumber *model in catalogModels) [names addObject:@(NWCatalogModel(catalogPlatform, model.unsignedIntValue))];
+        report[@"models"] = names; report[@"catalog_model_indices"] = catalogModels;
+        report[@"advertisement_variant"] = @"catalog_selection";
+        report[@"requested_advertising_sets"] = @(count);
+        report[@"interval_ms"] = platform == 1 ? @152.5 : @100;
+    }
     BOOL enableSubmitted = NO; double started = 0;
     @try {
         session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
@@ -384,13 +394,14 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
         if (limit.length != 7) { report[@"error"] = session.error ?: @"Advertising set capacity unavailable."; return report; }
         unsigned supported = ((const uint8_t *)limit.bytes)[6];
         report[@"supported_advertising_sets"] = @(supported);
-        if (supported < NWBT_LAB_PLATFORM_COUNT) {
+        if (supported < count) {
             report[@"error_code"] = @"advertising_sets";
-            report[@"error"] = @"The controller cannot support three simultaneous advertising sets.";
+            report[@"error"] = @"The controller cannot support the requested simultaneous advertising sets.";
             return report;
         }
-        for (unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled;i++) {
+        for (unsigned i=0;i<count && !session.error && !NWBTCancelled;i++) {
             uint8_t params[25], data[35]; NWBTLabFastPairParameters(params);
+            if (catalogModels && platform == 1) NWBTLabSwiftPairParameters(params);
             params[0] = NWBT_LAB_MULTI_HANDLE+i; params[10] = 1; // Per-set static random address.
             // Include the attempted handle in cleanup even after a lost completion.
             [handles addObject:@(params[0])];
@@ -401,7 +412,9 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
             uint8_t address[7]; NWBTLabDeviceAddress(address,(unsigned)platform,i);
             if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
                 phase:[NSString stringWithFormat:@"address_%u",i] cleanup:NO]) break;
-            size_t length = NWBTLabMultiDeviceData(data,(unsigned)platform,i);
+            size_t length = catalogModels ? NWBTLabCatalogData(data, catalogPlatform, catalogModels[i].unsignedIntValue) :
+                NWBTLabMultiDeviceData(data,(unsigned)platform,i);
+            if (!length) { session.error = @"Catalog advertising data unavailable."; break; }
             if (platform==3) {
                 length = NWBTLabFastPairPower(data,(int8_t)((const uint8_t *)reply.bytes)[6]);
                 if (!length) { session.error = @"Selected transmit power cannot be encoded."; break; }
@@ -411,17 +424,17 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
             [session command:0x2037 parameters:[NSData dataWithBytes:data length:length]
                 phase:[NSString stringWithFormat:@"data_%u",i] cleanup:NO];
         }
-        if (handles.count==NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled) {
+        if (handles.count==count && !session.error && !NWBTCancelled) {
             NSUInteger active=0;
-            for(unsigned i=0;i<NWBT_LAB_PLATFORM_COUNT && !session.error && !NWBTCancelled;i++) {
+            for(unsigned i=0;i<count && !session.error && !NWBTCancelled;i++) {
                 uint8_t enable[6]; NWBTLabDeviceEnable(enable,1,i); enableSubmitted=YES;
                 NSData *reply=[session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO];
                 if(!reply) break;
                 active++;if(!started) started=now();
             }
             report[@"active_set_count"] = @(active);
-            report[@"controller_advertising_acknowledged"] = @(active==NWBT_LAB_PLATFORM_COUNT);
-            if(active==NWBT_LAB_PLATFORM_COUNT) {
+            report[@"controller_advertising_acknowledged"] = @(active==count);
+            if(active==count) {
                 double deadline=started+10.0;
                 while(!session.error && !NWBTCancelled && now()<deadline) usleep(20000);
             }
@@ -452,6 +465,20 @@ NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) {
         NWBTCloseNativeChannel(channel);
     }
     return report;
+}
+
+NSDictionary *NWBTAdvertiseMultiDeviceLab(NSUInteger platform) { return advertiseMultiDevice(platform, nil); }
+NSDictionary *NWBTAdvertiseCatalogLab(NSUInteger platform, NSArray<NSNumber *> *models) {
+    unsigned selected[NW_CATALOG_SELECTION];
+    if (platform >= 3 || models.count < 1 || models.count > NW_CATALOG_SELECTION) return @{@"error_code": @"arguments"};
+    for (NSUInteger i = 0; i < models.count; ++i) {
+        if (![models[i] isKindOfClass:NSNumber.class] || models[i].integerValue < 0 ||
+            models[i].unsignedIntegerValue >= NW_CATALOG_MODELS || models[i].doubleValue != models[i].unsignedIntValue)
+            return @{@"error_code": @"arguments"};
+        selected[i] = models[i].unsignedIntValue;
+    }
+    if (!NWCatalogProfileSelection((unsigned)platform, selected, models.count)) return @{@"error_code": @"arguments"};
+    return advertiseMultiDevice(platform == 0 ? 2 : platform == 1 ? 3 : 1, models);
 }
 
 @interface NWBTPingSession : NSObject

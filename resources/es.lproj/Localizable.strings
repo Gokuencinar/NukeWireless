@@ -195,7 +195,7 @@
 "bt.ui.help" = "Escáner: activa Bluetooth y concede el permiso. Solo aparecen dispositivos que anuncian BLE.\n\nCapacidades y emisiones: apaga Bluetooth en Ajustes del iPhone. Mantén Bluetooth activado en el receptor.\n\nElige uno o tres dispositivos de una plataforma. La emisión dura 10 segundos. Detener finaliza la emisión y restaura Bluetooth.\n\nWindows requiere Swift Pair activado. Estos anuncios no implementan el emparejamiento del accesorio y su recepción no garantiza un aviso del sistema.";
 
 "bt.catalog.title" = "Catálogo aleatorio";
-"bt.catalog.menu_hint" = "Apple, Google y Microsoft · simulación local";
+"bt.catalog.menu_hint" = "Apple, Google y Microsoft · selección y anuncios";
 "bt.catalog.platform" = "Marca";
 "bt.catalog.selection" = "Modelos generados";
 "bt.catalog.hint" = "Elige una marca para explorar su catálogo.";
@@ -204,3 +204,10 @@
 "bt.catalog.generated" = "Tres modelos nuevos generados";
 "bt.catalog.identity" = "ID de simulación: %@";
 "bt.catalog.local_only" = "Simulación local. Los modelos solo se muestran en NukeWireless; no se emiten anuncios Bluetooth ni avisos de emparejamiento.";
+"bt.catalog.emit" = "Emitir %lu de 3 · 10 s";
+"bt.catalog.emit_hint" = "Usa los tres perfiles seleccionados";
+"bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
+"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app27.";
+"bt.catalog.profile_available" = "Perfil de anuncio disponible";
+"bt.catalog.profile_unavailable" = "Solo catálogo · perfil sin verificar";
+"bt.catalog.emission_note" = "Emisión manual de 10 s, sin emparejamiento ni aviso garantizado. Los IDs NWLab son locales.";

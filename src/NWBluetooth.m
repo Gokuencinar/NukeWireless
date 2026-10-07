@@ -5,6 +5,7 @@
 #import "NWScanBridge.h"
 #import "NWMainTabs.h"
 #import "NWBluetoothCatalog.h"
+#include "NWCatalogProfiles.h"
 #include <spawn.h>
 #include <sys/wait.h>
 #include <fcntl.h>
@@ -23,8 +24,12 @@ static int workerControl = -1; // Owned/closed by invoke, guarded by workerLock.
 static NSObject *workerLock;
 static NSDictionary *lastReport;
 static BOOL labRunning;
+#ifdef NW_UI_TESTING
+static BOOL captureCatalogArguments;
+static NSArray *capturedCatalogArguments;
+#endif
 static BOOL labOperation(NSString *operation) {
-    return [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"] || [operation isEqual:@"le_fast_pair_test"] || [operation isEqual:@"le_multi_windows_test"] || [operation isEqual:@"le_multi_apple_test"] || [operation isEqual:@"le_multi_android_test"];
+    return [operation isEqual:@"le_catalog_test"] || [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"] || [operation isEqual:@"le_fast_pair_test"] || [operation isEqual:@"le_multi_windows_test"] || [operation isEqual:@"le_multi_apple_test"] || [operation isEqual:@"le_multi_android_test"];
 }
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
@@ -239,6 +244,7 @@ static UILabel *durationBadge(BOOL enabled) {
 @property(nonatomic) BOOL checking;
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation;
 - (void)stopCurrentOperation;
+- (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models;
 @end
 
 @implementation NWBluetoothViewController
@@ -418,6 +424,8 @@ static UILabel *durationBadge(BOOL enabled) {
         if ([lastReport[@"operation"] isEqual:@"le_swift_pair_test"]) [details addObject:NWText(@"bt.lab.swift_receiver")];
         if ([lastReport[@"operation"] isEqual:@"le_fast_pair_test"]) [details addObject:NWText(@"bt.lab.android_receiver")];
         if ([lastReport[@"operation"] isEqual:@"le_apple_pairing_test"]) [details addObject:NWText(@"bt.lab.apple_receiver")];
+        if ([lastReport[@"operation"] isEqual:@"le_catalog_test"] && [lastReport[@"models"] isKindOfClass:NSArray.class])
+            [details addObject:[lastReport[@"models"] componentsJoinedByString:@", "]];
         if ([lastReport[@"service_restored"] boolValue]) [details addObject:NWText(@"bt.restored")];
         content.secondaryText = [details componentsJoinedByString:@"\n"];
         content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
@@ -456,7 +464,14 @@ static UILabel *durationBadge(BOOL enabled) {
     [table deselectRowAtIndexPath:index animated:YES];
     NSInteger action = menuAction(index);
     if (action == 9) {
-        if (!busy) [self.navigationController pushViewController:NWBluetoothCatalogController() animated:YES];
+        if (!busy) {
+            BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_test"] boolValue];
+            __weak NWBluetoothViewController *weakSelf = self;
+            UIViewController *catalog = NWBluetoothCatalogControllerWithEmitter(available, ^(NSUInteger platform, NSArray<NSNumber *> *models) {
+                [weakSelf emitCatalogPlatform:platform models:models];
+            });
+            [self.navigationController pushViewController:catalog animated:YES];
+        }
         return;
     }
     if (action == 1 && !busy) {
@@ -490,7 +505,24 @@ static UILabel *durationBadge(BOOL enabled) {
     }
     if (index.section == 4 && index.row == 1) [self stopCurrentOperation];
 }
+- (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models {
+    if (busy || NWBulkBusy() || ![self.capabilities[@"supported"] boolValue] ||
+        ![self.capabilities[@"supports_le_catalog_test"] boolValue] || platform >= 3 ||
+        models.count < 1 || models.count > NW_CATALOG_SELECTION) return;
+    unsigned selected[3]; NSMutableArray *indices = [NSMutableArray new];
+    for (NSUInteger i = 0; i < models.count; ++i) {
+        if (models[i].unsignedIntegerValue >= NW_CATALOG_MODELS) return;
+        selected[i] = models[i].unsignedIntValue; [indices addObject:models[i].stringValue];
+    }
+    if (!NWCatalogProfileSelection((unsigned)platform, selected, models.count)) return;
+    [self.navigationController popToViewController:self animated:NO];
+    [self runArguments:@[@"--le-catalog-test", [NSString stringWithFormat:@"%lu", (unsigned long)platform],
+        [indices componentsJoinedByString:@","]] operation:@"le_catalog_test"];
+}
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation {
+#ifdef NW_UI_TESTING
+    if (captureCatalogArguments && [operation isEqual:@"le_catalog_test"]) { capturedCatalogArguments = [arguments copy]; return; }
+#endif
     if (busy || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
@@ -683,11 +715,37 @@ int NWBluetoothUIRegressionCheck(void) {
         busy = YES;
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
+        busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
+        UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+        [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+        UIViewController *catalog = navigation.topViewController;
+        if (catalog == controller) return 45;
+        [catalog setValue:@2 forKey:@"platform"];
+        [catalog setValue:@[@{@"model": @5}, @{@"model": @1}, @{@"model": @4}] forKey:@"models"];
+        [(UITableViewController *)catalog tableView:((UITableViewController *)catalog).tableView
+            didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+        if (navigation.topViewController != controller ||
+            ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"2", @"5,1,4"]] || !labOperation(@"le_catalog_test")) return 46;
+        capturedCatalogArguments = nil; busy = YES;
+        [controller emitCatalogPlatform:0 models:@[@0]];
+        if (capturedCatalogArguments) return 47;
+        busy = NO; controller.capabilities = @{@"supported": @YES};
+        [controller emitCatalogPlatform:0 models:@[@0]];
+        if (capturedCatalogArguments) return 48;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
+        [controller emitCatalogPlatform:1 models:@[@2]];
+        if (capturedCatalogArguments) return 49;
+        lastReport = @{@"operation": @"le_catalog_test", @"error_code": @"cancelled",
+            @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
+            @"advertising_set_removed": @YES, @"service_restored": @YES};
+        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.stopped")]) return 50;
         return 0;
     } @finally {
         NWEndWiFiScanUITest();
         lastReport = previous; busy = previousBusy; labRunning = previousLab;
         @synchronized (workerLock) { cancelling = previousCancelling; }
+        captureCatalogArguments = NO; capturedCatalogArguments = nil;
     }
 }
 #endif

@@ -1,4 +1,5 @@
 #import "NWBTBridge.h"
+#include "../NWCatalogProfiles.h"
 #import "NWBTNative.h"
 #include "NWBTControl.h"
 #include <dlfcn.h>
@@ -232,7 +233,7 @@ static NSString *codeForReport(NSDictionary *report) {
     return @"transport";
 }
 
-static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL applePairing, BOOL fastPair, NSUInteger multiPlatform) {
+static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL applePairing, BOOL fastPair, NSUInteger multiPlatform, NSUInteger catalogPlatform, NSArray<NSNumber *> *catalogModels) {
     // Reject invalid options before guard, lock acquisition or service changes.
     if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
     NSDictionary *guard = NWBTVerifyBluetoothOff();
@@ -287,7 +288,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             }
             else if (NWBTCancelled) report = [errorReport(@"cancelled") mutableCopy];
             else report = [(address ? NWBTL2PingWithMilliseconds(address, count, intervalMS) : lab ?
-                (multiPlatform ? NWBTAdvertiseMultiDeviceLab(multiPlatform) : fastPair ? NWBTAdvertiseFastPairLab() : applePairing ? NWBTAdvertiseApplePairingLab() : NWBTAdvertiseSwiftPairLab()) : NWBTReadLECapabilities()) mutableCopy];
+                (catalogModels ? NWBTAdvertiseCatalogLab(catalogPlatform, catalogModels) : multiPlatform ? NWBTAdvertiseMultiDeviceLab(multiPlatform) : fastPair ? NWBTAdvertiseFastPairLab() : applePairing ? NWBTAdvertiseApplePairingLab() : NWBTAdvertiseSwiftPairLab()) : NWBTReadLECapabilities()) mutableCopy];
         }
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
@@ -335,9 +336,22 @@ int main(int argc, char **argv) {
         BOOL swiftPair = argc == 2 && !strcmp(argv[1], "--le-swift-pair-test");
         BOOL applePairing = argc == 2 && !strcmp(argv[1], "--le-apple-pairing-test");
         BOOL fastPair = argc == 2 && !strcmp(argv[1], "--le-fast-pair-test");
+        BOOL catalog = argc > 1 && !strcmp(argv[1], "--le-catalog-test");
+        NSUInteger catalogPlatform = 0; NSArray<NSNumber *> *catalogModels = nil;
+        if (catalog) {
+            unsigned selected[NW_CATALOG_SELECTION];
+            if (argc != 4 || strlen(argv[2]) != 1 || argv[2][0] < '0' || argv[2][0] > '2')
+                return printReport(errorReport(@"arguments"));
+            catalogPlatform = (NSUInteger)(argv[2][0] - '0');
+            size_t count = NWCatalogProfileParse(argv[3], (unsigned)catalogPlatform, selected);
+            if (!count) return printReport(errorReport(@"arguments"));
+            NSMutableArray *models = [NSMutableArray new];
+            for (size_t i = 0; i < count; ++i) [models addObject:@(selected[i])];
+            catalogModels = [models copy];
+        }
         NSUInteger multiPlatform = argc!=2 ? 0 : !strcmp(argv[1], "--le-multi-windows-test") ? 1 :
             !strcmp(argv[1], "--le-multi-apple-test") ? 2 : !strcmp(argv[1], "--le-multi-android-test") ? 3 : 0;
-        BOOL lab = swiftPair || applePairing || fastPair || multiPlatform;
+        BOOL lab = swiftPair || applePairing || fastPair || multiPlatform || catalog;
         // callerAllowed below admits only root or the exact installed app parent.
         recordAppRun = recordAppRun || capabilities || lab;
         if (recovery && getuid() != 0) return printReport(errorReport(@"permissions"));
@@ -359,7 +373,7 @@ int main(int argc, char **argv) {
                 alarm(0);
                 return printReport(errorReport(@"transport"));
             }
-            NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, applePairing, fastPair, multiPlatform) mutableCopy];
+            NSMutableDictionary *report = [runExclusive(nil, ownPath, 0, 0, lab, applePairing, fastPair, multiPlatform, catalogPlatform, catalogModels) mutableCopy];
             finishAppControl(report, &monitor);
             alarm(0); return printReport(report);
         }
@@ -370,6 +384,7 @@ int main(int argc, char **argv) {
                 @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_app_cancel_channel": @YES,
+                @"supports_le_catalog_test": @YES,
                 @"supports_le_swift_pair_test": @YES,
                 @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES, @"supports_le_multi_device_test": @YES});
         }
@@ -395,7 +410,7 @@ int main(int argc, char **argv) {
             alarm(0);
             return printReport(errorReport(@"transport"));
         }
-        NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, 0) mutableCopy];
+        NSMutableDictionary *report = [runExclusive(address.uppercaseString, ownPath, count, intervalMS, NO, NO, NO, 0, 0, nil) mutableCopy];
         finishAppControl(report, &monitor);
         alarm(0); return printReport(report);
     }

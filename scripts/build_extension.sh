@@ -5,6 +5,8 @@ mkdir -p build/audit
 python3 scripts/language_catalog.py build/audit
 clang -Wall -Wextra -Werror tests/test_device_catalog.c -o build/audit/test_device_catalog
 build/audit/test_device_catalog
+clang -Wall -Wextra -Werror tests/test_catalog_profiles.c -o build/audit/test_catalog_profiles
+build/audit/test_catalog_profiles
 clang -Wall -Wextra -Werror src/NWPolicy.c tests/test_policy.c -o build/audit/test_policy
 build/audit/test_policy
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/test_resources.m -o build/audit/test_resources

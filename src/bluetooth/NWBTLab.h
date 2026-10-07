@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
+#include "../NWCatalogProfiles.h"
 #define NWBT_LAB_HANDLE 0xee
 static inline size_t NWBTLabReplySize(uint16_t opcode) {
     switch (opcode) {
@@ -97,6 +98,29 @@ static inline size_t NWBTLabDeviceAddress(uint8_t p[7], unsigned platform, unsig
     // Separate lab static-random identities, unchanged for the whole emission.
     const uint8_t address[]={NWBT_LAB_MULTI_HANDLE+model,model+1,0,platform,0x57,0x4e,0xc2};
     memcpy(p,address,sizeof address);return sizeof address;
+}
+static inline size_t NWBTLabCatalogData(uint8_t p[35], unsigned platform, unsigned model) {
+    if (!NWCatalogProfileAvailable(platform, model)) return 0;
+    if (platform == 0) {
+        size_t length = NWBTLabApplePairingData(p);
+        uint32_t product = NWCatalogProfileID(platform, model);
+        p[11] = product & 0xff; p[12] = product >> 8; return length;
+    }
+    if (platform == 1) {
+        size_t length = NWBTLabFastPairData(p);
+        uint32_t product = NWCatalogProfileID(platform, model);
+        p[15] = product >> 16; p[16] = product >> 8; p[17] = product;
+        return length;
+    }
+    const char *name = NWCatalogModel(platform, model);
+    size_t length = strlen(name);
+    // Nonconnectable discovery: omit optional Flags to fit the complete name.
+    // Microsoft Display Name is part of its vendor section, not a scan response.
+    if (length > 24) return 0;
+    memset(p, 0, 35); p[0] = NWBT_LAB_HANDLE; p[1] = 3; p[2] = 1;
+    p[3] = (uint8_t)(7 + length); p[4] = (uint8_t)(6 + length);
+    p[5] = 0xff; p[6] = 6; p[8] = 3; p[10] = 0x80;
+    memcpy(p + 11, name, length); return 11 + length;
 }
 static inline size_t NWBTLabDeviceEnable(uint8_t p[6], int enabled, unsigned model) {
     if(model>=NWBT_LAB_PLATFORM_COUNT) return 0;
