@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <sys/socket.h>
 
-static NSString *const changed = @"NWBluetoothChanged";
+NSString *const NWBluetoothChanged = @"NWBluetoothChanged";
 static NSString *const reportKey = @"NukeWirelessBluetoothLastReport";
 static NSString *const invocationKey = @"NukeWirelessBluetoothLastInvocation";
 static BOOL busy, cancelling;
@@ -31,6 +31,15 @@ static NSArray *capturedCatalogArguments;
 static BOOL labOperation(NSString *operation) {
     return [operation isEqual:@"le_catalog_test"] || [operation isEqual:@"le_swift_pair_test"] || [operation isEqual:@"le_apple_pairing_test"] || [operation isEqual:@"le_fast_pair_test"] || [operation isEqual:@"le_multi_windows_test"] || [operation isEqual:@"le_multi_apple_test"] || [operation isEqual:@"le_multi_android_test"];
 }
+static BOOL emissionFinishedCleanly(NSDictionary *report) {
+    NSString *code = report[@"error_code"];
+    return labOperation(report[@"operation"]) && (!code || [code isEqual:@"cancelled"]) &&
+        (!report[@"error"] || [code isEqual:@"cancelled"]) && !report[@"cleanup_warning"] &&
+        [report[@"controller_advertising_acknowledged"] boolValue] &&
+        [report[@"advertising_stopped_acknowledged"] boolValue] &&
+        [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue];
+}
+static BOOL reportVisible(void) { return !busy && lastReport && !emissionFinishedCleanly(lastReport); }
 // Assigned by beginBackgroundTask before any worker/completion can read it.
 static UIBackgroundTaskIdentifier background;
 
@@ -50,8 +59,7 @@ static NSString *reportText(NSDictionary *report) {
             [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] ?
             @"bt.lab.stopped" : @"bt.lab.stop_unconfirmed");
     if (!code && labOperation(report[@"operation"]))
-        return NWText([report[@"controller_advertising_acknowledged"] boolValue] &&
-            [report[@"advertising_stopped_acknowledged"] boolValue] ? @"bt.lab.accepted" : @"bt.lab.incomplete");
+        return NWText(emissionFinishedCleanly(report) ? @"bt.lab.accepted" : @"bt.lab.incomplete");
     if (!code && [report[@"operation"] isEqual:@"le_capabilities"])
         return NWText([report[@"capabilities_verified"] boolValue] ? @"bt.le.success" : @"bt.le.partial");
     return code ? NWText([@"bt.error." stringByAppendingString:code]) :
@@ -132,6 +140,15 @@ static void cancelWorker(void) {
 }
 static BOOL cancellationRequested(void) {
     @synchronized (workerLock) { return cancelling; }
+}
+BOOL NWBluetoothStopping(void) { return cancellationRequested(); }
+void NWBluetoothStop(void) {
+    if (!busy || cancellationRequested()) return;
+    cancelWorker();
+    [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
+}
+NSString *NWBluetoothEmissionIssue(void) {
+    return reportVisible() && labOperation(lastReport[@"operation"]) ? reportText(lastReport) : nil;
 }
 
 // A separate helper owns privileged operations and recovery. The app only
@@ -245,6 +262,7 @@ static UILabel *durationBadge(BOOL enabled) {
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation;
 - (void)stopCurrentOperation;
 - (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models;
+- (void)finishOperation:(NSDictionary *)report;
 @end
 
 @implementation NWBluetoothViewController
@@ -263,7 +281,7 @@ static UILabel *durationBadge(BOOL enabled) {
         target:self action:@selector(showHelp)];
     self.navigationItem.leftBarButtonItem.accessibilityLabel = NWText(@"bt.ui.help_title");
     self.navigationItem.leftBarButtonItem.accessibilityIdentifier = @"nw.bluetooth.help";
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:changed object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:NWBluetoothChanged object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:NWAppearanceChanged object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:UIContentSizeCategoryDidChangeNotification object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(backgrounded:) name:UIApplicationDidEnterBackgroundNotification object:nil];
@@ -317,9 +335,7 @@ static UILabel *durationBadge(BOOL enabled) {
     [self presentViewController:help animated:YES completion:nil];
 }
 - (void)stopCurrentOperation {
-    if (!busy || cancellationRequested()) return;
-    cancelWorker();
-    [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
+    NWBluetoothStop();
 }
 - (void)backgrounded:(NSNotification *)notification { (void)notification; [self stopCurrentOperation]; }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 6; }
@@ -327,13 +343,13 @@ static UILabel *durationBadge(BOOL enabled) {
     (void)table;
     if (section <= 3) return section == 0 ? 3 : 2;
     if (section == 4) return busy ? 2 : 0;
-    return lastReport ? 1 + reportRows(lastReport).count : 0;
+    return reportVisible() ? 1 + (labOperation(lastReport[@"operation"]) ? 0 : reportRows(lastReport).count) : 0;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     (void)table;
     if (section <= 3) return NWText(@[@"bt.ui.explore", @"bt.ui.windows", @"bt.ui.apple", @"bt.ui.android"][section]);
     if (section == 4) return busy ? NWText(@"bt.ui.active") : nil;
-    return lastReport ? NWText(@"bt.ui.last_result") : nil;
+    return reportVisible() ? NWText(labOperation(lastReport[@"operation"]) ? @"bt.ui.attention" : @"bt.ui.last_result") : nil;
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     (void)table;
@@ -344,7 +360,7 @@ static UILabel *durationBadge(BOOL enabled) {
         else if (![self.capabilities[@"supported"] boolValue]) status = NWText(@"bt.error.unsupported");
         return status ? [NSString stringWithFormat:@"%@\n%@", status, NWText(@"bt.ui.emission_hint")] : NWText(@"bt.ui.emission_hint");
     }
-    return section == 4 && busy && labRunning ? NWText(@"bt.lab.stop_help") : nil;
+    return nil;
 }
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
     return [self tableView:table numberOfRowsInSection:section] ? UITableViewAutomaticDimension : 0.01;
@@ -458,6 +474,7 @@ static UILabel *durationBadge(BOOL enabled) {
         UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
         spinner.color = NWAccentColor(); [spinner startAnimating]; cell.accessoryView = spinner;
     }
+    if (index.section == 4 && index.row == 1) tint = UIColor.systemRedColor;
     content.imageProperties.tintColor = tint; cell.contentConfiguration = content; return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
@@ -515,14 +532,10 @@ static UILabel *durationBadge(BOOL enabled) {
         selected[i] = models[i].unsignedIntValue; [indices addObject:models[i].stringValue];
     }
     if (!NWCatalogProfileSelection((unsigned)platform, selected, models.count)) return;
-    [self.navigationController popToViewController:self animated:NO];
     [self runArguments:@[@"--le-catalog-test", [NSString stringWithFormat:@"%lu", (unsigned long)platform],
         [indices componentsJoinedByString:@","]] operation:@"le_catalog_test"];
 }
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation {
-#ifdef NW_UI_TESTING
-    if (captureCatalogArguments && [operation isEqual:@"le_catalog_test"]) { capturedCatalogArguments = [arguments copy]; return; }
-#endif
     if (busy || NWBulkBusy()) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bt.error.busy") message:nil preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
@@ -535,13 +548,11 @@ static UILabel *durationBadge(BOOL enabled) {
     busy = YES; lastReport = nil;
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
     background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ [self stopCurrentOperation]; }];
-    [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
+    [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
     [self refresh:nil];
-    if (self.view.window) {
-        [self.tableView layoutIfNeeded];
-        [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]
-            atScrollPosition:UITableViewScrollPositionMiddle animated:YES];
-    }
+#ifdef NW_UI_TESTING
+    if (captureCatalogArguments && [operation isEqual:@"le_catalog_test"]) { capturedCatalogArguments = [arguments copy]; return; }
+#endif
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         NSMutableDictionary *report = [invoke(arguments, YES) mutableCopy];
         if (operation) report[@"operation"] = operation;
@@ -551,18 +562,16 @@ static UILabel *durationBadge(BOOL enabled) {
             [NSUserDefaults.standardUserDefaults synchronize];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
-            lastReport = report; busy = NO;
-            if (background != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:background]; background = UIBackgroundTaskInvalid; }
-            [NSNotificationCenter.defaultCenter postNotificationName:changed object:nil];
-            [self refresh:nil];
-            if (self.view.window && self.navigationController.topViewController == self) {
-                [self.tableView layoutIfNeeded];
-                [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:5]
-                    atScrollPosition:UITableViewScrollPositionTop animated:YES];
-            }
-            UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.finished"));
+            [self finishOperation:report];
         });
     });
+}
+- (void)finishOperation:(NSDictionary *)report {
+    lastReport = report; busy = NO;
+    if (background != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:background]; background = UIBackgroundTaskInvalid; }
+    [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
+    [self refresh:nil];
+    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.finished"));
 }
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated]; self.navigationController.interactivePopGestureRecognizer.enabled = YES;
@@ -572,6 +581,15 @@ static UILabel *durationBadge(BOOL enabled) {
 UIViewController *NWBluetoothController(void) { return [NWBluetoothViewController new]; }
 
 #ifdef NW_UI_TESTING
+int NWBluetoothUIRegressionCatalogState(int state) {
+    if (state < 0 || state > 3) return 1;
+    if (!workerLock) workerLock = [NSObject new];
+    busy = state == 1 || state == 2; labRunning = YES;
+    @synchronized (workerLock) { cancelling = state == 2; }
+    lastReport = state == 3 ? @{@"operation": @"le_catalog_test", @"error_code": @"recovery", @"service_restored": @NO} : nil;
+    [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
+    return 0;
+}
 int NWBluetoothUIRegressionCheck(void) {
     NSDictionary *previous = lastReport; BOOL previousBusy = busy, previousLab = labRunning;
     if (!workerLock) workerLock = [NSObject new];
@@ -633,11 +651,13 @@ int NWBluetoothUIRegressionCheck(void) {
         busy = NO;
         lastReport = @{@"operation": @"le_swift_pair_test", @"controller_advertising_acknowledged": @YES,
             @"advertising_stopped_acknowledged": @YES, @"queries": @[@{@"opcode": @0x2039,
-            @"phase": @"disable", @"hci_status": @0, @"acknowledged": @YES}], @"service_restored": @YES};
-        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.accepted")]) return 10;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:5]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.text isEqual:NWText(@"bt.lab.disable")] || ![content.secondaryText isEqual:NWText(@"bt.le.reply")]) return 11;
+            @"phase": @"disable", @"hci_status": @0, @"acknowledged": @YES}], @"advertising_set_removed": @YES, @"service_restored": @YES};
+        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.accepted")] || reportVisible() ||
+            [controller tableView:controller.tableView numberOfRowsInSection:5] || NWBluetoothEmissionIssue()) return 10;
+        NSMutableDictionary *failedCleanup = [lastReport mutableCopy]; failedCleanup[@"service_restored"] = @NO;
+        lastReport = failedCleanup;
+        if (!reportVisible() || [controller tableView:controller.tableView numberOfRowsInSection:5] != 1 ||
+            ![NWBluetoothEmissionIssue() isEqual:NWText(@"bt.lab.incomplete")]) return 11;
         NSIndexPath *swiftButton = [NSIndexPath indexPathForRow:0 inSection:1];
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:swiftButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 20;
@@ -728,8 +748,35 @@ int NWBluetoothUIRegressionCheck(void) {
             @{@"model": @4, @"name": @"Surface Headphones 2", @"identity": @"NWLab-34567890"}] forKey:@"models"];
         [(UITableViewController *)catalogScreen tableView:((UITableViewController *)catalogScreen).tableView
             didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
-        if (navigation.topViewController != controller ||
+        if (navigation.topViewController != catalogScreen || !busy ||
             ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"2", @"5,1,4"]] || !labOperation(@"le_catalog_test")) return 46;
+        [(UITableViewController *)catalogScreen loadViewIfNeeded];
+        if (!catalogScreen.navigationItem.rightBarButtonItem.enabled ||
+            ![catalogScreen.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.catalog.stop"] ||
+            !catalogScreen.navigationItem.hidesBackButton || navigation.interactivePopGestureRecognizer.enabled) return 53;
+        UITableViewController *catalogTable = (UITableViewController *)catalogScreen;
+        NSIndexPath *emitButton = [NSIndexPath indexPathForRow:2 inSection:0];
+        UITableViewCell *emitCell = [catalogTable tableView:catalogTable.tableView cellForRowAtIndexPath:emitButton];
+        if (![ ((UIListContentConfiguration *)emitCell.contentConfiguration).text isEqual:NWText(@"bt.stop")]) return 54;
+        NSArray *selectionBefore = [[catalogScreen valueForKey:@"models"] copy];
+        [catalogTable tableView:catalogTable.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];
+        if (![selectionBefore isEqual:[catalogScreen valueForKey:@"models"]]) return 55;
+        [catalogTable tableView:catalogTable.tableView didSelectRowAtIndexPath:emitButton];
+        if (!cancellationRequested() || catalogScreen.navigationItem.rightBarButtonItem.enabled ||
+            ![catalogScreen.navigationItem.rightBarButtonItem.title isEqual:NWText(@"bt.stopping")]) return 56;
+        NSDictionary *quiet = @{@"operation": @"le_catalog_test", @"error_code": @"cancelled",
+            @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
+            @"advertising_set_removed": @YES, @"service_restored": @YES};
+        [controller finishOperation:quiet];
+        if (navigation.topViewController != catalogScreen || busy || NWBluetoothEmissionIssue() ||
+            [catalogTable numberOfSectionsInTableView:catalogTable.tableView] != 2 ||
+            catalogScreen.navigationItem.hidesBackButton || !navigation.interactivePopGestureRecognizer.enabled ||
+            ![catalogScreen.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.catalog.help"]) return 57;
+        NSMutableDictionary *restoreFailure = [quiet mutableCopy]; restoreFailure[@"service_restored"] = @NO;
+        [controller finishOperation:restoreFailure];
+        if (navigation.topViewController != catalogScreen || !NWBluetoothEmissionIssue() ||
+            [catalogTable numberOfSectionsInTableView:catalogTable.tableView] != 3) return 58;
+        [controller finishOperation:quiet];
         capturedCatalogArguments = nil; busy = YES;
         [controller emitCatalogPlatform:0 models:@[@0]];
         if (capturedCatalogArguments) return 47;
@@ -745,12 +792,26 @@ int NWBluetoothUIRegressionCheck(void) {
         controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_identity_v2": @YES};
         [controller emitCatalogPlatform:3 models:@[@5, @2, @0]];
         if (![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"3", @"5,2,0"]]) return 52;
+        [controller finishOperation:quiet];
         lastReport = @{@"operation": @"le_catalog_test", @"error_code": @"cancelled",
             @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
             @"advertising_set_removed": @YES, @"service_restored": @YES};
         if (![reportText(lastReport) isEqual:NWText(@"bt.lab.stopped")]) return 50;
+        for (NSString *operation in @[@"le_catalog_test", @"le_swift_pair_test", @"le_apple_pairing_test", @"le_fast_pair_test",
+            @"le_multi_windows_test", @"le_multi_apple_test", @"le_multi_android_test"]) {
+            NSMutableDictionary *complete = [quiet mutableCopy]; complete[@"operation"] = operation;
+            [complete removeObjectForKey:@"error_code"]; lastReport = complete;
+            if (reportVisible() || !emissionFinishedCleanly(complete)) return 59;
+            for (NSString *field in @[@"controller_advertising_acknowledged", @"advertising_stopped_acknowledged", @"advertising_set_removed", @"service_restored"]) {
+                NSMutableDictionary *partial = [complete mutableCopy]; partial[field] = @NO; lastReport = partial;
+                if (!reportVisible() || !NWBluetoothEmissionIssue()) return 60;
+            }
+            complete[@"cleanup_warning"] = @"fixture"; lastReport = complete;
+            if (!reportVisible()) return 61;
+        }
         return 0;
     } @finally {
+        if (background != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:background]; background = UIBackgroundTaskInvalid; }
         NWEndWiFiScanUITest();
         lastReport = previous; busy = previousBusy; labRunning = previousLab;
         @synchronized (workerLock) { cancelling = previousCancelling; }

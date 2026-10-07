@@ -33,11 +33,13 @@
         name:NWAppearanceChanged object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:)
         name:UIContentSizeCategoryDidChangeNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:)
+        name:NWBluetoothChanged object:nil];
     [self refresh:nil];
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated]; NWStyleNavigationBar(self.navigationController.navigationBar);
+    [super viewWillAppear:animated]; [self refresh:nil];
 }
 - (void)traitCollectionDidChange:(UITraitCollection *)previous {
     [super traitCollectionDidChange:previous];
@@ -48,7 +50,27 @@
     (void)notification;
     NWStyleNavigationBar(self.navigationController.navigationBar);
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
+    BOOL busy = NWBluetoothBusy(), stopping = NWBluetoothStopping();
+    self.navigationItem.hidesBackButton = busy;
+    self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
+    UIBarButtonItem *action = busy ? [[UIBarButtonItem alloc] initWithTitle:NWText(stopping ? @"bt.stopping" : @"bt.stop")
+        style:UIBarButtonItemStylePlain target:self action:@selector(stopEmission)] :
+        [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"questionmark.circle"]
+        style:UIBarButtonItemStylePlain target:self action:@selector(showHelp)];
+    action.enabled = !busy || !stopping;
+    action.tintColor = busy ? UIColor.systemRedColor : NWAccentColor();
+    action.accessibilityLabel = NWText(busy ? (stopping ? @"bt.stopping" : @"bt.stop") : @"bt.ui.help_title");
+    action.accessibilityIdentifier = busy ? @"nw.catalog.stop" : @"nw.catalog.help";
+    self.navigationItem.rightBarButtonItem = action;
     [self.tableView reloadData];
+}
+- (void)stopEmission { NWBluetoothStop(); }
+- (void)showHelp {
+    if (NWBluetoothBusy() || self.presentedViewController) return;
+    UIAlertController *help = [UIAlertController alertControllerWithTitle:NWText(@"bt.catalog.title")
+        message:NWText(@"bt.catalog.help") preferredStyle:UIAlertControllerStyleAlert];
+    [help addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:help animated:YES completion:nil];
 }
 - (void)generateModels {
     if (NWBluetoothBusy()) return;
@@ -86,15 +108,15 @@
         if (NWCatalogProfileAvailable((unsigned)self.platform, [model[@"model"] unsignedIntValue])) [models addObject:model[@"model"]];
     return [models copy];
 }
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 2; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return NWBluetoothEmissionIssue() ? 3 : 2; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; return section == 0 ? 3 : self.models.count;
+    (void)table; return section == 0 ? 3 : section == 1 ? self.models.count : (NWBluetoothEmissionIssue() ? 1 : 0);
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
-    (void)table; return NWText(section == 0 ? @"bt.catalog.platform" : @"bt.catalog.selection");
+    (void)table; return NWText(section == 0 ? @"bt.catalog.platform" : section == 1 ? @"bt.catalog.selection" : @"bt.ui.attention");
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
-    (void)table; return NWText(section == 0 ? @"bt.catalog.hint" : @"bt.catalog.emission_note");
+    (void)table; return section == 0 ? NWText(@"bt.ui.emission_hint") : nil;
 }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
     (void)table;
@@ -122,12 +144,19 @@
     content.secondaryTextProperties.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
     if (index.section == 0 && index.row == 2) {
         NSUInteger count = self.emissionModels.count;
-        BOOL enabled = self.emissionAvailable && self.emit && count && !NWBluetoothBusy();
-        content.text = [NSString stringWithFormat:NWText(@"bt.catalog.emit"), (unsigned long)count];
-        content.secondaryText = NWText(!self.emissionAvailable || !self.emit ? @"bt.catalog.worker_required" :
-            count == 3 ? @"bt.catalog.emit_hint" : @"bt.catalog.partial");
-        content.image = [UIImage systemImageNamed:@"play.circle.fill"];
-        content.textProperties.color = enabled ? UIColor.labelColor : UIColor.secondaryLabelColor;
+        BOOL busy = NWBluetoothBusy(), stopping = NWBluetoothStopping();
+        BOOL enabled = busy ? !stopping : self.emissionAvailable && self.emit && count;
+        content.text = busy ? NWText(stopping ? @"bt.stopping" : @"bt.stop") :
+            [NSString stringWithFormat:NWText(@"bt.catalog.emit"), (unsigned long)count];
+        content.secondaryText = busy ? NWText(stopping ? @"bt.ui.restoring" : @"bt.lab.running") :
+            NWText(!self.emissionAvailable || !self.emit ? @"bt.catalog.worker_required" :
+                count == 3 ? @"bt.catalog.emit_hint" : @"bt.catalog.partial");
+        content.image = [UIImage systemImageNamed:busy ? @"stop.circle.fill" : @"play.circle.fill"];
+        content.textProperties.color = busy ? UIColor.systemRedColor : enabled ? UIColor.labelColor : UIColor.secondaryLabelColor;
+        if (busy) {
+            UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+            [spinner startAnimating]; cell.accessoryView = spinner;
+        }
         cell.selectionStyle = enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         cell.accessibilityTraits |= UIAccessibilityTraitButton;
         if (!enabled) cell.accessibilityTraits |= UIAccessibilityTraitNotEnabled;
@@ -138,21 +167,30 @@
         content.image = [UIImage systemImageNamed:@"shuffle"];
         cell.selectionStyle = NWBluetoothBusy() ? UITableViewCellSelectionStyleNone : UITableViewCellSelectionStyleDefault;
         cell.accessibilityTraits |= UIAccessibilityTraitButton;
+        if (NWBluetoothBusy()) {
+            cell.accessibilityTraits |= UIAccessibilityTraitNotEnabled;
+            content.textProperties.color = UIColor.secondaryLabelColor;
+        }
         cell.accessibilityIdentifier = @"nw.catalog.generate";
-    } else {
+    } else if (index.section == 1) {
         NSDictionary *model = self.models[index.row];
         content.text = model[@"name"];
         unsigned modelIndex = [model[@"model"] unsignedIntValue];
-        content.secondaryText = NWCatalogProfileAvailable((unsigned)self.platform, modelIndex) ?
-            [NSString stringWithFormat:@"%@\n%@", [self profileIdentity:modelIndex], NWText(@"bt.catalog.profile_available")] :
-            NWText(@"bt.catalog.profile_unavailable");
-        content.image = [UIImage systemImageNamed:@"cube.transparent"];
+        content.secondaryText = [self profileIdentity:modelIndex];
+        content.image = [UIImage systemImageNamed:self.platform == 2 ? @"desktopcomputer" : @"headphones"];
         cell.accessibilityIdentifier = [NSString stringWithFormat:@"nw.catalog.model.%ld", (long)index.row];
+    } else {
+        content.text = NWBluetoothEmissionIssue();
+        content.image = [UIImage systemImageNamed:@"exclamationmark.circle"];
+        cell.accessibilityIdentifier = @"nw.catalog.issue";
     }
-    content.imageProperties.tintColor = NWAccentColor(); cell.contentConfiguration = content; return cell;
+    content.imageProperties.tintColor = index.section == 2 ? UIColor.systemOrangeColor :
+        index.section == 0 && NWBluetoothBusy() ? (index.row == 2 ? UIColor.systemRedColor : UIColor.tertiaryLabelColor) : NWAccentColor();
+    cell.contentConfiguration = content; return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
     [table deselectRowAtIndexPath:index animated:YES];
+    if (index.section == 0 && index.row == 2 && NWBluetoothBusy()) { NWBluetoothStop(); return; }
     if (NWBluetoothBusy()) return;
     if (index.section == 0 && index.row == 1) [self generateModels];
     else if (index.section == 0 && index.row == 2 && self.emissionAvailable && self.emit) {
@@ -224,8 +262,8 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
             }
         }
     }
-    if (controller.navigationItem.rightBarButtonItem ||
-        ![[controller tableView:controller.tableView titleForFooterInSection:1] isEqual:NWText(@"bt.catalog.emission_note")]) return 6;
+    if (![controller.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.catalog.help"] ||
+        [controller tableView:controller.tableView titleForFooterInSection:1]) return 6;
     NSIndexPath *emitIndex = [NSIndexPath indexPathForRow:2 inSection:0];
     UITableViewCell *emitCell = [controller tableView:controller.tableView cellForRowAtIndexPath:emitIndex];
     if (emitCell.selectionStyle != UITableViewCellSelectionStyleNone) return 7;

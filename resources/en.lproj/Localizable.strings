@@ -131,7 +131,7 @@
 "bt.lab.swift_menu" = "Windows notification test: advertise NWLab for 10 s. Enable Swift Pair on the laptop and turn Bluetooth off in iPhone Settings.";
 "bt.lab.swift_receiver" = "Check whether Windows displays a notification for NWLab. This test only advertises: it does not implement accessory pairing. A controller response does not confirm that Windows displayed the notification.";
 "bt.error.bluetooth_unavailable" = "Bluetooth state could not be verified. The service must be available before starting the test.";
-"bt.lab.running" = "BLE advertising test in progress…";
+"bt.lab.running" = "Advertising in progress…";
 "bt.lab.accepted" = "The controller accepted the announcement and acknowledged its disable command.";
 "bt.lab.incomplete" = "Advertising test was not confirmed.";
 "bt.lab.parameters" = "Prepare NWLab announcement";
@@ -190,14 +190,14 @@
 "bt.ui.scan_hint" = "Nearby devices and signal strength";
 "bt.ui.active" = "In progress";
 "bt.ui.last_result" = "Last activity";
-"bt.ui.emission_hint" = "10-second emissions. Turn off Bluetooth in iPhone Settings to emit; you can stop sooner.";
+"bt.ui.emission_hint" = "To advertise, turn Bluetooth off in iPhone Settings.";
 "bt.ui.help_title" = "Using Bluetooth";
 "bt.ui.help" = "Scan: turn on Bluetooth and allow access. Only devices advertising BLE are shown.\n\nCapabilities and emissions: turn off Bluetooth in iPhone Settings. Keep Bluetooth enabled on the receiver.\n\nChoose one or three devices for a platform. Emissions last 10 seconds. Stop ends the emission and restores Bluetooth.\n\nWindows requires Swift Pair enabled. These announcements do not implement accessory pairing, and reception does not guarantee a system notification.";
 
 "bt.catalog.title" = "Random catalog";
 "bt.catalog.menu_hint" = "Apple, Google, Microsoft and Samsung";
 "bt.catalog.platform" = "Brand";
-"bt.catalog.selection" = "Generated models";
+"bt.catalog.selection" = "Selection";
 "bt.catalog.hint" = "Choose a brand to explore its catalog.";
 "bt.catalog.generate" = "Generate three models";
 "bt.catalog.generate_hint" = "A new combination on every tap";
@@ -209,5 +209,8 @@
 "bt.catalog.partial" = "Only models with an available profile are advertised";
 "bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app28.";
 "bt.catalog.profile_available" = "Advertising profile available";
-"bt.catalog.profile_unavailable" = "Catalog only · unverified profile";
+"bt.catalog.profile_unavailable" = "Advertising unavailable";
 "bt.catalog.emission_note" = "The advertisement includes the profile model. Manual 10 s advertising, without pairing or guaranteed notifications.";
+"bt.ui.attention" = "Attention";
+"bt.ui.restoring" = "Restoring Bluetooth…";
+"bt.catalog.help" = "Choose a brand and generate a selection. Advertise uses only models with an available profile for 10 seconds.\n\nThe selection stays on screen; stop from the button or the top bar. No result is displayed when everything finishes correctly.\n\nTurn Bluetooth off in iPhone Settings and on at the receiver. These advertisements do not provide accessory pairing or guarantee a notification.";

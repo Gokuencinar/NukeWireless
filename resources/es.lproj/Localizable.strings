@@ -131,7 +131,7 @@
 "bt.lab.swift_menu" = "Prueba del aviso en Windows: anuncio NWLab durante 10 s. Activa Swift Pair en la laptop y apaga Bluetooth en Ajustes del iPhone.";
 "bt.lab.swift_receiver" = "Comprueba si Windows muestra un aviso de NWLab. La prueba solo emite el anuncio: no implementa el emparejamiento de un accesorio. La respuesta del controlador no confirma que Windows haya mostrado el aviso.";
 "bt.error.bluetooth_unavailable" = "No se pudo comprobar el estado de Bluetooth. El servicio debe estar disponible antes de iniciar la prueba.";
-"bt.lab.running" = "Prueba de emisión BLE en curso…";
+"bt.lab.running" = "Emisión en curso…";
 "bt.lab.accepted" = "El controlador aceptó el anuncio y confirmó su desactivación.";
 "bt.lab.incomplete" = "No se confirmó la prueba de anuncios.";
 "bt.lab.parameters" = "Preparar anuncio NWLab";
@@ -190,14 +190,14 @@
 "bt.ui.scan_hint" = "Dispositivos cercanos y señal";
 "bt.ui.active" = "En curso";
 "bt.ui.last_result" = "Última actividad";
-"bt.ui.emission_hint" = "Emisiones de 10 s. Apaga Bluetooth en Ajustes del iPhone para emitir; puedes detenerlas antes.";
+"bt.ui.emission_hint" = "Para emitir, apaga Bluetooth en Ajustes del iPhone.";
 "bt.ui.help_title" = "Cómo usar Bluetooth";
 "bt.ui.help" = "Escáner: activa Bluetooth y concede el permiso. Solo aparecen dispositivos que anuncian BLE.\n\nCapacidades y emisiones: apaga Bluetooth en Ajustes del iPhone. Mantén Bluetooth activado en el receptor.\n\nElige uno o tres dispositivos de una plataforma. La emisión dura 10 segundos. Detener finaliza la emisión y restaura Bluetooth.\n\nWindows requiere Swift Pair activado. Estos anuncios no implementan el emparejamiento del accesorio y su recepción no garantiza un aviso del sistema.";
 
 "bt.catalog.title" = "Catálogo aleatorio";
 "bt.catalog.menu_hint" = "Apple, Google, Microsoft y Samsung";
 "bt.catalog.platform" = "Marca";
-"bt.catalog.selection" = "Modelos generados";
+"bt.catalog.selection" = "Selección";
 "bt.catalog.hint" = "Elige una marca para explorar su catálogo.";
 "bt.catalog.generate" = "Generar tres modelos";
 "bt.catalog.generate_hint" = "Una combinación nueva en cada pulsación";
@@ -209,5 +209,8 @@
 "bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
 "bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app28.";
 "bt.catalog.profile_available" = "Perfil de anuncio disponible";
-"bt.catalog.profile_unavailable" = "Solo catálogo · perfil sin verificar";
+"bt.catalog.profile_unavailable" = "Emisión no disponible";
 "bt.catalog.emission_note" = "El anuncio incluye el modelo del perfil. Emisión manual de 10 s, sin emparejamiento ni aviso garantizado.";
+"bt.ui.attention" = "Atención";
+"bt.ui.restoring" = "Restaurando Bluetooth…";
+"bt.catalog.help" = "Elige una marca y genera una selección. Emitir usa solo los modelos con perfil disponible durante 10 segundos.\n\nLa selección permanece en pantalla; puedes detener desde el botón o la barra superior. Si todo termina correctamente no se muestra un resultado.\n\nApaga Bluetooth en Ajustes del iPhone y actívalo en el receptor. Estos anuncios no permiten emparejar un accesorio ni garantizan un aviso.";

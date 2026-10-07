@@ -4,6 +4,8 @@ import UIKit
 func checkBluetoothUI() -> Int32
 @_silgen_name("NWBluetoothCatalogUIRegressionPresent")
 func presentCatalog(_ platform: Int32) -> Int32
+@_silgen_name("NWBluetoothUIRegressionCatalogState")
+func catalogState(_ state: Int32) -> Int32
 
 @_silgen_name("NWBLEUIRegressionCheck")
 func checkBLEUI() -> Int32
@@ -83,12 +85,22 @@ struct RegressionTabs: View {
                 results.append(presentCatalog(platform + 1))
                 captureCatalog(platform + 1)
             } else {
+                captureCatalogState(1)
+            }
+        }
+    }
+    private func captureCatalogState(_ state: Int32) {
+        results.append(catalogState(state))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if state > 0 {
+                snapshot([1: "catalog-active.png", 2: "catalog-stopping.png", 3: "catalog-error.png"][state]!)
+                captureCatalogState(state == 3 ? 0 : state + 1)
+            } else {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 12]
-                    let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                        .appendingPathComponent("ui-regression.json")
+                    let report: [String: Any] = ["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 16]
+                    let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("ui-regression.json")
                     try? JSONSerialization.data(withJSONObject: report).write(to: file)
                 }
             }
