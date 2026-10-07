@@ -777,6 +777,26 @@ int NWBluetoothUIRegressionCheck(void) {
         if (navigation.topViewController != catalogScreen || !NWBluetoothEmissionIssue() ||
             [catalogTable numberOfSectionsInTableView:catalogTable.tableView] != 3) return 58;
         [controller finishOperation:quiet];
+        for (NSUInteger row = 0; row < 3; ++row) {
+            NSNumber *model = selectionBefore[row][@"model"];
+            NSIndexPath *singleIndex = [NSIndexPath indexPathForRow:row inSection:1];
+            [catalogTable tableView:catalogTable.tableView didSelectRowAtIndexPath:singleIndex];
+            NSArray *singleArguments = @[@"--le-catalog-test", @"2", model.stringValue];
+            if (!busy || navigation.topViewController != catalogScreen ||
+                ![capturedCatalogArguments isEqual:singleArguments] ||
+                ![selectionBefore isEqual:[catalogScreen valueForKey:@"models"]]) return 62;
+            UITableViewCell *active = [catalogTable tableView:catalogTable.tableView cellForRowAtIndexPath:singleIndex];
+            if (!active.accessoryView || active.selectionStyle != UITableViewCellSelectionStyleNone ||
+                ![((UIListContentConfiguration *)active.contentConfiguration).secondaryText isEqual:NWText(@"bt.lab.running")]) return 63;
+            [catalogTable tableView:catalogTable.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:(row + 1) % 3 inSection:1]];
+            if (![capturedCatalogArguments isEqual:singleArguments]) return 64;
+            UIBarButtonItem *stop = catalogScreen.navigationItem.rightBarButtonItem;
+            [UIApplication.sharedApplication sendAction:stop.action to:stop.target from:stop forEvent:nil];
+            if (!cancellationRequested() || catalogScreen.navigationItem.rightBarButtonItem.enabled) return 65;
+            [controller finishOperation:quiet];
+            if (busy || NWBluetoothEmissionIssue() || navigation.topViewController != catalogScreen ||
+                ![selectionBefore isEqual:[catalogScreen valueForKey:@"models"]]) return 66;
+        }
         capturedCatalogArguments = nil; busy = YES;
         [controller emitCatalogPlatform:0 models:@[@0]];
         if (capturedCatalogArguments) return 47;
