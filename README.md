@@ -4,11 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev43 / app27, candidata:** el catálogo añade **Emitir N de 3 · 10 s**,
+**Dev43 instalado / trabajador app27:** el catálogo añade **Emitir N de 3 · 10 s**,
 usando los perfiles disponibles de los modelos seleccionados y regresando al
 panel Bluetooth para conservar Detener. Los modelos sin correspondencia
 contrastada se indican y no se sustituyen. Requiere el nuevo trabajador app27;
-instalación y recepción física pendientes. Véase [emisión del catálogo](docs/BLUETOOTH-CATALOG-EMISSION-DEV43.md).
+compilación, simulador (once comprobaciones por idioma), paquete e instalación
+verificados. Apertura/emisión desde la UI y recepción física pendientes de
+aceptación. Véase [emisión del catálogo](docs/BLUETOOTH-CATALOG-EMISSION-DEV43.md).
 
 **Dev42 instalado / trabajador app26:** Bluetooth añade Catálogo aleatorio,
 con Apple, Google y Microsoft. Cada marca tiene seis modelos; se generan tres
