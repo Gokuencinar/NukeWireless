@@ -32,6 +32,18 @@ La dirección estática aleatoria de laboratorio es distinta por marca/modelo y 
 
 ## Validación y límites
 
-Las pruebas C comprueban IDs, captura Samsung, segmentos AD completos y límite de 31 bytes, direcciones distintas y estables al mover el modelo, las 80 selecciones y rechazo de entradas inválidas. El simulador cubre cuatro marcas, traducciones y apariencia oscura, además de navegación, Stop y rechazo de trabajador anterior. Compilación, paquete e instalación se registrarán con su procedencia exacta en el informe de entrega.
+Las pruebas C comprueban IDs, captura Samsung, segmentos AD completos y límite de 31 bytes, direcciones distintas y estables al mover el modelo, las 80 selecciones y rechazo de entradas inválidas. El simulador cubre cuatro marcas, traducciones y apariencia oscura, además de navegación, Stop y rechazo de trabajador anterior. El informe de entrega registra la procedencia exacta de compilación, paquete e instalación.
 
 El usuario informó que dev43 no mostraba error. Ese informe no confirma por sí solo Detener antes de diez segundos, restauración o reconocimiento de un modelo en el receptor. La aceptación de dev44 en iPhone/iPad, Android de varias marcas y Windows permanece pendiente. Un ACK del controlador tampoco prueba recepción ni un aviso del sistema. No se implementa un accesorio emparejable ni se garantiza que todos los receptores interpreten estos perfiles o muestren una tarjeta.
+
+## Entrega verificada
+
+Fuentes `7b761333db270b275c0d8cad3fca7b5eac633543`: [app y simulador](https://github.com/Gokuencinar/NukeWireless/actions/runs/37587166918) y [trabajador](https://github.com/Gokuencinar/NukeWireless/actions/runs/37587166571) aprobados. Doce comprobaciones por idioma (es/en); capturas de las cuatro marcas y modo oscuro revisadas. Siete comprobaciones del paquete de la app y validación del trabajador (procedencia, hashes, metadatos, permisos, capacidad nueva y rechazo de fuentes obsoletas) aprobadas.
+
+Paquete app: SHA-256 `44acc1133c31e18d1298e7d044f344af34b629e9a12a6855b5a9d3284ef5b302`. Trabajador: SHA-256 `7b05da070a7f85671019a32e6cd2839d8a52534d0b1bf8f61d21246209a82f89`. Instalación confirmada en el mismo iPhone XS/iOS 16.3.1, SSH 192.168.1.22 con clave conocida, `dpkg` dev44/app28 y capacidad `supports_le_catalog_identity_v2`. CodeDirectory mantiene `me.midnightchips.harpy-reloaded`; no aparecen nuevos informes de crash relevantes durante la instalación.
+
+Recuperación: cerrar NukeWireless e instalar conjuntamente `/var/mobile/Documents/NukeWireless-app27-backup.deb` y `/var/mobile/Documents/NukeWireless-dev43-backup.deb` desde el entorno SSH del mismo jailbreak. Ambos paquetes se transfirieron y verificaron por hash antes de instalar dev44/app28. No requiere respring ni reinicio general.
+
+La recepción pasiva en la laptop Windows confirma los doce anuncios seleccionados en cuatro ensayos de diez segundos: AirPods, AirPods Pro, AirPods Pro 2; Pixel Buds, A-Series, Pro; Surface Keyboard, Surface Mouse, Xbox Wireless Controller; Galaxy Buds (White), Buds Live (Black), Buds2 Pro. Coinciden las direcciones y los IDs/nombres recibidos; los cuatro ensayos confirman desactivación, retirada de sets y restauración del servicio. Es inspección del payload recibido, no aceptación de un aviso ni del reconocimiento del sistema en iOS/Android/Windows. Véase el informe `RECEPCION-CATALOGO-DEV44.json` de la entrega.
+
+El primer intento Google, inmediatamente después de restaurar el servicio tras Apple, se rechazó en preflight (`skywalk_registry`) sin emitir ni retirar servicios. Se conserva esa evidencia; los ensayos restantes pasaron dejando tiempo para que el servicio publicase de nuevo la interfaz. No se modificó el guard del trabajador ni se hicieron reinicios generales.

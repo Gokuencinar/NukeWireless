@@ -4,11 +4,12 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev44 / trabajador app28:** el catálogo añade Samsung (Galaxy Buds, Live,
+**Dev44 instalado / trabajador app28:** el catálogo añade Samsung (Galaxy Buds, Live,
 Buds2 y Buds2 Pro, con variantes de color), muestra la identidad del protocolo
 y conserva una dirección estable por modelo entre generaciones. Corrige IDs
 Google incorrectos de dev43 y añade Pixel Buds Pro. Emisión acotada con Detener;
-compilación e instalación pendientes. El reconocimiento en los receptores
+compilación, simulador (doce comprobaciones por idioma), paquete e instalación
+verificados. El reconocimiento en los receptores
 requiere aceptación específica. Véase [identidad de modelos](docs/BLUETOOTH-CATALOG-IDENTITY-DEV44.md).
 
 **Dev43 instalado / trabajador app27:** el catálogo añade **Emitir N de 3 · 10 s**,
