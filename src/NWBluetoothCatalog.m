@@ -176,7 +176,9 @@ int NWBluetoothCatalogUIRegressionPresent(int platform) {
                 controller = (NWBluetoothCatalogViewController *)navigation.topViewController;
             else {
                 if (root.presentedViewController) return 2;
-                controller = [NWBluetoothCatalogViewController new];
+                // Simulator fixture: enable the action without invoking any radio backend.
+                controller = (NWBluetoothCatalogViewController *)NWBluetoothCatalogControllerWithEmitter(YES,
+                    ^(NSUInteger selectedPlatform, NSArray<NSNumber *> *models) { (void)selectedPlatform; (void)models; });
                 navigation = [[UINavigationController alloc] initWithRootViewController:controller];
                 navigation.modalPresentationStyle = UIModalPresentationFullScreen;
                 [root presentViewController:navigation animated:NO completion:nil];

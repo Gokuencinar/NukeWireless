@@ -719,11 +719,14 @@ int NWBluetoothUIRegressionCheck(void) {
         controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
         [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
-        UIViewController *catalog = navigation.topViewController;
-        if (catalog == controller) return 45;
-        [catalog setValue:@2 forKey:@"platform"];
-        [catalog setValue:@[@{@"model": @5}, @{@"model": @1}, @{@"model": @4}] forKey:@"models"];
-        [(UITableViewController *)catalog tableView:((UITableViewController *)catalog).tableView
+        UIViewController *catalogScreen = navigation.topViewController;
+        if (catalogScreen == controller) return 45;
+        [catalogScreen setValue:@2 forKey:@"platform"];
+        [catalogScreen setValue:@[
+            @{@"model": @5, @"name": @"Xbox Wireless Controller", @"identity": @"NWLab-12345678"},
+            @{@"model": @1, @"name": @"Surface Mouse", @"identity": @"NWLab-23456789"},
+            @{@"model": @4, @"name": @"Surface Headphones 2", @"identity": @"NWLab-34567890"}] forKey:@"models"];
+        [(UITableViewController *)catalogScreen tableView:((UITableViewController *)catalogScreen).tableView
             didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
         if (navigation.topViewController != controller ||
             ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"2", @"5,1,4"]] || !labOperation(@"le_catalog_test")) return 46;

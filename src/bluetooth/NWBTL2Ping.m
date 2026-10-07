@@ -377,6 +377,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         NSMutableArray *names = [NSMutableArray new];
         for (NSNumber *model in catalogModels) [names addObject:@(NWCatalogModel(catalogPlatform, model.unsignedIntValue))];
         report[@"models"] = names; report[@"catalog_model_indices"] = catalogModels;
+        report[@"catalog_platform"] = @(catalogPlatform);
         report[@"advertisement_variant"] = @"catalog_selection";
         report[@"requested_advertising_sets"] = @(count);
         report[@"interval_ms"] = platform == 1 ? @152.5 : @100;
