@@ -199,13 +199,13 @@
 "bt.catalog.platform" = "Brand";
 "bt.catalog.selection" = "Selection";
 "bt.catalog.hint" = "Choose a brand to explore its catalog.";
-"bt.catalog.generate" = "Generate three models";
-"bt.catalog.generate_hint" = "A new combination on every tap";
-"bt.catalog.generated" = "Three new models generated";
+"bt.catalog.generate" = "Generate six models";
+"bt.catalog.generate_hint" = "All with available advertising profiles";
+"bt.catalog.generated" = "Six models generated";
 "bt.catalog.identity" = "Simulation ID: %@";
 "bt.catalog.local_only" = "Local simulation. These models are displayed only in NukeWireless; no Bluetooth advertisements or pairing alerts are emitted.";
-"bt.catalog.emit" = "Advertise %lu of 3 · 10 s";
-"bt.catalog.emit_hint" = "Uses the three selected profiles";
+"bt.catalog.emit" = "Advertise %lu models · 10 s";
+"bt.catalog.emit_hint" = "Uses all selected profiles";
 "bt.catalog.partial" = "Only models with an available profile are advertised";
 "bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app28.";
 "bt.catalog.profile_available" = "Advertising profile available";
@@ -213,5 +213,5 @@
 "bt.catalog.emission_note" = "The advertisement includes the profile model. Manual 10 s advertising, without pairing or guaranteed notifications.";
 "bt.ui.attention" = "Attention";
 "bt.ui.restoring" = "Restoring Bluetooth…";
-"bt.catalog.help" = "Choose a brand and generate a selection. Tap a model to advertise it individually, or Advertise to use the full selection. Only models with an available profile are used for 10 seconds.\n\nThe selection stays on screen; stop from the button or the top bar. No result is displayed when everything finishes correctly.\n\nTurn Bluetooth off in iPhone Settings and on at the receiver. These advertisements do not provide accessory pairing or guarantee a notification.";
+"bt.catalog.help" = "Choose a brand and generate a selection. Tap a model to advertise it individually, or Advertise to use the full selection. Only models with an available profile are used for 10 seconds. Google uses Fast Pair and includes Pixel Buds, Sony, Bose and JBL. Six available models are generated.\n\nThe selection stays on screen; stop from the button or the top bar. No result is displayed when everything finishes correctly.\n\nTurn Bluetooth off in iPhone Settings and on at the receiver. These advertisements do not provide accessory pairing or guarantee a notification.";
 "bt.catalog.single_hint" = "Tap a model’s play button to advertise it for 10 seconds.";

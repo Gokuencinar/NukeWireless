@@ -22,6 +22,7 @@ static NSString *bootstrapRoot;
 static BOOL recordAppRun;
 static uid_t invokingUID;
 static pid_t invokingParent;
+static atomic_bool restoringService;
 static char *const cleanEnvironment[] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", NULL};
 static double uptime(void) { return NSProcessInfo.processInfo.systemUptime; }
 static void cancelRun(int number) {
@@ -32,7 +33,7 @@ static void cancelFromApp(void) {
     // Do not depend on signal dispositions/masks inherited from UIKit or changed
     // by loaded frameworks. The radio loop observes this lock-free shared flag.
     atomic_store(&NWBTCancelled, 1);
-    alarm(4);
+    if (!atomic_load(&restoringService)) alarm(4);
 }
 static BOOL installCancellationSignals(void) {
     if (signal(SIGINT, cancelRun) == SIG_ERR || signal(SIGTERM, cancelRun) == SIG_ERR ||
@@ -156,6 +157,33 @@ static BOOL running(void) {
     return control("print", service, &state) == 0 && [state hasPrefix:@"user/501/com.apple.bluetoothd = {"] &&
         [state containsString:@"\n\tstate = running\n"];
 }
+// Observe availability only: no frames, HCI commands or service mutations.
+// bluetoothd can be running before its HCI nexus is republished. EBUSY means
+// the published channel belongs to the restored service, which is expected.
+static NSDictionary *waitForInterface(BOOL cleanup, NSUInteger *attempts) {
+    double deadline = uptime() + 5.0;
+    NSDictionary *result;
+    *attempts = 0;
+    do {
+        if (!cleanup && NWBTCancelled) return errorReport(@"cancelled");
+        NSDictionary *error = nil; uint64_t capacity = 0;
+        void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+        ++*attempts;
+        if (channel) {
+            NWBTCloseNativeChannel(channel);
+            return @{@"stage": @"skywalk_opened", @"remote_bluetooth_packets_sent": @0};
+        }
+        result = error ?: errorReport(@"transport");
+        if ([result[@"stage"] isEqual:@"skywalk_open"] && [result[@"system_errno"] intValue] == EBUSY) return result;
+        if (![result[@"interface_pending"] boolValue] || uptime() >= deadline) return result;
+        usleep(100000);
+    } while (uptime() < deadline);
+    return result;
+}
+static BOOL interfaceReady(NSDictionary *result) {
+    return [result[@"stage"] isEqual:@"skywalk_opened"] ||
+        ([result[@"stage"] isEqual:@"skywalk_open"] && [result[@"system_errno"] intValue] == EBUSY);
+}
 static BOOL restoreService(void) {
     // A live, enabled service is already restored; don't restart it twice.
     if (!running()) {
@@ -164,7 +192,9 @@ static BOOL restoreService(void) {
     }
     if (control("enable", service, NULL)) return NO;
     control("kickstart", service, NULL);
-    return running();
+    double deadline = uptime() + 3.0;
+    do { if (running()) return YES; usleep(100000); } while (uptime() < deadline);
+    return NO;
 }
 
 static int recover(void) {
@@ -259,17 +289,25 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         if (control("print-disabled", "user/501", &disabled) ||
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
-        NSDictionary *preflight = NWBTOpenSkywalk();
+        NSUInteger attempts = 0;
+        NSDictionary *preflight = waitForInterface(NO, &attempts);
         preflightStage = preflight[@"stage"];
         // The app can open/close this validated channel while bluetoothd is
         // running; SSH sees EBUSY instead. Both observed outcomes permit the
         // guarded retirement below. No frames are consumed in this preflight.
-        BOOL opened = [preflightStage isEqual:@"skywalk_opened"];
-        BOOL occupied = [preflightStage isEqual:@"skywalk_open"] && [preflight[@"system_errno"] intValue] == EBUSY;
-        if (!opened && !occupied) {
+        if (!interfaceReady(preflight)) {
             NSMutableDictionary *details = [errorReport(@"exclusive") mutableCopy];
+            if (NWBTCancelled) details[@"error_code"] = @"cancelled";
             details[@"exclusive_phase"] = @"preflight";
             details[@"preflight"] = preflight;
+            details[@"interface_probe_attempts"] = @(attempts);
+            return details;
+        }
+        // The user may change the power state during the bounded wait.
+        NSDictionary *currentGuard = NWBTNativeGuard();
+        if (currentGuard) {
+            NSMutableDictionary *details = [currentGuard mutableCopy];
+            details[@"error_code"] = codeForReport(currentGuard);
             return details;
         }
         recovery = startRecovery(ownPath, lock, &writer);
@@ -293,17 +331,35 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
     } @catch (NSException *exception) {
         (void)exception; report = [errorReport(@"transport") mutableCopy];
     } @finally {
+        atomic_store(&restoringService, YES);
+        // A late Stop still marks cancellation but cannot truncate readiness
+        // checks after the advertisement has already stopped.
+        alarm(26);
         if (writer >= 0) { if (armed) write(writer, "r", 1); close(writer); }
         if (recovery > 0) {
             int status = 0; BOOL exited = NO; double deadline = uptime() + 18.0;
             // Service recovery owns cancellation from here. A hard worker exit
             // still leaves the independent child alive holding the lock.
-            alarm(20);
             while (uptime() < deadline) {
                 if (waitpid(recovery, &status, WNOHANG) == recovery) { exited = YES; break; }
                 usleep(50000);
             }
-            if (armed && report) report[@"service_restored"] = @(exited && WIFEXITED(status) && WEXITSTATUS(status) == 0);
+            if (armed && report) {
+                BOOL restored = exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+                report[@"service_restored"] = @(restored);
+                if (restored) {
+                    NSUInteger attempts = 0; double started = uptime();
+                    NSDictionary *readiness = waitForInterface(YES, &attempts);
+                    report[@"controller_interface_ready"] = @(interfaceReady(readiness));
+                    report[@"recovery_interface_probe_attempts"] = @(attempts);
+                    report[@"recovery_interface_wait_seconds"] = @(uptime() - started);
+                    if (!interfaceReady(readiness)) {
+                        report[@"recovery_interface"] = readiness;
+                        report[@"cleanup_warning"] = @"Bluetooth service is running but its controller interface is not ready.";
+                        report[@"error_code"] = @"recovery";
+                    }
+                }
+            }
         }
         close(lock);
     }
@@ -312,7 +368,8 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
     if (preflightStage) report[@"preflight_stage"] = preflightStage;
     if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);
-    if (armed && ![report[@"service_restored"] boolValue]) report[@"error_code"] = @"recovery";
+    if (armed && (![report[@"service_restored"] boolValue] ||
+        (report[@"controller_interface_ready"] && ![report[@"controller_interface_ready"] boolValue]))) report[@"error_code"] = @"recovery";
     return report;
 }
 
@@ -385,6 +442,7 @@ int main(int argc, char **argv) {
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_app_cancel_channel": @YES,
                 @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES,
+                @"supports_le_catalog_six_models": @YES,
                 @"supports_le_swift_pair_test": @YES,
                 @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES, @"supports_le_multi_device_test": @YES});
         }

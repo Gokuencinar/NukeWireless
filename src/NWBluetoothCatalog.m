@@ -78,7 +78,16 @@
     if (NWBluetoothBusy()) return;
     if (self.platform >= NW_CATALOG_PLATFORMS) return;
     int previous = self.previousRanks[self.platform].intValue;
-    unsigned rank = NWCatalogNextRank(arc4random_uniform(previous < 0 ? NW_CATALOG_COMBINATIONS : NW_CATALOG_COMBINATIONS - 1), previous);
+    unsigned ranks[NW_CATALOG_COMBINATIONS];
+    unsigned count = NWCatalogProfileRanks((unsigned)self.platform, ranks);
+    if (!count) return;
+    int previousOrdinal = -1;
+    for (unsigned i = 0; i < count; ++i) if ((int)ranks[i] == previous) previousOrdinal = (int)i;
+    // Fast Pair has exactly one supported six-model set: refresh local IDs.
+    BOOL exclude = count > 1 && previousOrdinal >= 0;
+    unsigned ordinal = arc4random_uniform(exclude ? count - 1 : count);
+    if (exclude && ordinal >= (unsigned)previousOrdinal) ++ordinal;
+    unsigned rank = ranks[ordinal];
     unsigned selected[NW_CATALOG_SELECTION];
     if (!NWCatalogCombination(rank, selected)) return;
     NSMutableArray *models = [NSMutableArray new];
@@ -154,7 +163,7 @@
             [NSString stringWithFormat:NWText(@"bt.catalog.emit"), (unsigned long)count];
         content.secondaryText = busy ? NWText(stopping ? @"bt.ui.restoring" : @"bt.lab.running") :
             NWText(!self.emissionAvailable || !self.emit ? @"bt.catalog.worker_required" :
-                count == 3 ? @"bt.catalog.emit_hint" : @"bt.catalog.partial");
+                count == self.models.count ? @"bt.catalog.emit_hint" : @"bt.catalog.partial");
         content.image = [UIImage systemImageNamed:busy ? @"stop.circle.fill" : @"play.circle.fill"];
         content.textProperties.color = busy ? UIColor.systemRedColor : enabled ? UIColor.labelColor : UIColor.secondaryLabelColor;
         if (busy) {
@@ -284,15 +293,17 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
         UISegmentedControl *selector = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft", @"Samsung"]];
         selector.selectedSegmentIndex = platform;
         [controller platformChanged:selector];
-        if (controller.platform != platform || controller.models.count != 3) return 1;
+        if (controller.platform != platform || controller.models.count != NW_CATALOG_SELECTION) return 1;
         for (unsigned attempt = 0; attempt < 25; ++attempt) {
             NSArray *before = [controller.models valueForKey:@"name"];
             NSArray *identities = [controller.models valueForKey:@"identity"];
             [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];
             NSArray *after = [controller.models valueForKey:@"name"];
-            if (after.count != 3 || [NSSet setWithArray:after].count != 3 || [before isEqual:after]) return 2;
+            unsigned ranks[NW_CATALOG_COMBINATIONS];
+            if (after.count != NW_CATALOG_SELECTION || [NSSet setWithArray:after].count != NW_CATALOG_SELECTION ||
+                (NWCatalogProfileRanks((unsigned)platform, ranks) > 1 && [before isEqual:after])) return 2;
             if ([identities isEqual:[controller.models valueForKey:@"identity"]]) return 3;
-            for (NSUInteger row = 0; row < 3; ++row) {
+            for (NSUInteger row = 0; row < NW_CATALOG_SELECTION; ++row) {
                 UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:
                     [NSIndexPath indexPathForRow:row inSection:1]];
                 UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
@@ -301,7 +312,7 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
                 BOOL belongs = NO;
                 for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model)
                     if ([after[row] isEqual:@(NWCatalogModel((unsigned)platform, model))]) belongs = YES;
-                if (!belongs) return 5;
+                if (!belongs || !NWCatalogProfileAvailable((unsigned)platform, [controller.models[row][@"model"] unsignedIntValue])) return 5;
             }
         }
     }
@@ -316,9 +327,9 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
     for (NSUInteger platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
         controller.platform = platform;
         for (unsigned rank = 0; rank < NW_CATALOG_COMBINATIONS; ++rank) {
-            unsigned selected[3]; NWCatalogCombination(rank, selected);
+            unsigned selected[NW_CATALOG_SELECTION]; NWCatalogCombination(rank, selected);
             NSMutableArray *fixtures = [NSMutableArray new], *expected = [NSMutableArray new];
-            for (unsigned i = 0; i < 3; ++i) {
+            for (unsigned i = 0; i < NW_CATALOG_SELECTION; ++i) {
                 [fixtures addObject:@{@"model": @(selected[i]), @"name": @(NWCatalogModel((unsigned)platform, selected[i])), @"identity": @"NWLab-12345678-1234"}];
                 if (NWCatalogProfileAvailable((unsigned)platform, selected[i])) [expected addObject:@(selected[i])];
             }

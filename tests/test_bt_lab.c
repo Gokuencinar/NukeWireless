@@ -80,7 +80,12 @@ int main(void) {
         assert(multiple[2]==NWBT_LAB_MULTI_HANDLE+i && multiple[2]<=0xef && (multiple[3] | multiple[4]<<8)==1000 && multiple[5]==0);
         assert(NWBTLabDeviceEnable(multiple,0,i)==6 && multiple[0]==0 && multiple[3]==0 && multiple[4]==0);
     }
-    assert(NWBTLabDeviceEnable(multiple,1,3)==0);
+    for (unsigned slot = 3; slot < NW_CATALOG_SELECTION; ++slot) {
+        assert(NWBTLabDeviceEnable(multiple,1,slot)==6 && multiple[2]==NWBT_LAB_MULTI_HANDLE+slot);
+        assert(multiple[3]==0xe8 && multiple[4]==3);
+        assert(NWBTLabDeviceEnable(multiple,0,slot)==6 && multiple[0]==0);
+    }
+    assert(NWBTLabDeviceEnable(multiple,1,NW_CATALOG_SELECTION)==0);
     assert(NWBTLabReplySize(0x203b)==2 && NWBTLabReplySize(0x203a)==0);
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);

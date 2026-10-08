@@ -37,7 +37,8 @@ static BOOL emissionFinishedCleanly(NSDictionary *report) {
         (!report[@"error"] || [code isEqual:@"cancelled"]) && !report[@"cleanup_warning"] &&
         [report[@"controller_advertising_acknowledged"] boolValue] &&
         [report[@"advertising_stopped_acknowledged"] boolValue] &&
-        [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue];
+        [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] &&
+        (!report[@"controller_interface_ready"] || [report[@"controller_interface_ready"] boolValue]);
 }
 static BOOL reportVisible(void) { return !busy && lastReport && !emissionFinishedCleanly(lastReport); }
 // Assigned by beginBackgroundTask before any worker/completion can read it.
@@ -482,7 +483,8 @@ static UILabel *durationBadge(BOOL enabled) {
     NSInteger action = menuAction(index);
     if (action == 9) {
         if (!busy) {
-            BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_identity_v2"] boolValue];
+            BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_identity_v2"] boolValue] &&
+                [self.capabilities[@"supports_le_catalog_six_models"] boolValue];
             __weak NWBluetoothViewController *weakSelf = self;
             UIViewController *catalog = NWBluetoothCatalogControllerWithEmitter(available, ^(NSUInteger platform, NSArray<NSNumber *> *models) {
                 [weakSelf emitCatalogPlatform:platform models:models];
@@ -526,7 +528,8 @@ static UILabel *durationBadge(BOOL enabled) {
     if (busy || NWBulkBusy() || ![self.capabilities[@"supported"] boolValue] ||
         ![self.capabilities[@"supports_le_catalog_identity_v2"] boolValue] || platform >= NW_CATALOG_PLATFORMS ||
         models.count < 1 || models.count > NW_CATALOG_SELECTION) return;
-    unsigned selected[3]; NSMutableArray *indices = [NSMutableArray new];
+    if (models.count > 3 && ![self.capabilities[@"supports_le_catalog_six_models"] boolValue]) return;
+    unsigned selected[NW_CATALOG_SELECTION]; NSMutableArray *indices = [NSMutableArray new];
     for (NSUInteger i = 0; i < models.count; ++i) {
         if (models[i].unsignedIntegerValue >= NW_CATALOG_MODELS) return;
         selected[i] = models[i].unsignedIntValue; [indices addObject:models[i].stringValue];
@@ -736,7 +739,7 @@ int NWBluetoothUIRegressionCheck(void) {
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
         busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES};
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
         [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
         UIViewController *catalogScreen = navigation.topViewController;
@@ -777,6 +780,9 @@ int NWBluetoothUIRegressionCheck(void) {
         if (navigation.topViewController != catalogScreen || !NWBluetoothEmissionIssue() ||
             [catalogTable numberOfSectionsInTableView:catalogTable.tableView] != 3) return 58;
         [controller finishOperation:quiet];
+        NSMutableDictionary *notReady = [quiet mutableCopy];
+        notReady[@"controller_interface_ready"] = @NO;
+        if (emissionFinishedCleanly(notReady)) return 67;
         for (NSUInteger row = 0; row < 3; ++row) {
             NSNumber *model = selectionBefore[row][@"model"];
             NSIndexPath *singleIndex = [NSIndexPath indexPathForRow:row inSection:1];
@@ -797,6 +803,15 @@ int NWBluetoothUIRegressionCheck(void) {
             if (busy || NWBluetoothEmissionIssue() || navigation.topViewController != catalogScreen ||
                 ![selectionBefore isEqual:[catalogScreen valueForKey:@"models"]]) return 66;
         }
+        [controller emitCatalogPlatform:2 models:@[@0,@1,@2,@6,@7,@8]];
+        if (!busy || ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"2", @"0,1,2,6,7,8"]]) return 68;
+        NSMutableDictionary *naturalFinish = [quiet mutableCopy]; [naturalFinish removeObjectForKey:@"error_code"];
+        naturalFinish[@"controller_interface_ready"] = @YES;
+        [controller finishOperation:naturalFinish];
+        capturedCatalogArguments = nil;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_identity_v2": @YES};
+        [controller emitCatalogPlatform:2 models:@[@0,@1,@2,@6,@7,@8]];
+        if (busy || capturedCatalogArguments) return 69; // app28 cannot advertise six slots.
         capturedCatalogArguments = nil; busy = YES;
         [controller emitCatalogPlatform:0 models:@[@0]];
         if (capturedCatalogArguments) return 47;

@@ -272,7 +272,9 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     kern_return_t status = services(MACH_PORT_NULL, match, &iterator); // Consumes match.
     if (status || !iterator) {
         if (iterator) release(iterator);
-        return nativeOpenFailure(error, failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]));
+        NSMutableDictionary *report = [failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]) mutableCopy];
+        report[@"interface_pending"] = @(status == KERN_SUCCESS);
+        return nativeOpenFailure(error, report);
     }
     NSString *identifier = nil;
     NSUInteger candidates = 0;
@@ -290,7 +292,12 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     }
     release(iterator);
     uuid_t uuid;
-    if (!identifier || uuid_parse(identifier.UTF8String, uuid))
+    if (!identifier) {
+        NSMutableDictionary *report = [failure(@"skywalk_registry", @"The HCI interface has not published its nexus identifier.") mutableCopy];
+        report[@"interface_pending"] = @YES;
+        return nativeOpenFailure(error, report);
+    }
+    if (uuid_parse(identifier.UTF8String, uuid))
         return nativeOpenFailure(error, failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface."));
     errno = 0;
     fputs("NWBT phase: channel open\n", stderr);

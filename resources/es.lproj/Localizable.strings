@@ -199,13 +199,13 @@
 "bt.catalog.platform" = "Marca";
 "bt.catalog.selection" = "Selección";
 "bt.catalog.hint" = "Elige una marca para explorar su catálogo.";
-"bt.catalog.generate" = "Generar tres modelos";
-"bt.catalog.generate_hint" = "Una combinación nueva en cada pulsación";
-"bt.catalog.generated" = "Tres modelos nuevos generados";
+"bt.catalog.generate" = "Generar seis modelos";
+"bt.catalog.generate_hint" = "Todos con perfil de emisión disponible";
+"bt.catalog.generated" = "Seis modelos generados";
 "bt.catalog.identity" = "ID de simulación: %@";
 "bt.catalog.local_only" = "Simulación local. Los modelos solo se muestran en NukeWireless; no se emiten anuncios Bluetooth ni avisos de emparejamiento.";
-"bt.catalog.emit" = "Emitir %lu de 3 · 10 s";
-"bt.catalog.emit_hint" = "Usa los tres perfiles seleccionados";
+"bt.catalog.emit" = "Emitir %lu modelos · 10 s";
+"bt.catalog.emit_hint" = "Usa todos los perfiles seleccionados";
 "bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
 "bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app28.";
 "bt.catalog.profile_available" = "Perfil de anuncio disponible";
@@ -213,5 +213,5 @@
 "bt.catalog.emission_note" = "El anuncio incluye el modelo del perfil. Emisión manual de 10 s, sin emparejamiento ni aviso garantizado.";
 "bt.ui.attention" = "Atención";
 "bt.ui.restoring" = "Restaurando Bluetooth…";
-"bt.catalog.help" = "Elige una marca y genera una selección. Toca un modelo para emitirlo individualmente o Emitir para usar la selección completa. Solo se usan modelos con perfil disponible durante 10 segundos.\n\nLa selección permanece en pantalla; puedes detener desde el botón o la barra superior. Si todo termina correctamente no se muestra un resultado.\n\nApaga Bluetooth en Ajustes del iPhone y actívalo en el receptor. Estos anuncios no permiten emparejar un accesorio ni garantizan un aviso.";
+"bt.catalog.help" = "Elige una marca y genera una selección. Toca un modelo para emitirlo individualmente o Emitir para usar la selección completa. Solo se usan modelos con perfil disponible durante 10 segundos. Google usa Fast Pair e incluye Pixel Buds, Sony, Bose y JBL. Se generan seis modelos emitibles.\n\nLa selección permanece en pantalla; puedes detener desde el botón o la barra superior. Si todo termina correctamente no se muestra un resultado.\n\nApaga Bluetooth en Ajustes del iPhone y actívalo en el receptor. Estos anuncios no permiten emparejar un accesorio ni garantizan un aviso.";
 "bt.catalog.single_hint" = "Toca el botón de reproducción de un modelo para emitirlo durante 10 segundos.";

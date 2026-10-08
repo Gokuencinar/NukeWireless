@@ -4,10 +4,17 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev47 / trabajador app28:** la barra de cuatro opciones se separa del contenido
+**Dev48 / trabajador app29:** el catálogo genera seis modelos con perfiles disponibles
+y añade doce entradas entre Apple, Fast Pair, Microsoft y Samsung. La restauración verifica que la interfaz HCI
+está publicada antes de liberar la operación; la espera de disponibilidad está acotada,
+sin repetir anuncios. Compilación e instalación pendientes. Véase
+[emisiones consecutivas](docs/BLUETOOTH-REPEAT-DEV48.md).
+
+**Dev47 instalado / trabajador app28:** la barra de cuatro opciones se separa del contenido
 de la barra nativa para evitar iconos y textos superpuestos al volver del segundo plano.
 Mantiene los tres hosts y el delegado SwiftUI, la pestaña y la navegación Bluetooth.
-Compilación e instalación pendientes. Véase [restauración de pestañas](docs/MAIN-TABS-FOREGROUND-DEV47.md).
+Compilación, 26 checks por idioma con cuatro ciclos reales de segundo plano,
+paquete e instalación verificados; aceptación manual pendiente. Véase [restauración de pestañas](docs/MAIN-TABS-FOREGROUND-DEV47.md).
 
 **Dev46 instalado / trabajador app28:** los modelos generados con perfil disponible
 permiten emisión individual de 10 s al tocar su tarjeta; Emitir conserva la selección completa.

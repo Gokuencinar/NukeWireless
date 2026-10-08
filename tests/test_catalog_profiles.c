@@ -2,11 +2,11 @@
 #include <assert.h>
 #include <stdio.h>
 int main(void) {
-    const uint32_t apple[] = {0x2002, 0x200f, 0x200e, 0x2014, 0x200a};
-    const uint32_t google[] = {0x92bbbd, 0x8b66ab, 0x9adb11};
-    const uint32_t samsung[] = {0xb8b905, 0xd30704, 0x850116, 0x3f6718, 0xeaaa17, 0xab0c46};
+    const uint32_t apple[] = {0x2002, 0x200f, 0x200e, 0x2014, 0x200a, 0, 0x2013, 0x2011, 0x2012};
+    const uint32_t google[] = {0x92bbbd, 0x8b66ab, 0x9adb11, 0, 0, 0, 0x058d08, 0xcd8256, 0x821f66};
+    const uint32_t samsung[] = {0xb8b905, 0xd30704, 0x850116, 0x3f6718, 0xeaaa17, 0xab0c46, 0x39ea48, 0x011716, 0x42c519};
     unsigned available[NW_CATALOG_PLATFORMS] = {0};
-    uint8_t addresses[24][6]; unsigned addressCount = 0;
+    uint8_t addresses[NW_CATALOG_PLATFORMS * NW_CATALOG_MODELS][6]; unsigned addressCount = 0;
     for (unsigned platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
         for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model) {
             uint8_t buffer[37]; memset(buffer, 0x5a, sizeof buffer);
@@ -55,16 +55,33 @@ int main(void) {
             memcpy(addresses[addressCount++], first + 1, 6);
         }
     }
-    assert(available[0] == 5 && available[1] == 3 && available[2] == 6 && available[3] == 6);
-    uint8_t data[35]; assert(!NWBTLabCatalogData(data, NW_CATALOG_PLATFORMS, 0) && !NWBTLabCatalogData(data, 0, 6));
+    assert(available[0] == 8 && available[1] == 6 && available[2] == 9 && available[3] == 9);
+    const unsigned expectedSelections[] = {28, 1, 84, 84};
+    for (unsigned platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
+        unsigned ranks[NW_CATALOG_COMBINATIONS];
+        unsigned count = NWCatalogProfileRanks(platform, ranks);
+        assert(count == expectedSelections[platform]);
+        for (unsigned i = 0; i < count; ++i) {
+            unsigned models[NW_CATALOG_SELECTION];
+            assert(NWCatalogCombination(ranks[i], models));
+            assert(NWCatalogProfileSelection(platform, models, NW_CATALOG_SELECTION));
+            if (i) assert(ranks[i] > ranks[i - 1]);
+            if (platform == 1) assert(models[0] == 0 && models[1] == 1 && models[2] == 2 && models[3] == 6 && models[4] == 7 && models[5] == 8);
+        }
+    }
+    unsigned rejected[NW_CATALOG_COMBINATIONS];
+    assert(!NWCatalogProfileRanks(NW_CATALOG_PLATFORMS, rejected) && !NWCatalogProfileRanks(0, NULL));
+    uint8_t data[35]; assert(!NWBTLabCatalogData(data, NW_CATALOG_PLATFORMS, 0) && !NWBTLabCatalogData(data, 0, NW_CATALOG_MODELS));
     uint8_t address[7];
-    assert(!NWBTLabCatalogAddress(address, 0, 5, 0) && !NWBTLabCatalogAddress(address, 3, 0, 3));
-    unsigned parsed[3];
+    assert(!NWBTLabCatalogAddress(address, 0, 5, 0) && !NWBTLabCatalogAddress(address, 3, 0, NW_CATALOG_SELECTION));
+    assert(NWBTLabCatalogAddress(address, 3, 8, 5) == 7 && address[0] == NWBT_LAB_MULTI_HANDLE + 5);
+    unsigned parsed[NW_CATALOG_SELECTION];
     assert(NWCatalogProfileParse("4,0,3", 0, parsed) == 3 && parsed[0] == 4 && parsed[1] == 0 && parsed[2] == 3);
     assert(NWCatalogProfileParse("1,0", 1, parsed) == 2);
     assert(NWCatalogProfileParse("5", 2, parsed) == 1);
     assert(NWCatalogProfileParse("5,2,0", 3, parsed) == 3);
-    const char *invalid[] = {"", "0,0", "0,1,2,3", "6", "0,", ",0", "00", "-1", " 0", "0 1", "0;1"};
+    assert(NWCatalogProfileParse("0,1,2,6,7,8", 1, parsed) == 6);
+    const char *invalid[] = {"", "0,0", "0,1,2,3,4,5,6", "9", "0,", ",0", "00", "-1", " 0", "0 1", "0;1"};
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) assert(!NWCatalogProfileParse(invalid[i], 2, parsed));
     assert(!NWCatalogProfileParse("5", 0, parsed));
     assert(!NWCatalogProfileParse("3", 1, parsed));
@@ -73,12 +90,12 @@ int main(void) {
     assert(!NWCatalogProfileParse("0", 0, NULL));
     for (unsigned platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
         for (unsigned rank = 0; rank < NW_CATALOG_COMBINATIONS; ++rank) {
-            unsigned combination[3], supported[3]; size_t count = 0;
+            unsigned combination[NW_CATALOG_SELECTION], supported[NW_CATALOG_SELECTION]; size_t count = 0;
             assert(NWCatalogCombination(rank, combination));
-            for (unsigned i = 0; i < 3; ++i)
+            for (unsigned i = 0; i < NW_CATALOG_SELECTION; ++i)
                 if (NWCatalogProfileAvailable(platform, combination[i])) supported[count++] = combination[i];
             assert(NWCatalogProfileSelection(platform, supported, count) == (count > 0));
         }
     }
-    puts("PASS: four-brand model IDs, Samsung capture, stable distinct addresses, AD budgets, 80 selections and strict input rejection");
+    puts("PASS: 32 model profiles, Samsung capture, stable addresses, AD budgets, 197 available six-model selections and strict input rejection");
 }

@@ -144,7 +144,7 @@ static inline size_t NWBTLabCatalogAddress(uint8_t p[7], unsigned platform, unsi
     memcpy(p, address, sizeof address); return sizeof address;
 }
 static inline size_t NWBTLabDeviceEnable(uint8_t p[6], int enabled, unsigned model) {
-    if(model>=NWBT_LAB_PLATFORM_COUNT) return 0;
+    if(model>=NW_CATALOG_SELECTION) return 0;
     memset(p,0,6);p[0]=enabled ? 1 : 0;p[1]=1;p[2]=NWBT_LAB_MULTI_HANDLE+model;
     if(enabled) { p[3]=0xe8;p[4]=3; }
     return 6;
