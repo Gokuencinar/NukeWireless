@@ -13,7 +13,11 @@ int main(void) {
         }
         assert(!seen[mask]); seen[mask] = 1;
         for (unsigned platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform)
-            for (unsigned slot = 0; slot < NW_CATALOG_SELECTION; ++slot) assert(strlen(NWCatalogModel(platform, selected[slot])));
+            for (unsigned slot = 0; slot < NW_CATALOG_SELECTION; ++slot) {
+                const char *name = NWCatalogModel(platform, selected[slot]);
+                if (platform == 1 || selected[slot] < 9) assert(name && strlen(name));
+                else assert(!name);
+            }
         unsigned ranks[NW_CATALOG_COMBINATIONS] = {0};
         for (unsigned candidate = 0; candidate < NW_CATALOG_COMBINATIONS - 1; ++candidate) {
             unsigned next = NWCatalogNextRank(candidate, (int)rank);

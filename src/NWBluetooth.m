@@ -484,7 +484,8 @@ static UILabel *durationBadge(BOOL enabled) {
     if (action == 9) {
         if (!busy) {
             BOOL available = [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_catalog_identity_v2"] boolValue] &&
-                [self.capabilities[@"supports_le_catalog_six_models"] boolValue];
+                [self.capabilities[@"supports_le_catalog_six_models"] boolValue] &&
+                [self.capabilities[@"supports_le_catalog_extended_models"] boolValue];
             __weak NWBluetoothViewController *weakSelf = self;
             UIViewController *catalog = NWBluetoothCatalogControllerWithEmitter(available, ^(NSUInteger platform, NSArray<NSNumber *> *models) {
                 [weakSelf emitCatalogPlatform:platform models:models];
@@ -532,6 +533,7 @@ static UILabel *durationBadge(BOOL enabled) {
     unsigned selected[NW_CATALOG_SELECTION]; NSMutableArray *indices = [NSMutableArray new];
     for (NSUInteger i = 0; i < models.count; ++i) {
         if (models[i].unsignedIntegerValue >= NW_CATALOG_MODELS) return;
+        if (models[i].unsignedIntegerValue >= 9 && ![self.capabilities[@"supports_le_catalog_extended_models"] boolValue]) return;
         selected[i] = models[i].unsignedIntValue; [indices addObject:models[i].stringValue];
     }
     if (!NWCatalogProfileSelection((unsigned)platform, selected, models.count)) return;
@@ -739,7 +741,7 @@ int NWBluetoothUIRegressionCheck(void) {
         cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
         if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
         busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES};
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES, @"supports_le_catalog_extended_models": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
         [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
         UIViewController *catalogScreen = navigation.topViewController;
@@ -808,6 +810,13 @@ int NWBluetoothUIRegressionCheck(void) {
         NSMutableDictionary *naturalFinish = [quiet mutableCopy]; [naturalFinish removeObjectForKey:@"error_code"];
         naturalFinish[@"controller_interface_ready"] = @YES;
         [controller finishOperation:naturalFinish];
+        [controller emitCatalogPlatform:1 models:@[@0,@1,@2,@9,@10,@11]];
+        if (!busy || ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"1", @"0,1,2,9,10,11"]]) return 70;
+        [controller finishOperation:naturalFinish];
+        capturedCatalogArguments = nil;
+        controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES};
+        [controller emitCatalogPlatform:1 models:@[@9,@10,@11]];
+        if (busy || capturedCatalogArguments) return 71; // app30 does not know the added model indices.
         capturedCatalogArguments = nil;
         controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_identity_v2": @YES};
         [controller emitCatalogPlatform:2 models:@[@0,@1,@2,@6,@7,@8]];

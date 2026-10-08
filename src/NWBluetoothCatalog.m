@@ -83,7 +83,7 @@
     if (!count) return;
     int previousOrdinal = -1;
     for (unsigned i = 0; i < count; ++i) if ((int)ranks[i] == previous) previousOrdinal = (int)i;
-    // Fast Pair has exactly one supported six-model set: refresh local IDs.
+    // Exclude the preceding complete selection when alternatives exist.
     BOOL exclude = count > 1 && previousOrdinal >= 0;
     unsigned ordinal = arc4random_uniform(exclude ? count - 1 : count);
     if (exclude && ordinal >= (unsigned)previousOrdinal) ++ordinal;
@@ -310,8 +310,10 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
                 if (![content.text isEqual:after[row]] || ![content.secondaryText containsString:[controller profileIdentity:[controller.models[row][@"model"] unsignedIntValue]]] ||
                     cell.selectionStyle != UITableViewCellSelectionStyleNone) return 4;
                 BOOL belongs = NO;
-                for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model)
-                    if ([after[row] isEqual:@(NWCatalogModel((unsigned)platform, model))]) belongs = YES;
+                for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model) {
+                    const char *name = NWCatalogModel((unsigned)platform, model);
+                    if (name && [after[row] isEqual:@(name)]) belongs = YES;
+                }
                 if (!belongs || !NWCatalogProfileAvailable((unsigned)platform, [controller.models[row][@"model"] unsignedIntValue])) return 5;
             }
         }
@@ -330,6 +332,7 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
             unsigned selected[NW_CATALOG_SELECTION]; NWCatalogCombination(rank, selected);
             NSMutableArray *fixtures = [NSMutableArray new], *expected = [NSMutableArray new];
             for (unsigned i = 0; i < NW_CATALOG_SELECTION; ++i) {
+                if (!NWCatalogModel((unsigned)platform, selected[i])) continue;
                 [fixtures addObject:@{@"model": @(selected[i]), @"name": @(NWCatalogModel((unsigned)platform, selected[i])), @"identity": @"NWLab-12345678-1234"}];
                 if (NWCatalogProfileAvailable((unsigned)platform, selected[i])) [expected addObject:@(selected[i])];
             }

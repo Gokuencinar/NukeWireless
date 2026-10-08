@@ -4,6 +4,11 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev49 / trabajador app31:** Google/Fast Pair pasa de seis a nueve perfiles disponibles;
+Generar elige seis modelos entre 84 selecciones, sin repetir la anterior.
+Añade Sony WF-1000XM4, Sony WH-1000XM5 y Jabra Elite 5.
+Compilación e instalación pendientes. Véase [aleatoriedad Google](docs/BLUETOOTH-GOOGLE-RANDOM-DEV49.md).
+
 **Dev48 instalado / trabajador app30:** el catálogo genera seis modelos con perfiles disponibles
 y añade doce entradas entre Apple, Fast Pair, Microsoft y Samsung. La restauración verifica que la interfaz HCI
 está publicada antes de liberar la operación; la espera de disponibilidad está acotada,

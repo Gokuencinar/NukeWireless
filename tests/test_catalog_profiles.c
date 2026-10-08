@@ -3,7 +3,7 @@
 #include <stdio.h>
 int main(void) {
     const uint32_t apple[] = {0x2002, 0x200f, 0x200e, 0x2014, 0x200a, 0, 0x2013, 0x2011, 0x2012};
-    const uint32_t google[] = {0x92bbbd, 0x8b66ab, 0x9adb11, 0, 0, 0, 0x058d08, 0xcd8256, 0x821f66};
+    const uint32_t google[] = {0x92bbbd, 0x8b66ab, 0x9adb11, 0, 0, 0, 0x058d08, 0xcd8256, 0x821f66, 0xc8d335, 0xd446a7, 0x8b0a91};
     const uint32_t samsung[] = {0xb8b905, 0xd30704, 0x850116, 0x3f6718, 0xeaaa17, 0xab0c46, 0x39ea48, 0x011716, 0x42c519};
     unsigned available[NW_CATALOG_PLATFORMS] = {0};
     uint8_t addresses[NW_CATALOG_PLATFORMS * NW_CATALOG_MODELS][6]; unsigned addressCount = 0;
@@ -55,8 +55,8 @@ int main(void) {
             memcpy(addresses[addressCount++], first + 1, 6);
         }
     }
-    assert(available[0] == 8 && available[1] == 6 && available[2] == 9 && available[3] == 9);
-    const unsigned expectedSelections[] = {28, 1, 84, 84};
+    assert(available[0] == 8 && available[1] == 9 && available[2] == 9 && available[3] == 9);
+    const unsigned expectedSelections[] = {28, 84, 84, 84};
     for (unsigned platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
         unsigned ranks[NW_CATALOG_COMBINATIONS];
         unsigned count = NWCatalogProfileRanks(platform, ranks);
@@ -66,7 +66,7 @@ int main(void) {
             assert(NWCatalogCombination(ranks[i], models));
             assert(NWCatalogProfileSelection(platform, models, NW_CATALOG_SELECTION));
             if (i) assert(ranks[i] > ranks[i - 1]);
-            if (platform == 1) assert(models[0] == 0 && models[1] == 1 && models[2] == 2 && models[3] == 6 && models[4] == 7 && models[5] == 8);
+            if (platform == 1) for (unsigned j = 0; j < NW_CATALOG_SELECTION; ++j) assert(models[j] < 3 || models[j] >= 6);
         }
     }
     unsigned rejected[NW_CATALOG_COMBINATIONS];
@@ -81,6 +81,10 @@ int main(void) {
     assert(NWCatalogProfileParse("5", 2, parsed) == 1);
     assert(NWCatalogProfileParse("5,2,0", 3, parsed) == 3);
     assert(NWCatalogProfileParse("0,1,2,6,7,8", 1, parsed) == 6);
+    assert(NWCatalogProfileParse("0,1,2,9,10,11", 1, parsed) == 6 && parsed[3] == 9 && parsed[4] == 10 && parsed[5] == 11);
+    assert(NWCatalogProfileParse("11", 1, parsed) == 1 && parsed[0] == 11);
+    const char *invalidGoogle[] = {"12", "99999999999999999999", "01", "010", "10,10", "9,10,11,0,1,2,6", "10,", "10 11", "+10", "1a", "1:0"};
+    for (size_t i = 0; i < sizeof invalidGoogle / sizeof *invalidGoogle; ++i) assert(!NWCatalogProfileParse(invalidGoogle[i], 1, parsed));
     const char *invalid[] = {"", "0,0", "0,1,2,3,4,5,6", "9", "0,", ",0", "00", "-1", " 0", "0 1", "0;1"};
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) assert(!NWCatalogProfileParse(invalid[i], 2, parsed));
     assert(!NWCatalogProfileParse("5", 0, parsed));
@@ -97,5 +101,5 @@ int main(void) {
             assert(NWCatalogProfileSelection(platform, supported, count) == (count > 0));
         }
     }
-    puts("PASS: 32 model profiles, Samsung capture, stable addresses, AD budgets, 197 available six-model selections and strict input rejection");
+    puts("PASS: 35 model profiles, Samsung capture, stable addresses, AD budgets, 280 available six-model selections and strict decimal input rejection");
 }

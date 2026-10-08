@@ -443,6 +443,7 @@ int main(int argc, char **argv) {
                 @"supports_app_cancel_channel": @YES,
                 @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES,
                 @"supports_le_catalog_six_models": @YES,
+                @"supports_le_catalog_extended_models": @YES,
                 @"supports_le_swift_pair_test": @YES,
                 @"supports_le_apple_pairing_test": @YES, @"supports_le_fast_pair_test": @YES, @"supports_le_multi_device_test": @YES});
         }

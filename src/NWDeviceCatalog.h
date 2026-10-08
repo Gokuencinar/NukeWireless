@@ -3,14 +3,14 @@
 #include <stddef.h>
 
 // Display-only model names. No manufacturer IDs, advertising data or radio API.
-#define NW_CATALOG_MODELS 9
+#define NW_CATALOG_MODELS 12
 #define NW_CATALOG_PLATFORMS 4
 #define NW_CATALOG_SELECTION 6
-#define NW_CATALOG_COMBINATIONS 84 // Nine choose six.
+#define NW_CATALOG_COMBINATIONS 924 // Twelve choose six; per-brand availability filters these ranks.
 static inline const char *NWCatalogModel(unsigned platform, unsigned model) {
     static const char *const names[NW_CATALOG_PLATFORMS][NW_CATALOG_MODELS] = {
         {"AirPods", "AirPods 2", "AirPods Pro", "AirPods Pro 2", "AirPods Max", "AirPods 4", "AirPods 3", "Beats Studio Buds", "Beats Fit Pro"},
-        {"Pixel Buds", "Pixel Buds A-Series", "Pixel Buds Pro", "Pixel Buds Pro 2", "Nest Mini", "Nest Audio", "Sony WH-1000XM4", "Bose NC 700", "JBL Flip 6"},
+        {"Pixel Buds", "Pixel Buds A-Series", "Pixel Buds Pro", "Pixel Buds Pro 2", "Nest Mini", "Nest Audio", "Sony WH-1000XM4", "Bose NC 700", "JBL Flip 6", "Sony WF-1000XM4", "Sony WH-1000XM5", "Jabra Elite 5"},
         {"Surface Keyboard", "Surface Mouse", "Surface Precision Mouse", "Surface Headphones", "Surface Headphones 2", "Xbox Wireless Controller", "Surface Earbuds", "Surface Arc Mouse", "Microsoft Modern Mouse"},
         {"Galaxy Buds (White)", "Galaxy Buds (Black)", "Galaxy Buds Live (Black)", "Galaxy Buds Live (Bronze)", "Galaxy Buds2 (White)", "Galaxy Buds2 Pro", "Galaxy Buds2 (Purple)", "Galaxy Buds2 (Black)", "Galaxy Buds Live (Red)"}
     };
