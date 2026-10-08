@@ -9,7 +9,8 @@ y añade doce entradas entre Apple, Fast Pair, Microsoft y Samsung. La restaurac
 está publicada antes de liberar la operación; la espera de disponibilidad está acotada,
 sin repetir anuncios. Compilación, paquete, instalación y recepción de 26 identidades
 verificados; cinco emisiones consecutivas, cancelación temprana y emisión posterior
-comprobadas por SSH. Repetición desde la UI pendiente de aceptación manual. Véase
+comprobadas por SSH. El usuario confirma que la repetición desde el catálogo funciona,
+con seis tarjetas disponibles, Detener y final silencioso. Véase
 [emisiones consecutivas](docs/BLUETOOTH-REPEAT-DEV48.md).
 
 **Dev47 instalado / trabajador app28:** la barra de cuatro opciones se separa del contenido
