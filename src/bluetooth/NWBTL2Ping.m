@@ -95,7 +95,7 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
 NSDictionary *NWBTReadLECapabilities(void) {
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t capacity = 0;
-    void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
     NSMutableArray *queries = [NSMutableArray new];
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_capabilities",
@@ -240,7 +240,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
     if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
     BOOL swiftPair=platform==1, applePairing=platform==2, fastPair=platform==3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
-    uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    uint64_t capacity = 0; void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
     NWBTLabSession *session = [NWBTLabSession new];
     double advertisingStarted = 0;
@@ -360,7 +360,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
     NSUInteger count = catalogModels ? catalogModels.count : NWBT_LAB_PLATFORM_COUNT;
     unsigned catalogPlatform = platform == 1 ? 2 : platform == 2 ? 0 : platform == 3 ? 1 : 3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
-    uint64_t capacity = 0; void *channel = NWBTOpenNativeChannel(@"hci", &capacity, &error);
+    uint64_t capacity = 0; void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
     if (!channel) return error;
     NWBTLabSession *session = [NWBTLabSession new];
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
@@ -664,14 +664,14 @@ NSDictionary<NSString *, id> *NWBTL2PingWithMilliseconds(NSString *destination, 
     if (!memcmp(address, "\0\0\0\0\0\0", 6) || !memcmp(address, "\xff\xff\xff\xff\xff\xff", 6)) { report[@"error"] = @"Invalid target address."; return report; }
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
     uint64_t hciCapacity = 0, aclCapacity = 0;
-    void *hci = NWBTOpenNativeChannel(@"hci", &hciCapacity, &error); if (!hci) return error;
+    void *hci = NWBTOpenExclusiveNativeChannel(@"hci", &hciCapacity, &error); if (!hci) return error;
     void *acl = NULL; NWBTPingSession *session = [NWBTPingSession new];
     session.address = [NSData dataWithBytes:address length:6]; session.commandCredits = 1;
     session.events = [NSMutableData new]; session.aclStream = [NSMutableData new]; session.pdu = [NSMutableData new];
     session.completions = [NSMutableDictionary new]; session.auxiliary = [NSMutableArray new];
     session.samples = [NSMutableArray new]; session.eventCodes = [NSMutableArray new];
     @try {
-        acl = NWBTOpenNativeChannel(@"acl", &aclCapacity, &error);
+        acl = NWBTOpenExclusiveNativeChannel(@"acl", &aclCapacity, &error);
         if (!acl) return error;
         session.hci = [[NWBTRing alloc] initWithChannel:hci capacity:hciCapacity];
         session.acl = [[NWBTRing alloc] initWithChannel:acl capacity:aclCapacity];

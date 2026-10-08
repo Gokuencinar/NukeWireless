@@ -6,6 +6,9 @@
 // Internal interface. Only the ABI-guarded inspector calls this transport.
 NSDictionary *NWBTNativeGuard(void);
 void *NWBTOpenNativeChannel(NSString *protocol, uint64_t *capacity, NSDictionary **error);
+// Called only after guarded service retirement, before consuming/sending frames.
+// Waits for asynchronous driver ownership release; never retries HCI commands.
+void *NWBTOpenExclusiveNativeChannel(NSString *protocol, uint64_t *capacity, NSDictionary **error);
 void NWBTCloseNativeChannel(void *channel);
 // Shared by the radio loop, the private control thread and signal handlers.
 _Static_assert(ATOMIC_INT_LOCK_FREE == 2, "Cancellation must remain signal-safe");

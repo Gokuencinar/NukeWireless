@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev48 / trabajador app29:** el catálogo genera seis modelos con perfiles disponibles
+**Dev48 / trabajador app30:** el catálogo genera seis modelos con perfiles disponibles
 y añade doce entradas entre Apple, Fast Pair, Microsoft y Samsung. La restauración verifica que la interfaz HCI
 está publicada antes de liberar la operación; la espera de disponibilidad está acotada,
 sin repetir anuncios. Compilación e instalación pendientes. Véase

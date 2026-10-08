@@ -322,6 +322,27 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     return channel;
 }
 
+void *NWBTOpenExclusiveNativeChannel(NSString *protocol, uint64_t *capacity, NSDictionary **error) {
+    double started = NSProcessInfo.processInfo.systemUptime, deadline = started + 5.0;
+    NSUInteger attempts = 0;
+    do {
+        if (NWBTCancelled) { *error = failure(@"cancelled", @"Diagnostic cancelled."); return NULL; }
+        void *channel = NWBTOpenNativeChannel(protocol, capacity, error);
+        ++attempts;
+        if (channel) return channel;
+        NSDictionary *result = *error;
+        BOOL pending = [result[@"interface_pending"] boolValue] ||
+            ([result[@"stage"] isEqual:@"skywalk_open"] && [result[@"system_errno"] intValue] == EBUSY);
+        if (!pending || NSProcessInfo.processInfo.systemUptime >= deadline) break;
+        usleep(100000);
+    } while (NSProcessInfo.processInfo.systemUptime < deadline);
+    NSMutableDictionary *result = [*error mutableCopy];
+    result[@"exclusive_open_attempts"] = @(attempts);
+    result[@"exclusive_open_wait_seconds"] = @(NSProcessInfo.processInfo.systemUptime - started);
+    *error = result;
+    return NULL;
+}
+
 void NWBTCloseNativeChannel(void *channel) {
     NWChannelDestroy destroy = (NWChannelDestroy)dlsym(RTLD_DEFAULT, "os_channel_destroy");
     if (channel && destroy) destroy(channel);
