@@ -43,6 +43,18 @@ static UIImage *brandImage(NSString *name) {
 }
 static NSArray<NSString *> *brandNames(void) { return @[@"Apple", @"Google", @"Microsoft", @"Samsung"]; }
 static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"microsoft", @"samsung"]; }
+static UIImage *brandButtonImage(NSString *name) {
+    static NSMutableDictionary<NSString *, UIImage *> *images;
+    if (!images) images = [NSMutableDictionary new];
+    if (images[name]) return images[name];
+    UIImage *mark = brandImage(name); if (!mark) return nil;
+    // A shared image column aligns the marks' centers and the text starts.
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(64, 24)];
+    UIImage *image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        (void)context; [mark drawAtPoint:CGPointMake((64 - mark.size.width) / 2, 0)];
+    }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    images[name] = image; return image;
+}
 
 @interface NWBluetoothCatalogViewController : UITableViewController
 @property(nonatomic) NSUInteger platform;
@@ -188,7 +200,9 @@ static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"
                 UIButtonConfiguration *configuration = selected ? [UIButtonConfiguration tintedButtonConfiguration] : [UIButtonConfiguration plainButtonConfiguration];
                 configuration.title = brandNames()[platform];
                 configuration.subtitle = platform == 1 ? @"Android · Fast Pair" : platform == 2 ? @"Windows · Swift Pair" : platform == 3 ? @"Galaxy · EasySetup" : @"iPhone / iPad";
-                configuration.image = brandImage(brandAssets()[platform]); configuration.imagePadding = 8;
+                configuration.image = brandButtonImage(brandAssets()[platform]); configuration.imagePadding = 4;
+                configuration.titleAlignment = UIButtonConfigurationTitleAlignmentLeading;
+                configuration.contentInsets = NSDirectionalEdgeInsetsMake(10, 2, 10, 2);
                 configuration.titleLineBreakMode = NSLineBreakByWordWrapping;
                 configuration.subtitleLineBreakMode = NSLineBreakByWordWrapping;
                 configuration.baseForegroundColor = selected ? NWAccentColor() : UIColor.labelColor;
@@ -201,6 +215,7 @@ static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"
                     result[NSFontAttributeName] = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2]; return result;
                 };
                 UIButton *button = [UIButton buttonWithConfiguration:configuration primaryAction:nil];
+                button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
                 button.tag = platform; button.enabled = !NWBluetoothBusy();
                 button.titleLabel.numberOfLines = 0;
                 button.titleLabel.adjustsFontForContentSizeCategory = YES;

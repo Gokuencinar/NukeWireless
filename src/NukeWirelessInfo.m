@@ -19,7 +19,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev51";
+__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev52";
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -314,13 +314,13 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageWithContentsOfFile:[NWResourceBundle() pathForResource:@"CreditsAvatar" ofType:@"png"]]];
         avatar.contentMode = UIViewContentModeScaleAspectFill; avatar.clipsToBounds = YES; avatar.layer.cornerRadius = 20; avatar.layer.borderWidth = 1; avatar.layer.borderColor = UIColor.separatorColor.CGColor;
         [NSLayoutConstraint activateConstraints:@[[avatar.widthAnchor constraintEqualToConstant:40],[avatar.heightAnchor constraintEqualToConstant:40]]];
-        UILabel *name = [UILabel new]; name.text = @"Gokuencinar GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
+        UILabel *name = [UILabel new]; name.text = @"GokuEn"; name.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; name.adjustsFontForContentSizeCategory = YES; name.numberOfLines = 0;
         UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[avatar,name]]; stack.axis = UILayoutConstraintAxisHorizontal; stack.alignment = UIStackViewAlignmentCenter; stack.spacing = 12; stack.translatesAutoresizingMaskIntoConstraints = NO;
         [cell.contentView addSubview:stack]; UILayoutGuide *g = cell.contentView.layoutMarginsGuide;
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · Gokuencinar", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title")];
+        NSArray *labels = @[@"GitHub · GokuEn", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title")];
         NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") :
             (index.row == 4 ? NWText([@"appearance." stringByAppendingString:NWAccentName()]) : nil);
         UITableViewCell *cell = textCell(labels[index.row], detail, YES);
@@ -329,7 +329,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev51", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev52", NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -655,7 +655,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev51 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: extension dev52 loaded");
     NWInstallLanguageHooks();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.

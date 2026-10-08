@@ -1533,7 +1533,7 @@ static void hide_info_credits(id root) {
     id white = ((id (*)(id, SEL))objc_msgSend)(color_class, sel_registerName("whiteColor"));
     ((void (*)(id, SEL, id))objc_msgSend)(overlay, sel_registerName("addSubview:"), avatar);
 
-    const char *credit_texts[] = {"NUKE WIRELESS", "Desarrollado por", "Gokuencinar · GokuEn"};
+    const char *credit_texts[] = {"NUKE WIRELESS", "Desarrollado por", "GokuEn"};
     const double credit_y[] = {126, 164, 190};
     const double credit_h[] = {28, 22, 26};
     for (NSUInteger i = 0; i < 3; ++i) {
