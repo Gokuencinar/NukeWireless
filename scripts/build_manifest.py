@@ -14,10 +14,12 @@ SOURCES = ['src/NukeWirelessInfo.m', 'src/NWMainTabs.m', 'src/NWMainTabs.h', 'sr
            'src/NWRefreshThunk.S', 'scripts/build_extension.sh', 'resources/NukeLaunch.storyboard',
            'scripts/startup_resources.py',
            'resources/startup/NukeWirelessIcon.png']
+SOURCES += [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / 'resources/brands').iterdir()) if p.is_file()]
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 def source_hashes():
-    return {name: sha((ROOT / name).read_bytes() if name.endswith(('.car', '.png')) else
+    return {name: sha((ROOT / name).read_bytes() if name.endswith(('.car', '.png', '.pdf')) else
                       (ROOT / name).read_bytes().replace(b'\r\n', b'\n')) for name in SOURCES}
 if __name__ == '__main__':
     import argparse
@@ -30,5 +32,5 @@ if __name__ == '__main__':
         'launch_files': {p.relative_to(out / 'NukeLaunch.storyboardc').as_posix(): sha(p.read_bytes())
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
-        'version': '1.0.25+rh25.5~dev49', 'target': args.target,
+        'version': '1.0.25+rh25.5~dev50', 'target': args.target,
     }, indent=2) + '\n')

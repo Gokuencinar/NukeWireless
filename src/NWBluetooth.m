@@ -67,6 +67,7 @@ static NSString *reportText(NSDictionary *report) {
         NWText(@"bt.empty");
 }
 
+#ifdef NW_UI_TESTING
 // A support bitmap is a declaration by the controller, not emission evidence.
 static NSString *advertisingSupport(NSDictionary *report, BOOL extended) {
     NSString *hex = nil;
@@ -87,24 +88,7 @@ static NSString *advertisingSupport(NSDictionary *report, BOOL extended) {
     return NWText(@"ble.yes");
 }
 
-static NSString *queryTitle(NSDictionary *query) {
-    switch ([query[@"opcode"] unsignedIntegerValue]) {
-        case 0x1001: return NWText(@"bt.le.version");
-        case 0x1002: return NWText(@"bt.le.commands");
-        case 0x1003: return NWText(@"bt.le.features");
-        case 0x2003: return NWText(@"bt.le.le_features");
-        case 0x201c: return NWText(@"bt.le.states");
-        case 0x2036: return NWText(@"bt.lab.parameters");
-        case 0x2037: return NWText(@"bt.lab.data");
-        case 0x2039: return NWText([query[@"phase"] isEqual:@"disable"] ? @"bt.lab.disable" : @"bt.lab.enable");
-        case 0x203c: return NWText(@"bt.lab.remove");
-        default: return NWText(@"bt.le.title");
-    }
-}
-static NSArray *reportRows(NSDictionary *report) {
-    id rows = report[@"queries"];
-    return [rows isKindOfClass:NSArray.class] ? rows : @[];
-}
+#endif
 
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
 static NSString *helperPath(void) {
@@ -236,25 +220,10 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     return [report isKindOfClass:NSDictionary.class] ? report : @{@"error_code": @"transport"};
 }
 
-// Stable action identifiers keep presentation groups separate from worker commands.
+// Emissions have one entry point; scanning remains independent.
 static NSInteger menuAction(NSIndexPath *index) {
-    if (index.section == 0) return index.row == 2 ? 9 : index.row + 1;
-    if (index.section >= 1 && index.section <= 3)
-        return index.row == 0 ? index.section + 2 : index.section + 5;
-    return -1;
-}
-static UILabel *durationBadge(BOOL enabled) {
-    UILabel *badge = [UILabel new];
-    badge.text = NWText(@"bt.ui.duration");
-    badge.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption1];
-    badge.adjustsFontForContentSizeCategory = YES;
-    badge.textAlignment = NSTextAlignmentCenter;
-    badge.textColor = enabled ? NWAccentColor() : UIColor.secondaryLabelColor;
-    badge.backgroundColor = [(enabled ? NWAccentColor() : UIColor.secondaryLabelColor) colorWithAlphaComponent:0.10];
-    [badge sizeToFit]; badge.frame = CGRectMake(0, 0, badge.bounds.size.width + 20, badge.bounds.size.height + 12);
-    badge.layer.cornerRadius = 8; badge.clipsToBounds = YES;
-    badge.isAccessibilityElement = NO;
-    return badge;
+    if (index.row != 0) return -1;
+    return index.section == 0 ? 9 : index.section == 1 ? 1 : -1;
 }
 
 @interface NWBluetoothViewController : UITableViewController
@@ -339,18 +308,18 @@ static UILabel *durationBadge(BOOL enabled) {
     NWBluetoothStop();
 }
 - (void)backgrounded:(NSNotification *)notification { (void)notification; [self stopCurrentOperation]; }
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 6; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
     (void)table;
-    if (section <= 3) return section == 0 ? 3 : 2;
-    if (section == 4) return busy ? 2 : 0;
-    return reportVisible() ? 1 + (labOperation(lastReport[@"operation"]) ? 0 : reportRows(lastReport).count) : 0;
+    if (section < 2) return 1;
+    if (section == 2) return busy ? 2 : 0;
+    return NWBluetoothEmissionIssue() ? 1 : 0;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     (void)table;
-    if (section <= 3) return NWText(@[@"bt.ui.explore", @"bt.ui.windows", @"bt.ui.apple", @"bt.ui.android"][section]);
-    if (section == 4) return busy ? NWText(@"bt.ui.active") : nil;
-    return reportVisible() ? NWText(labOperation(lastReport[@"operation"]) ? @"bt.ui.attention" : @"bt.ui.last_result") : nil;
+    if (section < 2) return NWText(section == 0 ? @"bt.ui.emission" : @"bt.ui.explore");
+    if (section == 2) return busy ? NWText(@"bt.ui.active") : nil;
+    return NWBluetoothEmissionIssue() ? NWText(@"bt.ui.attention") : nil;
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     (void)table;
@@ -380,47 +349,12 @@ static UILabel *durationBadge(BOOL enabled) {
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.accessibilityIdentifier = @"nw.bluetooth.catalog";
         cell.selectionStyle = busy ? UITableViewCellSelectionStyleNone : UITableViewCellSelectionStyleDefault;
-    } else if (action >= 6 && action <= 8) {
-        content.text = NWText(@"bt.ui.multiple");
-        content.secondaryText = NWText(@[@"bt.ui.windows_multiple", @"bt.ui.apple_multiple", @"bt.ui.android_multiple"][action-6]);
-        content.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
-        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_multi_device_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
-        content.textProperties.color = NWAccentColor();
-    } else if (action == 5) {
-        content.text = NWText(@"bt.ui.single");
-        content.secondaryText = NWText(@"bt.ui.android_single");
-        content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
-        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_fast_pair_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
-        content.textProperties.color = NWAccentColor();
-    } else if (action == 4) {
-        content.text = NWText(@"bt.ui.single");
-        content.secondaryText = NWText(@"bt.ui.apple_single");
-        content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
-        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_apple_pairing_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
-        content.textProperties.color = NWAccentColor();
-    } else if (action == 3) {
-        content.text = NWText(@"bt.ui.single");
-        content.secondaryText = NWText(@"bt.ui.swift_single");
-        content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
-        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_swift_pair_test"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
-        content.textProperties.color = NWAccentColor();
-    } else if (action == 2) {
-        content.text = NWText(@"bt.ui.capabilities");
-        content.secondaryText = NWText(@"bt.ui.capabilities_hint");
-        content.image = [UIImage systemImageNamed:@"cpu"];
-        cell.selectionStyle = !busy && [self.capabilities[@"supported"] boolValue] &&
-            [self.capabilities[@"supports_le_capability_app"] boolValue] ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
-        content.textProperties.color = NWAccentColor();
     } else if (action == 1) {
         content.text = NWText(@"ble.title"); content.secondaryText = NWText(@"bt.ui.scan_hint");
         content.image = [UIImage systemImageNamed:@"dot.radiowaves.left.and.right"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = busy ? UITableViewCellSelectionStyleNone : UITableViewCellSelectionStyleDefault;
-    } else if (index.section == 4) {
+    } else if (index.section == 2) {
         BOOL stopping = busy && cancellationRequested();
         content.text = index.row || busy ? NWText(index.row ? (stopping ? @"bt.stopping" : labRunning ? @"bt.lab.stop" : @"bt.cancel") :
             stopping ? @"bt.stopping" : labRunning ? @"bt.lab.running" : @"bt.le.running") : NWText(@"bt.empty");
@@ -428,32 +362,9 @@ static UILabel *durationBadge(BOOL enabled) {
         cell.selectionStyle = index.row && busy && !stopping ?
             UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         content.textProperties.color = index.row ? UIColor.systemRedColor : NWAccentColor();
-    } else if (!lastReport) content.text = NWText(@"bt.empty");
-    else if (index.row == 0) {
-        NSString *code = lastReport[@"error_code"];
-        content.text = reportText(lastReport);
-        NSMutableArray<NSString *> *details = [NSMutableArray new];
-        if ([lastReport[@"operation"] isEqual:@"le_capabilities"]) {
-            [details addObject:[NSString stringWithFormat:NWText(@"bt.le.support"),
-                advertisingSupport(lastReport, NO), advertisingSupport(lastReport, YES)]];
-            [details addObject:NWText(@"bt.le.read_only")];
-        }
-        if ([lastReport[@"operation"] isEqual:@"le_swift_pair_test"]) [details addObject:NWText(@"bt.lab.swift_receiver")];
-        if ([lastReport[@"operation"] isEqual:@"le_fast_pair_test"]) [details addObject:NWText(@"bt.lab.android_receiver")];
-        if ([lastReport[@"operation"] isEqual:@"le_apple_pairing_test"]) [details addObject:NWText(@"bt.lab.apple_receiver")];
-        if ([lastReport[@"operation"] isEqual:@"le_catalog_test"] && [lastReport[@"models"] isKindOfClass:NSArray.class])
-            [details addObject:[lastReport[@"models"] componentsJoinedByString:@", "]];
-        if ([lastReport[@"service_restored"] boolValue]) [details addObject:NWText(@"bt.restored")];
-        content.secondaryText = [details componentsJoinedByString:@"\n"];
-        content.image = [UIImage systemImageNamed:code ? @"exclamationmark.circle" : @"checkmark.circle"];
-    } else if (lastReport[@"operation"]) {
-        NSDictionary *query = lastReport[@"queries"][index.row - 1];
-        content.text = queryTitle(query);
-        BOOL success = (query[@"return_data_hex"] || [query[@"acknowledged"] boolValue]) &&
-            query[@"hci_status"] && ![query[@"hci_status"] unsignedIntegerValue];
-        content.secondaryText = success ? NWText(@"bt.le.reply") : query[@"hci_status"] ?
-            [NSString stringWithFormat:NWText(@"bt.le.rejected"), [query[@"hci_status"] unsignedIntegerValue]] : NWText(@"bt.timeout");
-        content.image = [UIImage systemImageNamed:success ? @"checkmark.circle" : @"exclamationmark.circle"];
+    } else {
+        content.text = NWBluetoothEmissionIssue();
+        content.image = [UIImage systemImageNamed:@"exclamationmark.circle"];
     }
     UIColor *tint = NWAccentColor();
     if (action >= 1) {
@@ -464,18 +375,11 @@ static UILabel *durationBadge(BOOL enabled) {
         tint = enabled ? NWAccentColor() : UIColor.tertiaryLabelColor;
         cell.accessibilityTraits |= UIAccessibilityTraitButton;
         if (!enabled) cell.accessibilityTraits |= UIAccessibilityTraitNotEnabled;
-        if (action >= 3 && action <= 8) {
-            content.image = [UIImage systemImageNamed:action >= 6 ? @"square.stack.3d.up" : @"play.circle.fill"];
-            cell.accessoryView = durationBadge(enabled);
-            NSString *platform = NWText(@[@"bt.ui.windows", @"bt.ui.apple", @"bt.ui.android"][index.section-1]);
-            cell.accessibilityLabel = [NSString stringWithFormat:@"%@, %@, %@, %@", platform,
-                content.text, content.secondaryText, NWText(@"bt.ui.duration")];
-        }
-    } else if (index.section == 4 && index.row == 0) {
+    } else if (index.section == 2 && index.row == 0) {
         UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
         spinner.color = NWAccentColor(); [spinner startAnimating]; cell.accessoryView = spinner;
     }
-    if (index.section == 4 && index.row == 1) tint = UIColor.systemRedColor;
+    if (index.section == 2 && index.row == 1) tint = UIColor.systemRedColor;
     content.imageProperties.tintColor = tint; cell.contentConfiguration = content; return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
@@ -497,33 +401,7 @@ static UILabel *durationBadge(BOOL enabled) {
     if (action == 1 && !busy) {
         [self.navigationController pushViewController:NWBLEController() animated:YES]; return;
     }
-    if (action == 2) {
-        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_capability_app"] boolValue])
-            [self runArguments:@[@"--le-capabilities"] operation:@"le_capabilities"];
-        return;
-    }
-    if (action == 3) {
-        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_swift_pair_test"] boolValue])
-            [self runArguments:@[@"--le-swift-pair-test"] operation:@"le_swift_pair_test"];
-        return;
-    }
-    if (action == 4) {
-        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_apple_pairing_test"] boolValue])
-            [self runArguments:@[@"--le-apple-pairing-test"] operation:@"le_apple_pairing_test"];
-        return;
-    }
-    if (action == 5) {
-        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_fast_pair_test"] boolValue])
-            [self runArguments:@[@"--le-fast-pair-test"] operation:@"le_fast_pair_test"];
-        return;
-    }
-    if (action >= 6 && action <= 8) {
-        if (!busy && [self.capabilities[@"supported"] boolValue] && [self.capabilities[@"supports_le_multi_device_test"] boolValue])
-            [self runArguments:@[@[@"--le-multi-windows-test", @"--le-multi-apple-test", @"--le-multi-android-test"][action-6]]
-                operation:@[@"le_multi_windows_test", @"le_multi_apple_test", @"le_multi_android_test"][action-6]];
-        return;
-    }
-    if (index.section == 4 && index.row == 1) [self stopCurrentOperation];
+    if (index.section == 2 && index.row == 1) [self stopCurrentOperation];
 }
 - (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models {
     if (busy || NWBulkBusy() || ![self.capabilities[@"supported"] boolValue] ||
@@ -614,136 +492,45 @@ int NWBluetoothUIRegressionCheck(void) {
               @"return_data_hex": @"00"}]}, NO) isEqual:NWText(@"ble.unavailable")]) return 2;
         NWBluetoothViewController *controller = [NWBluetoothViewController new];
         [controller loadViewIfNeeded];
-        if ([controller numberOfSectionsInTableView:controller.tableView] != 6 ||
-            [controller tableView:controller.tableView numberOfRowsInSection:4] != 0 ||
-            [controller tableView:controller.tableView numberOfRowsInSection:0] != 3) return 42;
-        NSIndexPath *catalog = [NSIndexPath indexPathForRow:2 inSection:0];
-        UITableViewCell *catalogCell = [controller tableView:controller.tableView cellForRowAtIndexPath:catalog];
-        if (catalogCell.selectionStyle != UITableViewCellSelectionStyleDefault || catalogCell.accessoryView ||
-            ![((UIListContentConfiguration *)catalogCell.contentConfiguration).text isEqual:NWText(@"bt.catalog.title")]) return 46;
+        if ([controller numberOfSectionsInTableView:controller.tableView] != 4 ||
+            [controller tableView:controller.tableView numberOfRowsInSection:0] != 1 ||
+            [controller tableView:controller.tableView numberOfRowsInSection:1] != 1 ||
+            [controller tableView:controller.tableView numberOfRowsInSection:2] != 0 ||
+            [controller tableView:controller.tableView numberOfRowsInSection:3] != 0) return 42;
+        NSIndexPath *catalog = [NSIndexPath indexPathForRow:0 inSection:0];
+        NSIndexPath *scan = [NSIndexPath indexPathForRow:0 inSection:1];
+        UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:catalog];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault ||
+            ![cell.accessibilityIdentifier isEqual:@"nw.bluetooth.catalog"]) return 46;
         if (NWBluetoothCatalogUIRegressionCheck()) return 47;
-        for (NSInteger section=1; section<=3; section++) {
-            if ([controller tableView:controller.tableView numberOfRowsInSection:section] != 2) return 43;
-            for (NSInteger row=0; row<2; row++) {
-                UITableViewCell *retained = [controller tableView:controller.tableView cellForRowAtIndexPath:
-                    [NSIndexPath indexPathForRow:row inSection:section]];
-                if (![((UIListContentConfiguration *)retained.contentConfiguration).text isEqual:NWText(row ? @"bt.ui.multiple" : @"bt.ui.single")]) return 43;
-                if (![retained.accessoryView isKindOfClass:UILabel.class] || ![retained.accessibilityLabel containsString:NWText(@"bt.ui.duration")]) return 44;
-            }
-        }
         if (controller.navigationItem.leftBarButtonItem.action != @selector(showHelp)) return 45;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_capability_reads": @YES};
-        NSIndexPath *button = [NSIndexPath indexPathForRow:1 inSection:0];
-        UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 3;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_capability_app": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault) return 4;
-        if ([controller tableView:controller.tableView numberOfRowsInSection:5] != 2) return 5;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:5]];
-        UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.text isEqual:NWText(@"bt.le.success")] || ![content.secondaryText containsString:NWText(@"bt.restored")]) return 6;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:5]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.text isEqual:NWText(@"bt.le.commands")] || ![content.secondaryText isEqual:NWText(@"bt.le.reply")]) return 7;
-        busy = YES; labRunning = NO;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:button];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone ||
-            [controller tableView:controller.tableView numberOfRowsInSection:4] != 2) return 8;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:4]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.text isEqual:NWText(@"bt.le.running")]) return 9;
-        busy = NO;
-        lastReport = @{@"operation": @"le_swift_pair_test", @"controller_advertising_acknowledged": @YES,
-            @"advertising_stopped_acknowledged": @YES, @"queries": @[@{@"opcode": @0x2039,
-            @"phase": @"disable", @"hci_status": @0, @"acknowledged": @YES}], @"advertising_set_removed": @YES, @"service_restored": @YES};
-        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.accepted")] || reportVisible() ||
-            [controller tableView:controller.tableView numberOfRowsInSection:5] || NWBluetoothEmissionIssue()) return 10;
+        lastReport = @{@"operation": @"le_catalog_test", @"controller_advertising_acknowledged": @YES,
+            @"advertising_stopped_acknowledged": @YES, @"advertising_set_removed": @YES, @"service_restored": @YES};
+        if ([controller tableView:controller.tableView numberOfRowsInSection:3] || NWBluetoothEmissionIssue()) return 10;
         NSMutableDictionary *failedCleanup = [lastReport mutableCopy]; failedCleanup[@"service_restored"] = @NO;
         lastReport = failedCleanup;
-        if (!reportVisible() || [controller tableView:controller.tableView numberOfRowsInSection:5] != 1 ||
-            ![NWBluetoothEmissionIssue() isEqual:NWText(@"bt.lab.incomplete")]) return 11;
-        NSIndexPath *swiftButton = [NSIndexPath indexPathForRow:0 inSection:1];
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:swiftButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 20;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_swift_pair_test": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:swiftButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_swift_pair_test")) return 21;
-        lastReport = @{@"operation": @"le_swift_pair_test", @"controller_advertising_acknowledged": @YES,
-            @"advertising_stopped_acknowledged": @YES, @"service_restored": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:5]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.secondaryText containsString:NWText(@"bt.lab.swift_receiver")]) return 22;
-        busy = YES;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:swiftButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 23;
-        labRunning = YES;
+        if ([controller tableView:controller.tableView numberOfRowsInSection:3] != 1 || !NWBluetoothEmissionIssue()) return 11;
+        busy = YES; labRunning = YES;
+        for (NSIndexPath *entry in @[catalog, scan]) {
+            cell = [controller tableView:controller.tableView cellForRowAtIndexPath:entry];
+            if (cell.selectionStyle != UITableViewCellSelectionStyleNone ||
+                !(cell.accessibilityTraits & UIAccessibilityTraitNotEnabled)) return 23;
+        }
         [controller refresh:nil];
         UIBarButtonItem *stop = controller.navigationItem.rightBarButtonItem;
-        if (!stop.enabled || ![stop.title isEqual:NWText(@"bt.stop")] || stop.action != @selector(stopCurrentOperation)) return 24;
-        // Cancellation before spawn must remain latched for the future worker.
+        if (!stop.enabled || stop.action != @selector(stopCurrentOperation)) return 24;
+        [controller stopCurrentOperation]; // Cancellation before spawn remains latched.
+        if (!cancellationRequested() || controller.navigationItem.rightBarButtonItem.enabled) return 25;
+        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:2]];
+        if (cell.selectionStyle != UITableViewCellSelectionStyleNone ||
+            ![((UIListContentConfiguration *)cell.contentConfiguration).text isEqual:NWText(@"bt.stopping")]) return 26;
         [controller stopCurrentOperation];
-        stop = controller.navigationItem.rightBarButtonItem;
-        if (!cancellationRequested() || stop.enabled || ![stop.title isEqual:NWText(@"bt.stopping")]) return 25;
-        NSIndexPath *cancelButton = [NSIndexPath indexPathForRow:1 inSection:4];
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:cancelButton];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone || ![content.text isEqual:NWText(@"bt.stopping")]) return 26;
-        [controller stopCurrentOperation]; // A repeated tap cannot restart or re-enable anything.
         busy = NO; [controller refresh:nil];
         if (controller.navigationItem.rightBarButtonItem) return 27;
-        lastReport = @{@"operation": @"le_swift_pair_test", @"error_code": @"cancelled",
-            @"controller_advertising_acknowledged": @YES, @"advertising_stopped_acknowledged": @YES,
-            @"advertising_set_removed": @YES, @"service_restored": @YES};
-        if (![reportText(lastReport) isEqual:NWText(@"bt.lab.stopped")]) return 28;
-        NSMutableDictionary *incomplete = [lastReport mutableCopy];
-        incomplete[@"advertising_stopped_acknowledged"] = @NO;
-        if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 29;
-        incomplete[@"advertising_stopped_acknowledged"] = @YES; incomplete[@"service_restored"] = @NO;
-        if (![reportText(incomplete) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 30;
-        NSIndexPath *appleButton = [NSIndexPath indexPathForRow:0 inSection:2];
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 31;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_apple_pairing_test": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_apple_pairing_test")) return 32;
-        lastReport = @{@"operation": @"le_apple_pairing_test", @"controller_advertising_acknowledged": @YES,
-            @"advertising_stopped_acknowledged": @YES, @"service_restored": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:5]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.secondaryText containsString:NWText(@"bt.lab.apple_receiver")]) return 33;
-        busy = YES;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:appleButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 34;
-        busy = NO; controller.capabilities = @{};
-        NSIndexPath *androidButton = [NSIndexPath indexPathForRow:0 inSection:3];
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:androidButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 35;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_fast_pair_test": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:androidButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_fast_pair_test")) return 36;
-        lastReport = @{@"operation": @"le_fast_pair_test", @"controller_advertising_acknowledged": @YES,
-            @"advertising_stopped_acknowledged": @YES, @"service_restored": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:5]];
-        content = (UIListContentConfiguration *)cell.contentConfiguration;
-        if (![content.secondaryText containsString:NWText(@"bt.lab.android_receiver")]) return 37;
-        busy = YES;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:androidButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 38;
-        busy = NO; controller.capabilities = @{};
-        NSIndexPath *sequenceButton = [NSIndexPath indexPathForRow:1 inSection:1];
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 39;
-        controller.capabilities = @{@"supported": @YES, @"supports_le_multi_device_test": @YES};
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleDefault || !labOperation(@"le_multi_windows_test") || !NWScanBusy()) return 40;
-        busy = YES;
-        cell = [controller tableView:controller.tableView cellForRowAtIndexPath:sequenceButton];
-        if (cell.selectionStyle != UITableViewCellSelectionStyleNone) return 41;
         busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
         controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES, @"supports_le_catalog_extended_models": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
-        [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+        [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
         UIViewController *catalogScreen = navigation.topViewController;
         if (catalogScreen == controller) return 45;
         [catalogScreen setValue:@2 forKey:@"platform"];

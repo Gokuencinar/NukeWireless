@@ -6,6 +6,31 @@
 #import "NWResources.h"
 #include <stdlib.h>
 
+static UIImage *brandImage(NSString *name) {
+    static NSMutableDictionary<NSString *, UIImage *> *images;
+    if (!images) images = [NSMutableDictionary new];
+    if (images[name]) return images[name];
+    NSURL *url = [NWResourceBundle() URLForResource:name withExtension:@"pdf" subdirectory:@"brands"];
+    if (!url) return nil;
+    CGPDFDocumentRef document = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
+    if (!document) return nil;
+    CGPDFPageRef page = CGPDFDocumentGetPage(document, 1);
+    UIImage *image = nil;
+    if (page) {
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(24, 24)];
+        image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+            CGContextTranslateCTM(context.CGContext, 0, 24); CGContextScaleCTM(context.CGContext, 1, -1);
+            CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFMediaBox, CGRectMake(0, 0, 24, 24), 0, YES));
+            CGContextDrawPDFPage(context.CGContext, page);
+        }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    CGPDFDocumentRelease(document);
+    if (image) images[name] = image;
+    return image;
+}
+static NSArray<NSString *> *brandNames(void) { return @[@"Apple", @"Google", @"Microsoft", @"Samsung"]; }
+static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"microsoft", @"samsung"]; }
+
 @interface NWBluetoothCatalogViewController : UITableViewController
 @property(nonatomic) NSUInteger platform;
 @property(nonatomic, strong) NSMutableArray<NSNumber *> *previousRanks;
@@ -14,9 +39,8 @@
 @property(nonatomic, copy) NSArray<NSNumber *> *emittingModels;
 @property(nonatomic, copy) void (^emit)(NSUInteger platform, NSArray<NSNumber *> *models);
 - (void)generateModels;
-- (void)platformChanged:(UISegmentedControl *)sender;
+- (void)platformChanged:(UIButton *)sender;
 - (NSArray<NSNumber *> *)emissionModels;
-- (NSString *)profileIdentity:(unsigned)model;
 @end
 
 @implementation NWBluetoothCatalogViewController
@@ -100,18 +124,10 @@
         UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"bt.catalog.generated"));
     }
 }
-- (void)platformChanged:(UISegmentedControl *)sender {
-    if (NWBluetoothBusy()) return;
-    if (sender.selectedSegmentIndex < 0 || sender.selectedSegmentIndex >= NW_CATALOG_PLATFORMS ||
-        (NSUInteger)sender.selectedSegmentIndex == self.platform) return;
-    self.platform = (NSUInteger)sender.selectedSegmentIndex; [self generateModels];
-}
-- (NSString *)profileIdentity:(unsigned)model {
-    if (!NWCatalogProfileAvailable((unsigned)self.platform, model)) return NWText(@"bt.catalog.profile_unavailable");
-    if (self.platform == 2) return @"Swift Pair · Display Name";
-    uint32_t product = NWCatalogProfileID((unsigned)self.platform, model);
-    if (self.platform == 0) return [NSString stringWithFormat:@"Apple · 0x%04X", (unsigned)product];
-    return [NSString stringWithFormat:@"%@ · %06X", self.platform == 1 ? @"Fast Pair" : @"EasySetup", (unsigned)product];
+- (void)platformChanged:(UIButton *)sender {
+    if (NWBluetoothBusy() || sender.tag < 0 || sender.tag >= NW_CATALOG_PLATFORMS ||
+        (NSUInteger)sender.tag == self.platform) return;
+    self.platform = (NSUInteger)sender.tag; [self generateModels];
 }
 - (NSArray<NSNumber *> *)emissionModels {
     NSMutableArray *models = [NSMutableArray new];
@@ -126,6 +142,17 @@
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     (void)table; return NWText(section == 0 ? @"bt.catalog.platform" : section == 1 ? @"bt.catalog.selection" : @"bt.ui.attention");
 }
+- (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
+    (void)table;
+    if (section != 1) return nil;
+    UITableViewHeaderFooterView *header = [[UITableViewHeaderFooterView alloc] initWithReuseIdentifier:nil];
+    UIListContentConfiguration *content = [UIListContentConfiguration groupedHeaderConfiguration];
+    content.text = NWText(@"bt.catalog.selection");
+    content.image = brandImage(self.platform == 1 ? @"android" : brandAssets()[self.platform]);
+    content.imageProperties.tintColor = UIColor.secondaryLabelColor;
+    content.imageProperties.maximumSize = CGSizeMake(18, 18);
+    header.contentConfiguration = content; return header;
+}
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     (void)table;
     if (section == 0) return NWText(@"bt.ui.emission_hint");
@@ -136,19 +163,49 @@
     UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
     NWStyleCell(cell); cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (index.section == 0 && index.row == 0) {
-        UISegmentedControl *platform = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft", @"Samsung"]];
-        platform.selectedSegmentIndex = self.platform;
-        platform.enabled = !NWBluetoothBusy();
-        platform.accessibilityIdentifier = @"nw.catalog.platform";
-        platform.accessibilityLabel = NWText(@"bt.catalog.platform");
-        [platform addTarget:self action:@selector(platformChanged:) forControlEvents:UIControlEventValueChanged];
-        platform.translatesAutoresizingMaskIntoConstraints = NO;
-        [cell.contentView addSubview:platform];
+        UIStackView *selector = [[UIStackView alloc] init];
+        selector.axis = UILayoutConstraintAxisVertical; selector.spacing = 8;
+        selector.translatesAutoresizingMaskIntoConstraints = NO;
+        NSUInteger columns = UIContentSizeCategoryIsAccessibilityCategory(self.traitCollection.preferredContentSizeCategory) ? 1 : 2;
+        for (NSUInteger row = 0; row < NW_CATALOG_PLATFORMS / columns; ++row) {
+            UIStackView *pair = [[UIStackView alloc] init]; pair.spacing = 8; pair.distribution = UIStackViewDistributionFillEqually;
+            for (NSUInteger column = 0; column < columns; ++column) {
+                NSUInteger platform = row * columns + column;
+                BOOL selected = platform == self.platform;
+                UIButtonConfiguration *configuration = selected ? [UIButtonConfiguration tintedButtonConfiguration] : [UIButtonConfiguration plainButtonConfiguration];
+                configuration.title = brandNames()[platform];
+                configuration.subtitle = platform == 1 ? @"Android · Fast Pair" : platform == 2 ? @"Windows · Swift Pair" : platform == 3 ? @"Galaxy · EasySetup" : @"iPhone / iPad";
+                configuration.image = brandImage(brandAssets()[platform]); configuration.imagePadding = 8;
+                configuration.titleLineBreakMode = NSLineBreakByWordWrapping;
+                configuration.subtitleLineBreakMode = NSLineBreakByWordWrapping;
+                configuration.baseForegroundColor = selected ? NWAccentColor() : UIColor.labelColor;
+                configuration.titleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey, id> *(NSDictionary<NSAttributedStringKey, id> *attributes) {
+                    NSMutableDictionary *result = [attributes mutableCopy];
+                    result[NSFontAttributeName] = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; return result;
+                };
+                configuration.subtitleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey, id> *(NSDictionary<NSAttributedStringKey, id> *attributes) {
+                    NSMutableDictionary *result = [attributes mutableCopy];
+                    result[NSFontAttributeName] = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2]; return result;
+                };
+                UIButton *button = [UIButton buttonWithConfiguration:configuration primaryAction:nil];
+                button.tag = platform; button.enabled = !NWBluetoothBusy();
+                button.titleLabel.numberOfLines = 0;
+                button.titleLabel.adjustsFontForContentSizeCategory = YES;
+                button.accessibilityLabel = [NSString stringWithFormat:@"%@, %@", configuration.title, configuration.subtitle];
+                if (selected) button.accessibilityTraits |= UIAccessibilityTraitSelected;
+                button.accessibilityIdentifier = [NSString stringWithFormat:@"nw.catalog.platform.%lu", (unsigned long)platform];
+                [button.heightAnchor constraintGreaterThanOrEqualToConstant:56].active = YES;
+                [button addTarget:self action:@selector(platformChanged:) forControlEvents:UIControlEventTouchUpInside];
+                [pair addArrangedSubview:button];
+            }
+            [selector addArrangedSubview:pair];
+        }
+        [cell.contentView addSubview:selector];
         [NSLayoutConstraint activateConstraints:@[
-            [platform.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
-            [platform.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
-            [platform.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:16],
-            [platform.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-16]]];
+            [selector.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:12],
+            [selector.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-12],
+            [selector.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:12],
+            [selector.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-12]]];
         return cell;
     }
     UIListContentConfiguration *content = [cell defaultContentConfiguration];
@@ -189,7 +246,7 @@
         NSDictionary *model = self.models[index.row];
         content.text = model[@"name"];
         unsigned modelIndex = [model[@"model"] unsignedIntValue];
-        content.secondaryText = [self profileIdentity:modelIndex];
+        content.secondaryText = nil;
         content.image = [UIImage systemImageNamed:self.platform == 2 ? @"desktopcomputer" : @"headphones"];
         BOOL supported = NWCatalogProfileAvailable((unsigned)self.platform, modelIndex);
         BOOL busy = NWBluetoothBusy();
@@ -289,9 +346,21 @@ int NWBluetoothCatalogUIRegressionSinglePresent(void) {
 int NWBluetoothCatalogUIRegressionCheck(void) {
     NWBluetoothCatalogViewController *controller = [NWBluetoothCatalogViewController new];
     [controller loadViewIfNeeded];
+    for (NSString *asset in @[@"apple", @"google", @"microsoft", @"samsung", @"android"])
+        if (!brandImage(asset)) return 13;
+    UITableViewCell *brands = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+    UIStackView *selectorView = (UIStackView *)brands.contentView.subviews.firstObject;
+    NSUInteger buttons = 0;
+    for (UIStackView *pair in selectorView.arrangedSubviews) for (UIButton *button in pair.arrangedSubviews) {
+        if (!button.configuration.image || !button.accessibilityLabel.length ||
+            button.tag != (NSInteger)buttons) return 14;
+        if (((button.accessibilityTraits & UIAccessibilityTraitSelected) != 0) != (buttons == controller.platform)) return 15;
+        ++buttons;
+    }
+    if (buttons != NW_CATALOG_PLATFORMS) return 16;
     for (NSUInteger platform = 0; platform < NW_CATALOG_PLATFORMS; ++platform) {
-        UISegmentedControl *selector = [[UISegmentedControl alloc] initWithItems:@[@"Apple", @"Google", @"Microsoft", @"Samsung"]];
-        selector.selectedSegmentIndex = platform;
+        UIButton *selector = [UIButton new];
+        selector.tag = platform;
         [controller platformChanged:selector];
         if (controller.platform != platform || controller.models.count != NW_CATALOG_SELECTION) return 1;
         for (unsigned attempt = 0; attempt < 25; ++attempt) {
@@ -307,7 +376,7 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
                 UITableViewCell *cell = [controller tableView:controller.tableView cellForRowAtIndexPath:
                     [NSIndexPath indexPathForRow:row inSection:1]];
                 UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
-                if (![content.text isEqual:after[row]] || ![content.secondaryText containsString:[controller profileIdentity:[controller.models[row][@"model"] unsignedIntValue]]] ||
+                if (![content.text isEqual:after[row]] || content.secondaryText != nil ||
                     cell.selectionStyle != UITableViewCellSelectionStyleNone) return 4;
                 BOOL belongs = NO;
                 for (unsigned model = 0; model < NW_CATALOG_MODELS; ++model) {

@@ -192,26 +192,28 @@
 "bt.ui.last_result" = "Última actividad";
 "bt.ui.emission_hint" = "Para emitir, apaga Bluetooth en Ajustes del iPhone.";
 "bt.ui.help_title" = "Cómo usar Bluetooth";
-"bt.ui.help" = "Escáner: activa Bluetooth y concede el permiso. Solo aparecen dispositivos que anuncian BLE.\n\nCapacidades y emisiones: apaga Bluetooth en Ajustes del iPhone. Mantén Bluetooth activado en el receptor.\n\nElige uno o tres dispositivos de una plataforma. La emisión dura 10 segundos. Detener finaliza la emisión y restaura Bluetooth.\n\nWindows requiere Swift Pair activado. Estos anuncios no implementan el emparejamiento del accesorio y su recepción no garantiza un aviso del sistema.";
+"bt.ui.help" = "Dispositivos aleatorios: elige una marca, genera seis modelos y emite uno o todos durante 10 segundos. Detener finaliza la emisión y restaura Bluetooth. Apaga Bluetooth en Ajustes del iPhone y actívalo en el receptor.\n\nEscáner: activa Bluetooth y concede el permiso para ver dispositivos que anuncian BLE.\n\nFast Pair funciona en Android compatibles de varias marcas mediante los servicios de Google. Samsung EasySetup depende del entorno Galaxy. Windows requiere Swift Pair activado. Estos anuncios no implementan un accesorio emparejable ni garantizan un aviso.";
 
-"bt.catalog.title" = "Catálogo aleatorio";
-"bt.catalog.menu_hint" = "Apple, Google, Microsoft y Samsung";
+"bt.catalog.title" = "Dispositivos aleatorios";
+"bt.catalog.menu_hint" = "Genera modelos y emite uno o todos";
 "bt.catalog.platform" = "Marca";
 "bt.catalog.selection" = "Selección";
 "bt.catalog.hint" = "Elige una marca para explorar su catálogo.";
-"bt.catalog.generate" = "Generar seis modelos";
-"bt.catalog.generate_hint" = "Todos con perfil de emisión disponible";
+"bt.catalog.generate" = "Generar otra selección";
+"bt.catalog.generate_hint" = "Seis modelos con perfil disponible";
 "bt.catalog.generated" = "Seis modelos generados";
 "bt.catalog.identity" = "ID de simulación: %@";
 "bt.catalog.local_only" = "Simulación local. Los modelos solo se muestran en NukeWireless; no se emiten anuncios Bluetooth ni avisos de emparejamiento.";
-"bt.catalog.emit" = "Emitir %lu modelos · 10 s";
-"bt.catalog.emit_hint" = "Usa todos los perfiles seleccionados";
+"bt.catalog.emit" = "Emitir todos (%lu) · 10 s";
+"bt.catalog.emit_hint" = "O toca ▶ junto a un modelo";
 "bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
-"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app28.";
+"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app31.";
 "bt.catalog.profile_available" = "Perfil de anuncio disponible";
 "bt.catalog.profile_unavailable" = "Emisión no disponible";
 "bt.catalog.emission_note" = "El anuncio incluye el modelo del perfil. Emisión manual de 10 s, sin emparejamiento ni aviso garantizado.";
 "bt.ui.attention" = "Atención";
 "bt.ui.restoring" = "Restaurando Bluetooth…";
-"bt.catalog.help" = "Elige una marca y genera una selección. Toca un modelo para emitirlo individualmente o Emitir para usar la selección completa. Solo se usan modelos con perfil disponible durante 10 segundos. Google usa Fast Pair e incluye Pixel Buds, Sony, Bose, JBL y Jabra. Se generan seis modelos emitibles.\n\nLa selección permanece en pantalla; puedes detener desde el botón o la barra superior. Si todo termina correctamente no se muestra un resultado.\n\nApaga Bluetooth en Ajustes del iPhone y actívalo en el receptor. Estos anuncios no permiten emparejar un accesorio ni garantizan un aviso.";
+"bt.catalog.help" = "Elige una marca y genera seis modelos. Toca ▶ en una tarjeta para emitir ese modelo o Emitir todos para usar la selección completa durante 10 segundos. Puedes detener desde la barra superior. La selección permanece abierta y los resultados correctos no se muestran.\n\nGoogle usa Fast Pair: incluye accesorios Pixel, Sony, Bose, JBL y Jabra, para Android compatibles con los servicios de Google. Samsung usa EasySetup; sus avisos dependen del entorno Galaxy. No hay un aviso universal para todos los Android.\n\nApaga Bluetooth en Ajustes del iPhone y actívalo en el receptor. Los anuncios no permiten emparejar un accesorio ni garantizan un aviso.";
 "bt.catalog.single_hint" = "Toca el botón de reproducción de un modelo para emitirlo durante 10 segundos.";
+
+"bt.ui.emission" = "Emisión";

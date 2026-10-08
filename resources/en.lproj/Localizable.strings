@@ -192,26 +192,28 @@
 "bt.ui.last_result" = "Last activity";
 "bt.ui.emission_hint" = "To advertise, turn Bluetooth off in iPhone Settings.";
 "bt.ui.help_title" = "Using Bluetooth";
-"bt.ui.help" = "Scan: turn on Bluetooth and allow access. Only devices advertising BLE are shown.\n\nCapabilities and emissions: turn off Bluetooth in iPhone Settings. Keep Bluetooth enabled on the receiver.\n\nChoose one or three devices for a platform. Emissions last 10 seconds. Stop ends the emission and restores Bluetooth.\n\nWindows requires Swift Pair enabled. These announcements do not implement accessory pairing, and reception does not guarantee a system notification.";
+"bt.ui.help" = "Random devices: choose a brand, generate six models and advertise one or all for 10 seconds. Stop ends advertising and restores Bluetooth. Turn Bluetooth off in iPhone Settings and on at the receiver.\n\nScanner: turn on Bluetooth and allow access to see devices advertising BLE.\n\nFast Pair works on compatible Android phones from several brands through Google services. Samsung EasySetup depends on the Galaxy environment. Windows requires Swift Pair enabled. These announcements do not implement a pairable accessory or guarantee a notification.";
 
-"bt.catalog.title" = "Random catalog";
-"bt.catalog.menu_hint" = "Apple, Google, Microsoft and Samsung";
+"bt.catalog.title" = "Random devices";
+"bt.catalog.menu_hint" = "Generate models and advertise one or all";
 "bt.catalog.platform" = "Brand";
 "bt.catalog.selection" = "Selection";
 "bt.catalog.hint" = "Choose a brand to explore its catalog.";
-"bt.catalog.generate" = "Generate six models";
-"bt.catalog.generate_hint" = "All with available advertising profiles";
+"bt.catalog.generate" = "Generate another selection";
+"bt.catalog.generate_hint" = "Six models with available profiles";
 "bt.catalog.generated" = "Six models generated";
 "bt.catalog.identity" = "Simulation ID: %@";
 "bt.catalog.local_only" = "Local simulation. These models are displayed only in NukeWireless; no Bluetooth advertisements or pairing alerts are emitted.";
-"bt.catalog.emit" = "Advertise %lu models · 10 s";
-"bt.catalog.emit_hint" = "Uses all selected profiles";
+"bt.catalog.emit" = "Advertise all (%lu) · 10 s";
+"bt.catalog.emit_hint" = "Or tap ▶ beside a model";
 "bt.catalog.partial" = "Only models with an available profile are advertised";
-"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app28.";
+"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app31.";
 "bt.catalog.profile_available" = "Advertising profile available";
 "bt.catalog.profile_unavailable" = "Advertising unavailable";
 "bt.catalog.emission_note" = "The advertisement includes the profile model. Manual 10 s advertising, without pairing or guaranteed notifications.";
 "bt.ui.attention" = "Attention";
 "bt.ui.restoring" = "Restoring Bluetooth…";
-"bt.catalog.help" = "Choose a brand and generate a selection. Tap a model to advertise it individually, or Advertise to use the full selection. Only models with an available profile are used for 10 seconds. Google uses Fast Pair and includes Pixel Buds, Sony, Bose, JBL and Jabra. Six available models are generated.\n\nThe selection stays on screen; stop from the button or the top bar. No result is displayed when everything finishes correctly.\n\nTurn Bluetooth off in iPhone Settings and on at the receiver. These advertisements do not provide accessory pairing or guarantee a notification.";
+"bt.catalog.help" = "Choose a brand and generate six models. Tap ▶ on a card to advertise that model, or Advertise all to use the full selection for 10 seconds. Stop from the top bar. The selection stays open and successful results are hidden.\n\nGoogle uses Fast Pair: Pixel, Sony, Bose, JBL and Jabra accessories for compatible Android devices with Google services. Samsung uses EasySetup; its notifications depend on the Galaxy environment. There is no universal notification for every Android device.\n\nTurn Bluetooth off in iPhone Settings and on at the receiver. These advertisements do not provide accessory pairing or guarantee a notification.";
 "bt.catalog.single_hint" = "Tap a model’s play button to advertise it for 10 seconds.";
+
+"bt.ui.emission" = "Advertising";

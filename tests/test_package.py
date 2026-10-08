@@ -55,6 +55,10 @@ class PackageTests(unittest.TestCase):
         bundle = package.APP+'NukeWirelessResources.bundle/'
         vendors = plistlib.loads(self.after[bundle+'oui_vendors.plist'][1])
         self.assertTrue(self.after[bundle+'CreditsAvatar.png'][1].startswith(b'\x89PNG\r\n\x1a\n'))
+        for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
+            data = self.after[bundle+'brands/'+brand+'.pdf'][1]
+            self.assertTrue(data.startswith(b'%PDF-'))
+            self.assertEqual(data, (ROOT / 'resources/brands' / (brand+'.pdf')).read_bytes())
         self.assertGreater(len(vendors),30000)
         self.assertTrue(all(re.fullmatch('[0-9A-F]{6}',k) and isinstance(v,str) and v for k,v in vendors.items()))
         languages = []

@@ -22,6 +22,7 @@ def fixture(app):
         CFBundleName='NukeWireless', CFBundleDevelopmentRegion='en', CFBundleLocalizations=['en', 'es'],
         CFBundlePackageType='BNDL')))
     shutil.copyfile(ROOT / 'resources/CreditsAvatar.png', bundle / 'CreditsAvatar.png')
+    shutil.copytree(ROOT / 'resources/brands', bundle / 'brands', dirs_exist_ok=True)
     for language in ['en', 'es']:
         nested = bundle / f'{language}.lproj'; nested.mkdir(exist_ok=True)
         shutil.copyfile(ROOT / f'resources/{language}.lproj/Localizable.strings', nested / 'Localizable.strings')
