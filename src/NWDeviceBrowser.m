@@ -209,6 +209,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     [table deselectRowAtIndexPath:index animated:YES];
     if (index.row < 0 || index.row >= (NSInteger)self.rows.count) return;
     NSDictionary *row = [self.rows[index.row] copy];
+    [self.search.searchBar endEditing:YES];
     [self.view endEditing:YES];
     [self showDeviceActions:row anchor:[table cellForRowAtIndexPath:index] ?: table];
 }
