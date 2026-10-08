@@ -6,6 +6,7 @@ import struct
 from pathlib import Path
 from bluetooth_manifest import ROOT, sha, sources
 from compat_macho import inspect
+from compat_layout import SCHEMES, ordered_entries
 from package_utils import directory, regular, pack_ar, tar_bytes
 
 VERSION = '0.0.3~app31'
@@ -48,7 +49,9 @@ def inspect_tool(data):
     if '@rpath/NukeBluetoothBridge.dylib' not in result['loads']: raise ValueError('companion library not linked')
     return result
 
-def build(artifact, output):
+def build(artifact, output, scheme='roothide'):
+    prefix, _, architecture, label = SCHEMES[scheme]
+    root = '/' + prefix.rstrip('/') if prefix else ''
     report = json.loads((artifact / 'bluetooth-manifest.json').read_text(encoding='utf-8'))
     if report['version'] != VERSION or report['sources'] != sources():
         raise ValueError('stale Bluetooth inspector sources')
@@ -61,32 +64,37 @@ def build(artifact, output):
     control = f'''Package: com.gokuencinar.nukewireless.bluetooth
 Name: NukeWireless Bluetooth Bridge (Research)
 Version: {PACKAGE_VERSION}
-Architecture: iphoneos-arm64e
+Architecture: {architecture}
 Section: Development
-Maintainer: Gokuencinar
-Author: Gokuencinar
-Depends: firmware (>= 16.3), firmware (<< 16.4), rootless-compat, ldid
-Description: Experimental native Bluetooth diagnostics for NukeWireless. Finite configurable echoes, cancellation and independent service recovery. Restricted to the inspected iPhone XS / iOS 16.3.1. Configurable options in milliseconds require app dev25 or later.
+Maintainer: GokuEn
+Author: GokuEn
+Depends: firmware (>= 15.0), firmware (<< 19.0), ldid{', rootless-compat' if scheme == 'roothide' else ''}
+Description: Guarded experimental Bluetooth worker for NukeWireless ({label}). Native operations remain restricted to iPhone XS / iOS 16.3.1. Other systems can query availability but are not admitted for radio operations.
 '''.encode()
-    postinst = b'''#!/bin/sh
+    postinst = f'''#!/bin/sh
 set -e
-ldid -Hsha256 -M -S/usr/share/nukewireless-bluetooth/inspector.entitlements /usr/bin/nwbt-inspect
-ldid -Hsha256 -M -S/usr/share/nukewireless-bluetooth/inspector.entitlements /usr/bin/nwbt-run
-ldid -Hsha256 -S /usr/lib/NukeBluetoothBridge.dylib
-chown root:wheel /usr/bin/nwbt-run
-chmod 4755 /usr/bin/nwbt-run
+ldid -Hsha256 -M -S{root}/usr/share/nukewireless-bluetooth/inspector.entitlements {root}/usr/bin/nwbt-inspect
+ldid -Hsha256 -M -S{root}/usr/share/nukewireless-bluetooth/inspector.entitlements {root}/usr/bin/nwbt-run
+ldid -Hsha256 -S {root}/usr/lib/NukeBluetoothBridge.dylib
+chown root:wheel {root}/usr/bin/nwbt-run
+chmod 4755 {root}/usr/bin/nwbt-run
 exit 0
-'''
+'''.encode()
+    report.update(scheme=scheme, architecture=architecture, bootstrap=label,
+                  native_runtime_allowlist=[{'machine': 'iPhone11,2', 'ios': '16.3.1'}],
+                  verified_bootstrap='roothide', runtime_verified=False)
     entries = [directory(path) for path in ['usr', 'usr/bin', 'usr/lib', 'usr/share', 'usr/share/nukewireless-bluetooth']]
     entries += [regular('usr/bin/nwbt-inspect', tool, 0o755), regular('usr/bin/nwbt-run', runner, 0o755),
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'NukeWireless Info > Bluetooth uses nwbt-run --ping-ms ADDRESS COUNT INTERVAL_MS. Defaults: 5 and 1000 ms. Count: 1-20, interval: 1000-5000 ms, count * interval <= 20000. The legacy --ping ADDRESS [COUNT INTERVAL_SECONDS] keeps its seconds semantics. One-second response deadline per echo and a bounded 20-second ping window; delays may leave partial results. Bluetooth must be off in Settings and the target in pairing mode. Only iPhone XS / iOS 16.3.1 / RootHide is admitted. The runner verifies its app caller and uses an independent recovery child before exclusive service access. No firmware modification, pairing-key storage, audio channel, or flooding. Raw nwbt-inspect diagnostics still require operator-managed recovery. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'Bluetooth > Random catalog supports individual or selected-model lab advertisements for 10 seconds, with cooperative Stop and independent service recovery. Native transport admits only iPhone XS / iOS 16.3.1; only RootHide has device verification. Other iOS versions retain the ABI guard and report unsupported. Package layout alone does not validate native radio operations. The runner validates the complete installed app caller path under the same bootstrap. No pairing keys, address rotation or link disconnection. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+    for member, _ in entries:
+        member.name = './' + prefix + member.name.removeprefix('./')
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pack_ar([('debian-binary', b'2.0\n'),
         ('control.tar.gz', tar_bytes([regular('control', control), regular('postinst', postinst, 0o755)])),
-        ('data.tar.gz', tar_bytes(entries))]))
+        ('data.tar.gz', tar_bytes(ordered_entries(entries)))]))
     report['package_sha256'] = sha(output.read_bytes())
     report['package_version'] = PACKAGE_VERSION
     report['runtime_verified'] = False
@@ -96,5 +104,11 @@ exit 0
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--artifact', type=Path, required=True)
-    parser.add_argument('--output', type=Path, default=ROOT / f'dist/bluetooth/com.gokuencinar.nukewireless.bluetooth_{PACKAGE_VERSION}_iphoneos-arm64e.deb')
-    args = parser.parse_args(); build(args.artifact, args.output)
+    parser.add_argument('--scheme', choices=['all', *SCHEMES], default='roothide')
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    if args.scheme == 'all' and args.output:
+        parser.error('--output specifies one package; use a single --scheme')
+    for scheme in SCHEMES if args.scheme == 'all' else [args.scheme]:
+        output = args.output or ROOT / f'dist/bluetooth/com.gokuencinar.nukewireless.bluetooth_{PACKAGE_VERSION}_{SCHEMES[scheme][2]}.deb'
+        build(args.artifact, output, scheme)

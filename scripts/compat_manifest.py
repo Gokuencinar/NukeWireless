@@ -3,7 +3,9 @@ import json
 from build_manifest import ROOT, sha
 
 SOURCES = ["src/compat/NWLegacyPaths.c", "scripts/build_compat.sh",
-           "scripts/compat_manifest.py", "scripts/build_compat_debs.py", "scripts/compat_macho.py"]
+           "scripts/compat_manifest.py", "scripts/build_compat_debs.py", "scripts/compat_macho.py",
+           "scripts/compat_layout.py", "scripts/build_bluetooth_deb.py",
+           "scripts/test_ui_simulator.sh", ".github/workflows/compat-build.yml"]
 
 def compat_sources():
     return {name: sha((ROOT / name).read_bytes().replace(b"\r\n", b"\n")) for name in SOURCES}

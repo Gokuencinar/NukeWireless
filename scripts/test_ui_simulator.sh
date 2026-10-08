@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+minimum_ios="${NW_MIN_IOS:-16.3}"
+case "$minimum_ios" in
+  15.0|16.3) ;;
+  *) echo "Unsupported simulator deployment target: $minimum_ios" >&2; exit 1 ;;
+esac
 cd "$(dirname "$0")/.."
 sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 arch="$(uname -m)"
@@ -16,21 +21,21 @@ collect_ui_artifacts() {
   done
 }
 trap collect_ui_artifacts EXIT
-xcrun --sdk iphonesimulator clang -arch "$arch" -mios-simulator-version-min=16.3 -isysroot "$sdk" \
-  -Wall -Wextra -Werror -fobjc-arc -fblocks -fPIC -O2 -dynamiclib -DNW_UI_TESTING \
+xcrun --sdk iphonesimulator clang -arch "$arch" "-mios-simulator-version-min=$minimum_ios" -isysroot "$sdk" \
+  -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -fPIC -O2 -dynamiclib -DNW_UI_TESTING \
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   src/NukeWirelessInfo.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
-xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios16.3-simulator" -sdk "$sdk" -parse-as-library \
+xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios$minimum_ios-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
-python3 - "$out/UIRegression.app/Info.plist" <<'PY'
+python3 - "$out/UIRegression.app/Info.plist" "$minimum_ios" <<'PY'
 import plistlib,sys
 with open(sys.argv[1], 'wb') as f:
     plistlib.dump(dict(CFBundleIdentifier='app.nukewireless.ui-regression', CFBundleName='UIRegression',
         CFBundleExecutable='UIRegression', CFBundlePackageType='APPL', CFBundleVersion='1',
-        CFBundleShortVersionString='1', MinimumOSVersion='16.3', UILaunchScreen={},
+        CFBundleShortVersionString='1', MinimumOSVersion=sys.argv[2], UILaunchScreen={},
         NSBluetoothAlwaysUsageDescription='Scan nearby BLE devices',
         UIApplicationSceneManifest={'UIApplicationSupportsMultipleScenes': False}), f)
 PY
@@ -40,6 +45,15 @@ codesign -s - --force "$out/UIRegression.app"
 device="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if "iPhone" in x["name"]))')"
 xcrun simctl boot "$device" || true
 xcrun simctl bootstatus "$device" -b
+python3 - "$out/runtime.json" "$device" "$minimum_ios" <<'PY'
+import json, subprocess, sys
+inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', '--json']))
+runtime, phone = next((runtime, phone) for runtime, phones in inventory['devices'].items()
+                      for phone in phones if phone['udid'] == sys.argv[2])
+with open(sys.argv[1], 'w', encoding='utf-8') as stream:
+    json.dump(dict(runtime=runtime, device=phone['name'], deployment_target=sys.argv[3],
+                   physical_device=False), stream, indent=2)
+PY
 xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
 for language in en es; do

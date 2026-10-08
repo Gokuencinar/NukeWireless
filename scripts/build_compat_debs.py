@@ -13,34 +13,10 @@ from build_manifest import ROOT, sha
 from build_nuke_info_deb import build, read_tar, APP, EXPECTED_SOURCE_SHA256
 from compat_manifest import compat_sources
 from compat_macho import compatible_aegis, inspect, thin_arm64
-from package_utils import directory, regular, read_ar, get_tar_member, pack_ar, tar_bytes
+from compat_layout import SCHEMES, ordered_entries
+from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "1.0.25+rh25.6~compat2"
-SCHEMES = {
-    "roothide": ("", "usr/lib/TweakInject", "iphoneos-arm64e", "Dopamine RootHide / Relaxin"),
-    "rootless": ("var/jb/", "Library/MobileSubstrate/DynamicLibraries", "iphoneos-arm64", "Dopamine rootless"),
-    "rootful": ("", "Library/MobileSubstrate/DynamicLibraries", "iphoneos-arm", "Rootful"),
-}
-
-def ordered_entries(entries):
-    """Supply all parents before children; reject collisions instead of overwriting."""
-    files = {}; dirs = {}
-    for member, data in entries:
-        name = member.name.removeprefix("./").strip("/")
-        if not name:
-            continue
-        member = copy.copy(member); member.name = "./" + name
-        if member.isdir():
-            dirs.setdefault(name, (member, None)); continue
-        if name in files:
-            raise ValueError("duplicate package file: " + name)
-        files[name] = (member, data)
-        for parent in Path(name).parents:
-            path = parent.as_posix()
-            if path != ".": dirs.setdefault(path, directory(path))
-    if files.keys() & dirs.keys():
-        raise ValueError("package file/directory collision")
-    return [dirs[name] for name in sorted(dirs, key=lambda x: (x.count("/"), x))] + [files[name] for name in sorted(files)]
+VERSION = "1.0.25+rh25.6~compat3"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -49,7 +25,8 @@ set -e
 ENT={root}/usr/share/nukewireless-roothide/roothide.entitlements
 APP={root}/Applications/HarpyReloaded.app/HarpyReloaded
 BASE={root}/usr/libexec/harpy-reloaded
-for executable in "$APP" "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
+ldid -Hsha256 -M -Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"
+for executable in "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
     ldid -Hsha256 -M "-S$ENT" "$executable"
 done
 ldid -S {root}/{inject}/NukeWirelessPaths.dylib
@@ -74,7 +51,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.2", MinimumOSVersion="15.0")
+    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.3", MinimumOSVersion="15.0")
     replacement = {
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
@@ -102,7 +79,10 @@ def package(scheme, core, artifact, output):
     # Explicit status included with every candidate; no unsupported validation claim.
     report = {"version": VERSION, "scheme": scheme, "bootstrap": label,
               "architecture": architecture, "minimum_ios": "15.0", "maximum_ios_exclusive": "19.0",
-              "runtime_verified": False, "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
+              "runtime_verified": False, "source_core_version": core_manifest["version"],
+              "app_signing_identifier": "me.midnightchips.harpy-reloaded",
+              "bluetooth_native_verified_environment": {"machine": "iPhone11,2", "ios": "16.3.1", "bootstrap": "roothide"},
+              "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
               "core": core_manifest, "baseline_sha256": EXPECTED_SOURCE_SHA256,
               "development_core_sha256": sha(core)}
@@ -114,8 +94,8 @@ def package(scheme, core, artifact, output):
 Name: NukeWireless
 Version: {VERSION}
 Architecture: {architecture}
-Author: Gokuencinar
-Maintainer: Gokuencinar
+Author: GokuEn
+Maintainer: GokuEn
 Section: Utilities
 {predepends}Depends: firmware (>= 15.0), firmware (<< 19.0), ldid, arpoison, network-cmds, {hooks}
 Conflicts: xyz.cypwn.harpy-reloaded
@@ -135,10 +115,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat2")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat3")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.
+    (ROOT / "work").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="nuke-compat-", dir=ROOT / "work") as temporary:
         staged = Path(temporary) / "core.deb"
         build(args.baseline, args.artifact, staged)

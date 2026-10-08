@@ -33,4 +33,4 @@ if __name__ == '__main__':
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
         'version': '1.0.25+rh25.5~dev52', 'target': args.target,
-    }, indent=2) + '\n')
+    }, indent=2) + '\n', encoding='utf-8')

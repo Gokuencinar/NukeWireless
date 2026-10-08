@@ -62,7 +62,7 @@ def build(source, artifact, output):
     if sha(raw) != EXPECTED_SOURCE_SHA256:
         raise ValueError("baseline must be the current pinned rh25.3 package")
     library = (artifact / "NukeWirelessInfo_ios.dylib").read_bytes()
-    manifest = json.loads((artifact / "build-manifest.json").read_text())
+    manifest = json.loads((artifact / "build-manifest.json").read_text(encoding="utf-8"))
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
     if manifest["version"] != VERSION or b"NWBuild-rh25.5-dev52" not in library:
@@ -148,7 +148,7 @@ def build(source, artifact, output):
               "extension":manifest, "app_before":sha(executable),"app_after":sha(replacement[APP+"HarpyReloaded"]),
               "changed_existing_files": sorted(replacement), "changed_control_files": ["control", "postinst"],
               "app_signing_identifier": "me.midnightchips.harpy-reloaded", "release_published":False}
-    output.with_suffix(".manifest.json").write_text(json.dumps(report,indent=2)+"\n")
+    output.with_suffix(".manifest.json").write_text(json.dumps(report,indent=2)+"\n", encoding="utf-8")
     print(output); print("sha256",report["package_sha256"])
     return report
 

@@ -1,107 +1,121 @@
-# Candidatas de compatibilidad iOS 15–18
+# Candidatas de compatibilidad iOS 15–18: compat3
 
-La referencia funcional sigue siendo dev18; dev19 está instalada y sus funciones
-nuevas están pendientes de comprobación. Este port genera **candidatas
-experimentales**, no una afirmación de funcionamiento en dispositivos que no
-se han probado. El único dispositivo disponible es iOS 16.3.1 con Dopamine
-RootHide; no se instala automáticamente este port sobre él.
+Preparadas desde las fuentes de **dev52**, conservando el trabajador **app31**.
+La referencia instalada y aceptada sigue siendo dev52 en iPhone XS / iOS 16.3.1 /
+Dopamine RootHide. `compat1` y `compat2` pertenecen a dev18/dev19 y no contienen
+la interfaz actual: no reutilizar sus artefactos para esta entrega.
 
-## Variantes
+El usuario no dispone de otros dispositivos para probar. El mínimo de build
+15.0 y la dependencia de instalación `< 19.0` delimitan una candidata; **no
+acreditan funcionamiento completo en iOS 15, 17, 18 ni otros bootstraps**.
 
-| Paquete | Arquitectura Debian | Ubicación de la app | Bibliotecas inyectadas | Entorno previsto |
+## Paquetes separados
+
+| Variante | Arquitectura Debian | App | Inyección | Entorno previsto |
 | --- | --- | --- | --- | --- |
-| RootHide | iphoneos-arm64e | /Applications/HarpyReloaded.app | /usr/lib/TweakInject | Dopamine RootHide y Relaxin con bootstrap RootHide |
-| Rootless | iphoneos-arm64 | /var/jb/Applications/HarpyReloaded.app | /var/jb/Library/MobileSubstrate/DynamicLibraries | Dopamine convencional |
-| Rootful | iphoneos-arm | /Applications/HarpyReloaded.app | /Library/MobileSubstrate/DynamicLibraries | Jailbreak rootful que soporte el dispositivo/iOS |
+| RootHide | iphoneos-arm64e | /Applications/HarpyReloaded.app | /usr/lib/TweakInject | Bootstrap RootHide |
+| Dopamine rootless | iphoneos-arm64 | /var/jb/Applications/HarpyReloaded.app | /var/jb/Library/MobileSubstrate/DynamicLibraries | Dopamine convencional |
+| Rootful | iphoneos-arm | /Applications/HarpyReloaded.app | /Library/MobileSubstrate/DynamicLibraries | Jailbreak rootful compatible con el equipo/iOS |
 
-Las tres variantes conservan `com.gokuencinar.nukewireless`, el bundle ID,
-las preferencias y los identificadores privados del ejecutable. Se instala
-solo la variante correspondiente al bootstrap. Las arquitecturas Debian no
-son arquitecturas Mach-O: la app conservada y sus extensiones son **arm64**,
-también en el paquete RootHide. No hay soporte para procesos de 32 bits.
+Solo instalar la variante del bootstrap real. Todas contienen Mach-O **arm64**;
+la etiqueta Debian RootHide no convierte la app en arm64e. Conservan los IDs
+de paquete y el bundle ID `me.midnightchips.harpy-reloaded` para preferencias,
+datos y permiso Bluetooth. El script de firma fija también ese identificador
+en el CodeDirectory; se corrige la omisión de las candidatas antiguas.
 
-Objetivo de compilación y dependencia de instalación: iOS 15.0–18.x. Eso no
-crea un jailbreak para cada modelo/versión. Hay que comprobar primero la
-matriz real del jailbreak; RootHide es un esquema de bootstrap, no una versión
-de iOS. Relaxin usa la candidata RootHide solo en sus instalaciones RootHide.
+La app tiene versión `1.0.25+rh25.6~compat3`, CFBundleVersion `25.6.3` y manifiesto
+que identifica el núcleo dev52. El marcador compilado del núcleo sigue siendo
+`NWBuild-rh25.5-dev52`. No se cambia la versión de la biblioteca Bluetooth:
+sus fuentes y restricciones no se han ampliado.
 
-## Qué cambia
+## Adaptación actual
 
-- La extensión de interfaz se recompila con mínimo iOS 15.0 y avisos
-  de disponibilidad tratados como errores. Conserva idioma, Info, copia,
-  Actualizar, bloqueo masivo y diseño.
-- `compat1` corresponde a dev18; `compat2` incorpora el panel de búsqueda,
-  filtros, ordenación y los colores de dev19. Sus funciones nuevas se limitan
-  a presentación y preferencias, según [DEVICE-BROWSER.md](DEVICE-BROWSER.md).
-- `src/compat/NWLegacyPaths.c` recupera el adaptador del commit
-  `29614397b9b3744f65bfa00aefaa734c3477b9d0` del checkout histórico. El hash de
-  su prebuilt coincide **exactamente** con `NukeWirelessPaths.dylib` de rh25.3:
-  `33244c638df562b6a16899a82e0fb7045fc96713ac276f4069037941c403db78`.
-  Hash SHA-256 de la fuente recuperada, con LF:
-  `39352e26eaf6e1d2e08fd661757683e69e884fbc108c506768f17f0f200ebcc8`.
-- Se recompila ese adaptador para iOS 15. No se reduce simplemente el campo
-  de versión mínima de las antiguas bibliotecas compiladas para iOS 16.3.
-- Las candidatas emplean **un solo adaptador**: retiran la segunda copia,
-  `HarpyRootHidePaths.dylib`, que también requiere 16.3 y sobreescribe los
-  mismos métodos. Este cambio necesita comprobación funcional propia.
-- La raíz de recursos se deriva de la ubicación real de la app. `/Applications`
-  equivale a raíz sin prefijo; se evita añadir `/var/jb` dos veces al procesar
-  argumentos. Las rutas Apple y los datos del usuario no se prefijan.
-- Antes de intervenir en el desbloqueo Swift se verifican los bytes de las
-  entradas del ejecutable fijado. El filtro y el guard interno seleccionan
-  únicamente `me.midnightchips.harpy-reloaded`.
-- Aegis conserva la validación del **camino completo del proceso padre** y
-  exige que app y auxiliar estén en la misma raíz. Se adapta el control ya
-  presente en arm64e a arm64, con offsets e instrucciones verificados y hash
-  del binario original obligatorio. No se permite un padre arbitrario.
-- El puente opcional antiguo de `libjailbreak` comprueba ahora las dos
-  direcciones devueltas por `dlsym` antes de invocarlas. Si una implementación
-  nueva no exporta esos símbolos, el auxiliar no llama a una dirección nula.
-- Los auxiliares se empaquetan con su slice arm64. Las firmas se renuevan al
-  instalar. Los enlaces `.roothidepatch` y `rootless-compat` se conservan
-  exclusivamente en RootHide; los otros paquetes usan `mobilesubstrate`.
-- El constructor inspecciona mínimos de iOS y dependencias enlazadas de cada
-  Mach-O empaquetado. Rechaza artefactos antiguos, fuentes distintas y binarios
-  que requieran iOS superior a 15.
+- Un solo listado de fuentes: `build_compat.sh` reutiliza `build_extension.sh`
+  con `NW_MIN_IOS=15.0`. Incluye `NWMainTabs` y `NWBluetoothCatalog`, ausentes
+  del build histórico. El build de desarrollo habitual conserva mínimo 16.3.
+- La compilación trata los usos de API sin guard de disponibilidad como error.
+  El mismo parámetro permite compilar la regresión del simulador con mínimo 15.
+  Su `runtime.json` identifica el iOS realmente ejecutado: no equivale a probar
+  todos los sistemas desde el deployment target.
+- Se conservan las cuatro pestañas, catálogo de seis modelos, emisión individual
+  o de todos, Detener, final silencioso, logos alineados, créditos GokuEn y
+  acciones Wi-Fi desde resultados de búsqueda.
+- El adaptador de rutas recuperado se recompila para iOS 15. Se retira la copia
+  `HarpyRootHidePaths.dylib`, que requiere 16.3 y sobrescribe los mismos métodos.
+  Esa sustitución requiere una aceptación física propia.
+- Las rutas se derivan de la app y auxiliares instalados. El mismo esquema se
+  aplica a `nwbt-run`, `nwbt-inspect`, biblioteca y sus scripts de firma.
+  RootHide mantiene sus enlaces `.roothidepatch` y `rootless-compat`; las otras
+  variantes no los llevan.
+- Aegis conserva la comprobación del camino completo del padre en la misma
+  raíz. El port arm64 verifica hash, offsets e instrucciones de la base antes
+  de adaptar la whitelist y proteger los símbolos opcionales de libjailbreak.
+  No se reduce artificialmente el deployment target de binarios antiguos.
+- Cada Mach-O se inspecciona: arquitectura, mínimo de iOS y dependencias. Los
+  manifiestos rechazan fuentes o hashes distintos. Las pruebas inspeccionan
+  los tres esquemas, firma, recursos, padres, duplicados y rechazos de artefactos.
 
-## Construcción reproducible
+## Bluetooth y funciones privadas
+
+El catálogo visual y el escáner CoreBluetooth no dependen de que esté admitida
+la emisión nativa. Los paquetes del trabajador admiten instalación en el rango
+experimental, pero `--status` y `NWBTNativeGuard` siguen restringiendo el
+transporte a **iPhone11,2 / iOS 16.3.1** y a los bytes inspeccionados de la biblioteca
+privada. Solo RootHide tiene evidencia funcional en dispositivo; cambiar el
+prefijo para Dopamine o rootful no valida restauración ni acceso al controlador.
+
+No se quitan guards para aparentar soporte general. En otras combinaciones los
+controles de emisión quedan no disponibles. Para ampliarlos hay que observar
+el controlador, firmas privadas, registro IOKit y recuperación del servicio en
+la build exacta; una respuesta HCI no demuestra recepción ni aviso del receptor.
+
+El núcleo Swift original se conserva como binario, sin su fuente completa.
+Foundation/NSTask, MobileWiFi y los auxiliares pueden variar. Wi-Fi, escaneo BLE,
+emisión y apariencia necesitan evidencias separadas.
+
+## Construcción y comprobaciones
 
 En macOS con Xcode:
 
 ```bash
 bash scripts/build_compat.sh
+NW_MIN_IOS=15.0 bash scripts/test_ui_simulator.sh
 python3 scripts/build_compat_debs.py \
   dist/com.gokuencinar.nukewireless_1.0.25+rh25.3_iphoneos-arm64e.deb \
   --artifact build/audit
+python3 scripts/build_bluetooth_deb.py --artifact build/bluetooth --scheme all
+python3 tests/test_compat_package.py --artifact build
 ```
 
-El workflow `compat-build.yml` compila y conserva un artefacto temporal;
-no instala, publica releases ni modifica un repositorio de paquetes. La base
-rh25.3 se necesita localmente y está fijada por SHA-256. Cada `.deb` tiene un
-manifiesto adjunto y `compatibility.json` con `runtime_verified: false`.
+`compat-build.yml` compila ambas bibliotecas, auxiliar Bluetooth y regresión de
+navegación/segundo plano en español e inglés con macOS 15. Conserva artefactos
+privados temporales; no publica releases ni instala en dispositivos. La base
+rh25.3 se necesita localmente y está fijada por SHA-256. Los paquetes de app
+salen en `dist/compat3`; los auxiliares en `dist/bluetooth`.
 
-## Qué falta demostrar
+Cada candidata incluye `compatibility.json` y un manifiesto externo con
+`runtime_verified: false`. Consultar el informe de esta entrega para el resultado
+real de CI y paquete; no confundir estas instrucciones con pruebas ejecutadas.
 
-Todavía no se han observado arranque, carga de la extensión, dos escaneos,
-bloqueo/desbloqueo, lectura de SSID/BSSID ni restauración de red en iOS 15,
-17 o 18. Foundation/NSTask, MobileWiFi y las restricciones de ejecución de
-auxiliares pueden variar entre sistemas y bootstraps. Sus símbolos y métodos
-en las versiones nuevas requieren observación, además de un build correcto.
-El núcleo Swift original se conserva en binario: este repositorio no contiene
-su fuente completa ni puede garantizar sus llamadas privadas en otro iOS.
+## Validación física pendiente y recuperación
 
-Antes de distribuir una variante como estable: instalar en su dispositivo de
-destino, comprobar arranque y escaneo, autorizar un ciclo de bloqueo/desbloqueo
-y verificar que no queden auxiliares activos. Para volver atrás en el iPhone
-actual, reinstalar la deb dev18 conservada mediante `dpkg -i` y abrir la app.
-No instalar una variante de otro esquema ni forzar su arquitectura.
+Antes de declarar estable una combinación: arranque, carga de extensión,
+permisos, dos escaneos, SSID/BSSID, menú Wi-Fi y nombres; bloqueo/desbloqueo
+solo en red y equipos propios autorizados. Para el transporte Bluetooth:
+terminación, Detener, repetición y restauración, más recepción externa cuando
+se pretenda acreditar un anuncio. Comprobar que no quedan auxiliares activos.
 
-## Referencias contrastadas el 4 de octubre de 2026
+No instalar otra arquitectura con `--force`. Para recuperar el dispositivo
+actual, reinstalar el paquete **dev52 verificado** y su trabajador app31 desde
+el mismo bootstrap; no usar la instrucción histórica de recuperar dev18.
+No son necesarios resprings ni reinicios generales por rutina.
 
-- [Theos: rootless, prefijos y arquitecturas de paquete](https://theos.dev/docs/rootless).
-- [RootHide: port de aplicaciones y requisitos de firma](https://github.com/roothide/Developer).
-- [Dopamine: soporte actual por dispositivo/iOS](https://ellekit.space/dopamine/).
-- [Relaxin: proyecto oficial](https://github.com/owngoal-dev/Relaxin).
-- Referencia local del usuario: BandLock 1.0/1.2, variantes Dopamine,
-  RootHide y Rootful. Sus descripciones también distinguen iOS experimentales;
-  compartir empaquetado no demuestra las APIs de red de NukeWireless.
+## Fuentes primarias consultadas el 8 de octubre de 2026
+
+- [Theos: rootless](https://theos.dev/docs/rootless).
+- [RootHide: adaptación y firma](https://github.com/roothide/Developer).
+- [Dopamine: soporte por chip y versión](https://github.com/opa334/Dopamine).
+
+La existencia de un jailbreak para un iOS no demuestra compatibilidad de las
+API privadas de NukeWireless. Rootful describe un esquema de instalación,
+no un jailbreak disponible para cualquier dispositivo/iOS.

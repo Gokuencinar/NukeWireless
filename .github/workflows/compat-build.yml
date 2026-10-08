@@ -1,4 +1,4 @@
-name: iOS 15 compatibility candidates
+name: iOS 15-18 compatibility candidates
 on:
   push:
     branches: [audit-rh25.5]
@@ -10,18 +10,26 @@ on:
       - 'scripts/startup_resources.py'
       - 'scripts/build_compat*'
       - 'scripts/compat_*'
+      - 'scripts/build_bluetooth_inspector.sh'
+      - 'scripts/bluetooth_manifest.py'
+      - 'scripts/build_bluetooth_deb.py'
+      - 'scripts/test_ui_simulator.sh'
+      - 'tests/**'
       - '.github/workflows/compat-build.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   compile:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Compile app adapters and launch resources for iOS 15
+      - name: Compile current app, adapter and guarded Bluetooth worker for iOS 15
         run: bash scripts/build_compat.sh
+      - name: Navigation and background regression with iOS 15 deployment target
+        run: NW_MIN_IOS=15.0 bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: nuke-wireless-compatibility
           path: |
@@ -31,4 +39,11 @@ jobs:
             build/audit/compat-manifest.json
             build/audit/NukeLaunch.storyboardc/
             build/audit/NWBootPic.png
+            build/bluetooth/NukeBluetoothBridge.dylib
+            build/bluetooth/nwbt-run
+            build/bluetooth/nwbt-inspect
+            build/bluetooth/bluetooth-manifest.json
+            build/ui/*.png
+            build/ui/*.json
+            build/ui/*.ips
           retention-days: 14

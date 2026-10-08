@@ -4,6 +4,12 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
+**Compat3 en preparación:** candidatas desde dev52 para iOS 15–18 en RootHide,
+Dopamine rootless y rootful. Incluyen la interfaz actual y paquetes del trabajador
+con los guards de ABI conservados. No se declara soporte físico para nuevos iOS;
+el usuario solo dispone del iPhone XS / iOS 16.3.1 / RootHide.
+Véase [compatibilidad y límites](docs/COMPATIBILITY.md).
+
 **Dev52 instalado / app31 sin cambios:** logos del selector Bluetooth alineados
 por columnas y créditos solo GokuEn. Conserva el Samsung ampliado y las acciones
 Wi-Fi de dev51. Compilación, simulador (33 comprobaciones por idioma), siete
