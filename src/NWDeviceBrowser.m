@@ -29,6 +29,7 @@ static uint32_t addressNumber(NSString *text) {
 - (void)refreshSnapshot;
 - (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor;
 - (void)showRename:(NSDictionary *)row;
+- (void)renameFromMenu:(UIAlertController *)menu row:(NSDictionary *)row;
 @end
 static __weak NWDeviceBrowserController *visibleBrowser;
 @implementation NWDeviceBrowserController
@@ -179,6 +180,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     UITableViewCell *cell = [table dequeueReusableCellWithIdentifier:@"NWBrowserDevice"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"NWBrowserDevice"];
     NWStyleCell(cell); cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.accessibilityTraits &= ~UIAccessibilityTraitButton;
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
     content.textProperties.numberOfLines = 0;
     content.secondaryTextProperties.numberOfLines = 0;
@@ -251,7 +253,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     __weak UIAlertController *weakMenu = menu;
     UIAlertAction *rename = [UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         (void)action;
-        [weakMenu dismissViewControllerAnimated:YES completion:^{ [weakSelf showRename:row]; }];
+        [weakSelf renameFromMenu:weakMenu row:row];
     }];
     rename.enabled = NWDeviceCanRename(row); [menu addAction:rename];
     UIAlertAction *clear = [UIAlertAction actionWithTitle:NWNativeText(@"Clear Nickname") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
@@ -272,6 +274,9 @@ static __weak NWDeviceBrowserController *visibleBrowser;
 - (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor {
     UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
     [presenter presentViewController:[self deviceMenu:row anchor:anchor] animated:YES completion:nil];
+}
+- (void)renameFromMenu:(UIAlertController *)menu row:(NSDictionary *)row {
+    [menu dismissViewControllerAnimated:YES completion:^{ [self showRename:row]; }];
 }
 - (void)showRename:(NSDictionary *)row {
     UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
@@ -305,6 +310,9 @@ void NWPresentDeviceBrowser(UIViewController *presenter) {
 }
 void NWRefreshVisibleDeviceBrowser(void) { if (visibleBrowser.view.window) [visibleBrowser refreshSnapshot]; }
 #ifdef NW_UI_TESTING
+// UIKit can hide the browser beneath search/alerts; the test follows the same
+// retained controller even while viewDidDisappear clears the visible refresh target.
+static __weak NWDeviceBrowserController *regressionBrowser;
 int NWDeviceBrowserUIRegressionCheck(void) {
     if (NWDeviceActionsUIRegressionCheck()) return 1;
     NWBeginDeviceActionsUITest();
@@ -346,6 +354,7 @@ int NWDeviceBrowserUIRegressionPresent(void) {
 int NWDeviceBrowserUIRegressionSearch(void) {
     NWDeviceBrowserController *browser = visibleBrowser;
     if (!browser.view.window) return 1;
+    regressionBrowser = browser;
     browser.search.searchBar.selectedScopeButtonIndex = 0;
     browser.search.searchBar.text = @"44:55"; [browser projectSnapshot]; browser.search.active = YES;
     return browser.rows.count == 1 ? 0 : 2;
@@ -357,12 +366,31 @@ int NWDeviceBrowserUIRegressionSelect(void) {
     return 0;
 }
 int NWDeviceBrowserUIRegressionMenu(void) {
-    NWDeviceBrowserController *browser = visibleBrowser;
+    NWDeviceBrowserController *browser = regressionBrowser;
     UIViewController *presented = browser.presentedViewController;
     if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
     if (![presented isKindOfClass:UIAlertController.class] || !browser.search.active ||
         ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
     UIAlertController *menu = (UIAlertController *)presented;
     return menu.actions.count == 5 && [menu.title isEqual:@"Mesa"] && menu.actions[0].enabled ? 0 : 2;
+}
+int NWDeviceBrowserUIRegressionRename(void) {
+    NWDeviceBrowserController *browser = regressionBrowser;
+    UIViewController *presented = browser.presentedViewController;
+    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
+    if (![presented isKindOfClass:UIAlertController.class] || !browser.rows.count) return 1;
+    [browser renameFromMenu:(UIAlertController *)presented row:browser.rows.firstObject];
+    return 0;
+}
+int NWDeviceBrowserUIRegressionRenameCheck(void) {
+    NWDeviceBrowserController *browser = regressionBrowser;
+    UIViewController *presented = browser.presentedViewController;
+    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
+    if (![presented isKindOfClass:UIAlertController.class] || !browser.search.active ||
+        ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
+    UIAlertController *rename = (UIAlertController *)presented;
+    return rename.preferredStyle == UIAlertControllerStyleAlert && rename.textFields.count == 1 &&
+        [rename.title isEqual:NWNativeText(@"Rename Device")] &&
+        [rename.textFields.firstObject.text isEqual:@"Mesa"] ? 0 : 2;
 }
 #endif

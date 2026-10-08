@@ -8,4 +8,6 @@ int NWDeviceBrowserUIRegressionPresent(void);
 int NWDeviceBrowserUIRegressionSearch(void);
 int NWDeviceBrowserUIRegressionSelect(void);
 int NWDeviceBrowserUIRegressionMenu(void);
+int NWDeviceBrowserUIRegressionRename(void);
+int NWDeviceBrowserUIRegressionRenameCheck(void);
 #endif

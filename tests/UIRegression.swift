@@ -11,6 +11,10 @@ func searchBrowser() -> Int32
 func selectBrowser() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionMenu")
 func checkBrowserMenu() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionRename")
+func renameBrowser() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionRenameCheck")
+func checkBrowserRename() -> Int32
 @_silgen_name("NWEndDeviceActionsUITest")
 func endBrowserFixture()
 @_silgen_name("NWBluetoothUIRegressionCheck")
@@ -113,7 +117,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 31,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 33,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -165,8 +169,11 @@ struct RegressionTabs: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             if phase == 0 { results.append(searchBrowser()); captureBrowser(1, fixture: fixture) }
             else if phase == 1 { results.append(selectBrowser()); captureBrowser(2, fixture: fixture) }
-            else {
+            else if phase == 2 {
                 results.append(checkBrowserMenu()); snapshot("browser-actions.png")
+                results.append(renameBrowser()); captureBrowser(3, fixture: fixture)
+            } else {
+                results.append(checkBrowserRename()); snapshot("browser-rename.png")
                 guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                     .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
                 root.dismiss(animated: false) {
