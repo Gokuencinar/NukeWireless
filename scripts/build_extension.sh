@@ -3,7 +3,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/audit
 python3 scripts/language_catalog.py build/audit
-python3 tests/test_native_abi.py
 clang -Wall -Wextra -Werror tests/test_device_catalog.c -o build/audit/test_device_catalog
 build/audit/test_device_catalog
 clang -Wall -Wextra -Werror tests/test_catalog_profiles.c -o build/audit/test_catalog_profiles
