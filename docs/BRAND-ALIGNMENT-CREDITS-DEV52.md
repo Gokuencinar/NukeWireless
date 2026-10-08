@@ -12,6 +12,6 @@ Fuentes `50cb538957a609ecd6044082dc76a3aababe1786`: [Development build](https://
 
 Instalado por SSH .22 en el iPhone XS/iOS16.3.1 con clave conocida. Verificados dpkg dev52/app31, CFBundleVersion25.5.52, los cinco logos por bytes y CodeDirectory me.midnightchips.harpy-reloaded; no nuevos crashes relevantes en la comparación posterior, trabajador inactivo y bluetoothd running. No se repiten operaciones de radio ni bloqueo real para estos cambios de presentación.
 
-Aceptación manual de la alineación, créditos y acciones Wi-Fi pendiente. Dev50 fue confirmado por el usuario el 8 de octubre; dev51 fue instalado y verificado antes de este ajuste.
+Aceptación manual de la alineación, créditos y acciones Wi-Fi confirmada por el usuario el 8 de octubre de 2026: «esta correcto», en respuesta a la pregunta de aceptación de dev52. Esta confirmación corresponde a la interfaz y al cambio/retirada del nombre personalizado; no añade una prueba de bloqueo real o recepción de radio. Dev50 fue confirmado por el usuario el 8 de octubre; dev51 fue instalado y verificado antes de este ajuste.
 
 Recuperación: cerrar NukeWireless e instalar /var/mobile/Documents/NukeWireless-dev51-backup.deb en el mismo entorno del jailbreak. App31 permanece instalado. Sin respring ni reinicio general.
