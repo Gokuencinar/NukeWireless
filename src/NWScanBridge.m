@@ -57,7 +57,8 @@ static uint32_t ipv4(NSString *text) {
     struct in_addr a; return text && inet_pton(AF_INET, text.UTF8String, &a) == 1 ? ntohl(a.s_addr) : 0;
 }
 static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
-    *local = *mask = 0; *gateway = ipv4(readObject(commands(), @"gatewayIP"));
+    *local = *mask = 0;
+    if (gateway) *gateway = ipv4(readObject(commands(), @"gatewayIP"));
     struct ifaddrs *first = NULL;
     if (getifaddrs(&first)) return;
     for (struct ifaddrs *p = first; p; p = p->ifa_next) {
@@ -92,7 +93,7 @@ static uint32_t configurationGateway(void) {
     return ipv4(value[@"Router"]);
 }
 static NSString *networkIdentity(void) {
-    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    uint32_t local, mask; localNetwork(&local, &mask, NULL);
     // The scanner invokes this on the main thread during launch. Querying
     // MobileWiFi here can wait on wifid and stall the initial view transition.
     // The interface tuple is sufficient to reject stale scan and bulk results.
