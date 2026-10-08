@@ -1,5 +1,6 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
+#include "NWBTSkywalkABI.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <CommonCrypto/CommonDigest.h>
@@ -16,6 +17,8 @@
 #include <stdio.h>
 #include <poll.h>
 #include <dispatch/dispatch.h>
+#include <sys/utsname.h>
+#include <stdlib.h>
 
 // Declarations from Apple IOKitUser/IOKitLib.h and XNU 8792.61.2
 // bsd/skywalk/channel/os_channel.h. BlueTool on 20D67 opens port 0
@@ -32,14 +35,7 @@ typedef void *(*NWAttrCreate)(void);
 typedef void (*NWAttrDestroy)(void *);
 typedef int (*NWAttrRead)(void *, void *);
 typedef int (*NWAttrGet)(void *, int, uint64_t *);
-typedef struct {
-    uint16_t flags, length;
-    uint32_t index;
-    uint64_t externalPointer, bufferPointer, metadataPointer;
-    uint32_t reserved[8];
-} NWSlotProperties;
-_Static_assert(sizeof(NWSlotProperties) == 64, "Skywalk slot property size");
-_Static_assert(offsetof(NWSlotProperties, bufferPointer) == 16, "Skywalk buffer offset");
+typedef NWBTSkywalkSlotProperties NWSlotProperties;
 typedef uint32_t (*NWRingID)(void *, int);
 typedef void *(*NWRing)(void *, uint32_t);
 typedef void *(*NWSlot)(void *, void *, NWSlotProperties *);
@@ -105,6 +101,7 @@ static NSDictionary *requireBluetoothOff(void) {
         return failure(@"bluetooth_state", @"Turn Bluetooth off in Settings before using the exclusive transport.");
     return nil;
 }
+static NSString *nativeNexus(NSString *wanted, NSDictionary **error);
 
 static BOOL managerSignature(Class cls, SEL selector, BOOL meta, const char *result, const char *argument) {
     Method method = meta ? class_getClassMethod(cls, selector) : class_getInstanceMethod(cls, selector);
@@ -119,14 +116,51 @@ static BOOL managerSignature(Class cls, SEL selector, BOOL meta, const char *res
     return YES;
 }
 
+static BOOL managerBooleanSignature(Class cls, SEL selector) {
+    return managerSignature(cls, selector, NO, "B", NULL) || managerSignature(cls, selector, NO, "c", NULL);
+}
+
+// Read-only admission: do not create a manager, channel or recovery process.
+// XNU's channel ABI is independent of AppleConvergedTransport's opaque struct.
+NSDictionary *NWBTSkywalkCompatibility(void) {
+    NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
+    struct utsname kernel = {0};
+    unsigned darwin = uname(&kernel) == 0 ? (unsigned)strtoul(kernel.release, NULL, 10) : 0;
+    if (!NWBTSkywalkOSAllowed((unsigned)os.majorVersion, darwin))
+        return failure(@"abi", @"This Skywalk contract covers matching iOS 15-18 / Darwin 21-24 only.");
+    const char *symbols[] = {"os_channel_create", "os_channel_destroy", "os_channel_attr_create",
+        "os_channel_attr_destroy", "os_channel_read_attr", "os_channel_attr_get", "os_channel_ring_id",
+        "os_channel_tx_ring", "os_channel_rx_ring", "os_channel_get_next_slot",
+        "os_channel_set_slot_properties", "os_channel_advance_slot", "os_channel_sync", "os_channel_get_fd"};
+    for (NSUInteger i = 0; i < sizeof(symbols) / sizeof(symbols[0]); ++i)
+        if (!dlsym(RTLD_DEFAULT, symbols[i])) return failure(@"abi", @"Required XNU channel entry point is missing.");
+    dlopen("/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager", RTLD_LAZY | RTLD_LOCAL);
+    Class cls = NSClassFromString(@"BluetoothManager");
+    if (!managerSignature(cls, NSSelectorFromString(@"sharedInstance"), YES, "@", NULL) ||
+        !managerSignature(cls, NSSelectorFromString(@"setSharedInstanceQueue:"), YES, "v", "@") ||
+        !managerBooleanSignature(cls, NSSelectorFromString(@"available")) ||
+        !managerBooleanSignature(cls, NSSelectorFromString(@"enabled")))
+        return failure(@"abi", @"Bluetooth state method signatures do not match the required contract.");
+    return nil;
+}
+
+NSDictionary *NWBTNativeAvailability(void) {
+    NSDictionary *error = NWBTSkywalkCompatibility();
+    if (error) return error;
+    NSString *identifier = nativeNexus(@"hci", &error);
+    if (!identifier) return error ?: failure(@"abi", @"A matching HCI Skywalk interface is not available.");
+    uuid_t uuid;
+    return uuid_parse(identifier.UTF8String, uuid) ? failure(@"abi", @"The HCI nexus identifier is invalid.") : nil;
+}
+
 NSDictionary *NWBTVerifyBluetoothOff(void) {
-    NSDictionary *abi = requireKnownABI(); if (abi) return abi;
+    NSDictionary *abi = NWBTSkywalkCompatibility(); if (abi) return abi;
     Class cls = NSClassFromString(@"BluetoothManager");
     SEL shared = NSSelectorFromString(@"sharedInstance"), queueSelector = NSSelectorFromString(@"setSharedInstanceQueue:");
     SEL available = NSSelectorFromString(@"available"), enabled = NSSelectorFromString(@"enabled");
     if (!managerSignature(cls, shared, YES, "@", NULL) ||
         !managerSignature(cls, queueSelector, YES, "v", "@") ||
-        !managerSignature(cls, available, NO, "B", NULL) || !managerSignature(cls, enabled, NO, "B", NULL))
+        !managerBooleanSignature(cls, available) || !managerBooleanSignature(cls, enabled))
         return failure(@"bluetooth_state_unavailable", @"Bluetooth state ABI differs from the inspected runtime.");
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -238,7 +272,7 @@ static NSDictionary *skywalkVersion(void *channel, uint64_t capacity) {
 NSDictionary *NWBTNativeGuard(void) {
     if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
     fputs("NWBT phase: ABI guard\n", stderr);
-    NSDictionary *error = requireKnownABI();
+    NSDictionary *error = NWBTSkywalkCompatibility();
     if (error) return error;
     fputs("NWBT phase: Bluetooth state\n", stderr);
     error = requireBluetoothOff();
@@ -246,9 +280,17 @@ NSDictionary *NWBTNativeGuard(void) {
     return nil;
 }
 
+NSDictionary *NWBTLegacyGuard(void) {
+    if (getuid() != 0) return failure(@"permissions", @"Run this diagnostic as root.");
+    NSDictionary *error = requireKnownABI();
+    return error ?: requireBluetoothOff();
+}
+
+NSDictionary *NWBTLegacyCompatibility(void) { return requireKnownABI(); }
+
 static void *nativeOpenFailure(NSDictionary **error, NSDictionary *report) { *error = report; return NULL; }
 
-void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary **error) {
+static NSString *nativeNexus(NSString *wanted, NSDictionary **error) {
     fputs("NWBT phase: registry lookup\n", stderr);
     void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY | RTLD_LOCAL);
     NWMatching matching = (NWMatching)dlsym(iokit, "IOServiceMatching");
@@ -257,24 +299,19 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     NWIORelease release = (NWIORelease)dlsym(iokit, "IOObjectRelease");
     NWProperty property = (NWProperty)dlsym(iokit, "IORegistryEntryCreateCFProperty");
     NWSearch search = (NWSearch)dlsym(iokit, "IORegistryEntrySearchCFProperty");
-    NWChannelCreate create = (NWChannelCreate)dlsym(RTLD_DEFAULT, "os_channel_create");
-    NWChannelDestroy destroy = (NWChannelDestroy)dlsym(RTLD_DEFAULT, "os_channel_destroy");
-    NWAttrCreate attrCreate = (NWAttrCreate)dlsym(RTLD_DEFAULT, "os_channel_attr_create");
-    NWAttrDestroy attrDestroy = (NWAttrDestroy)dlsym(RTLD_DEFAULT, "os_channel_attr_destroy");
-    NWAttrRead attrRead = (NWAttrRead)dlsym(RTLD_DEFAULT, "os_channel_read_attr");
-    NWAttrGet attrGet = (NWAttrGet)dlsym(RTLD_DEFAULT, "os_channel_attr_get");
-    if (!iokit || !matching || !services || !next || !release || !property || !search ||
-        !create || !destroy || !attrCreate || !attrDestroy || !attrRead || !attrGet)
-        return nativeOpenFailure(error, failure(@"skywalk_symbols", @"The inspected IOKit/Skywalk interfaces are unavailable."));
+    if (!iokit || !matching || !services || !next || !release || !property || !search) {
+        *error = failure(@"skywalk_symbols", @"The required IOKit registry interfaces are unavailable.");
+        return nil;
+    }
     CFMutableDictionaryRef match = matching("AppleConvergedIPCRTIInterface");
-    if (!match) return nativeOpenFailure(error, failure(@"skywalk_registry", @"The HCI registry matching dictionary could not be created."));
+    if (!match) { *error = failure(@"skywalk_registry", @"The HCI registry matching dictionary could not be created."); return nil; }
     mach_port_t iterator = MACH_PORT_NULL;
     kern_return_t status = services(MACH_PORT_NULL, match, &iterator); // Consumes match.
     if (status || !iterator) {
         if (iterator) release(iterator);
         NSMutableDictionary *report = [failure(@"skywalk_registry", [NSString stringWithFormat:@"Interface lookup failed: 0x%08x.", status]) mutableCopy];
         report[@"interface_pending"] = @(status == KERN_SUCCESS);
-        return nativeOpenFailure(error, report);
+        *error = report; return nil;
     }
     NSString *identifier = nil;
     NSUInteger candidates = 0;
@@ -291,12 +328,26 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
         if (identifier) break;
     }
     release(iterator);
-    uuid_t uuid;
     if (!identifier) {
         NSMutableDictionary *report = [failure(@"skywalk_registry", @"The HCI interface has not published its nexus identifier.") mutableCopy];
         report[@"interface_pending"] = @YES;
-        return nativeOpenFailure(error, report);
+        *error = report; return nil;
     }
+    return identifier;
+}
+
+void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary **error) {
+    NSString *identifier = nativeNexus(wanted, error);
+    if (!identifier) return NULL;
+    NWChannelCreate create = (NWChannelCreate)dlsym(RTLD_DEFAULT, "os_channel_create");
+    NWChannelDestroy destroy = (NWChannelDestroy)dlsym(RTLD_DEFAULT, "os_channel_destroy");
+    NWAttrCreate attrCreate = (NWAttrCreate)dlsym(RTLD_DEFAULT, "os_channel_attr_create");
+    NWAttrDestroy attrDestroy = (NWAttrDestroy)dlsym(RTLD_DEFAULT, "os_channel_attr_destroy");
+    NWAttrRead attrRead = (NWAttrRead)dlsym(RTLD_DEFAULT, "os_channel_read_attr");
+    NWAttrGet attrGet = (NWAttrGet)dlsym(RTLD_DEFAULT, "os_channel_attr_get");
+    if (!create || !destroy || !attrCreate || !attrDestroy || !attrRead || !attrGet)
+        return nativeOpenFailure(error, failure(@"skywalk_symbols", @"Required XNU channel entry points are unavailable."));
+    uuid_t uuid;
     if (uuid_parse(identifier.UTF8String, uuid))
         return nativeOpenFailure(error, failure(@"skywalk_registry", @"No valid nexus identifier was found under the HCI interface."));
     errno = 0;
@@ -313,7 +364,7 @@ void *NWBTOpenNativeChannel(NSString *wanted, uint64_t *capacity, NSDictionary *
     void *attributes = attrCreate();
     if (!attributes) { destroy(channel); return nativeOpenFailure(error, failure(@"skywalk_attributes", @"No channel attributes.")); }
     uint64_t bytes = 0;
-    int result = attrRead(channel, attributes) || attrGet(attributes, 4, &bytes);
+    int result = attrRead(channel, attributes) || attrGet(attributes, NWBTSkywalkBufferSize, &bytes);
     attrDestroy(attributes);
     if (result || bytes < 20 || bytes > UINT16_MAX) {
         destroy(channel); return nativeOpenFailure(error, failure(@"skywalk_attributes", @"Invalid channel capacity."));

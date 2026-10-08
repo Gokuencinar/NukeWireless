@@ -89,7 +89,7 @@
 "bt.restored" = "Servicio Bluetooth restaurado. Puedes activarlo de nuevo en Ajustes.";
 "bt.finished" = "Diagnóstico Bluetooth terminado.";
 "bt.error.missing" = "Falta instalar el módulo NukeWireless Bluetooth Bridge.";
-"bt.error.unsupported" = "Este transporte solo está comprobado y habilitado en iPhone XS, iOS 16.3.1 y Dopamine RootHide.";
+"bt.error.unsupported" = "La emisión no está disponible con las interfaces Bluetooth de este dispositivo.";
 "bt.error.arguments" = "La solicitud Bluetooth no es válida.";
 "bt.error.permissions" = "No se pudo acceder al helper Bluetooth. Reinstala el módulo para recuperar su firma y permisos.";
 "bt.error.bluetooth_off" = "Apaga Bluetooth desde Ajustes del iPhone antes de iniciar el diagnóstico.";
@@ -162,7 +162,7 @@
 "bt.lab.android_menu" = "Anuncio fijo Pixel Buds de laboratorio. Intervalo de 100 ms; puede detenerse antes. Requiere Bluetooth apagado en Ajustes.";
 "bt.lab.android_receiver" = "Sin receptor Android disponible: el aviso Fast Pair sigue sin verificar. Solo se prueba el anuncio; no permite emparejar un accesorio real.";
 
-"bt.error.advertising_sets" = "El controlador no permite tres conjuntos de anuncios simultáneos.";
+"bt.error.advertising_sets" = "El controlador no permite emitir todos los modelos seleccionados a la vez.";
 "bt.lab.multi_windows_title" = "Windows: tres dispositivos (10 s)";
 "bt.lab.multi_apple_title" = "Apple: tres modelos (10 s)";
 "bt.lab.multi_android_title" = "Android: tres modelos (10 s)";
@@ -207,7 +207,7 @@
 "bt.catalog.emit" = "Emitir todos (%lu) · 10 s";
 "bt.catalog.emit_hint" = "O toca ▶ junto a un modelo";
 "bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
-"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app31.";
+"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app32.";
 "bt.catalog.profile_available" = "Perfil de anuncio disponible";
 "bt.catalog.profile_unavailable" = "Emisión no disponible";
 "bt.catalog.emission_note" = "El anuncio incluye el modelo del perfil. Emisión manual de 10 s, sin emparejamiento ni aviso garantizado.";

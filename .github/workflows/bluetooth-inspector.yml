@@ -11,6 +11,7 @@ on:
       - 'tests/test_hci_read.c'
       - 'tests/test_bt_lab.c'
       - 'tests/test_bt_control.c'
+      - 'tests/test_bt_skywalk.c'
       - 'tests/test_catalog_profiles.c'
       - '.github/workflows/bluetooth-inspector.yml'
   workflow_dispatch:

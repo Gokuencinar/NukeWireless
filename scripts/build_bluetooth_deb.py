@@ -9,7 +9,7 @@ from compat_macho import inspect
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.3~app31'
+VERSION = '0.0.3~app32'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -69,7 +69,7 @@ Section: Development
 Maintainer: GokuEn
 Author: GokuEn
 Depends: firmware (>= 15.0), firmware (<< 19.0), ldid{', rootless-compat' if scheme == 'roothide' else ''}
-Description: Guarded experimental Bluetooth worker for NukeWireless ({label}). Native operations remain restricted to iPhone XS / iOS 16.3.1. Other systems can query availability but are not admitted for radio operations.
+Description: Guarded experimental Bluetooth worker for NukeWireless ({label}). Advertising uses runtime-checked Skywalk interfaces on iOS 15-18. Unsupported controller transports are refused. Other systems require device validation.
 '''.encode()
     postinst = f'''#!/bin/sh
 set -e
@@ -81,14 +81,17 @@ chmod 4755 {root}/usr/bin/nwbt-run
 exit 0
 '''.encode()
     report.update(scheme=scheme, architecture=architecture, bootstrap=label,
-                  native_runtime_allowlist=[{'machine': 'iPhone11,2', 'ios': '16.3.1'}],
+                  native_admission_policy='skywalk-runtime-contract-v1',
+                  native_ios_range=[15, 18],
+                  legacy_runtime_allowlist=[{'machine': 'iPhone11,2', 'ios': '16.3.1'}],
+                  physical_reference={'machine': 'iPhone11,2', 'ios': '16.3.1'},
                   verified_bootstrap='roothide', runtime_verified=False)
     entries = [directory(path) for path in ['usr', 'usr/bin', 'usr/lib', 'usr/share', 'usr/share/nukewireless-bluetooth']]
     entries += [regular('usr/bin/nwbt-inspect', tool, 0o755), regular('usr/bin/nwbt-run', runner, 0o755),
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'Bluetooth > Random catalog supports individual or selected-model lab advertisements for 10 seconds, with cooperative Stop and independent service recovery. Native transport admits only iPhone XS / iOS 16.3.1; only RootHide has device verification. Other iOS versions retain the ABI guard and report unsupported. Package layout alone does not validate native radio operations. The runner validates the complete installed app caller path under the same bootstrap. No pairing keys, address rotation or link disconnection. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'Bluetooth > Random catalog supports individual or selected-model lab advertisements for 10 seconds, with cooperative Stop and independent service recovery. Advertising on iOS 15-18 requires a matching Darwin ABI, method signatures, HCI Skywalk nexus and controller command contract. Devices using another transport are refused. Local HCI replies do not prove external reception. The legacy ACT and ACL diagnostic retains the iPhone XS / iOS 16.3.1 guard. Only the reference RootHide device has physical evidence; other versions and bootstraps require device validation. The runner validates the complete installed app caller path under the same bootstrap. Recovery inherits only the inspected fixed user/501 or system domain. No pairing keys, address rotation or link disconnection. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
     for member, _ in entries:
         member.name = './' + prefix + member.name.removeprefix('./')
     output.parent.mkdir(parents=True, exist_ok=True)

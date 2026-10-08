@@ -3,7 +3,13 @@
 #include <signal.h>
 #include <stdatomic.h>
 
-// Internal interface. Only the ABI-guarded inspector calls this transport.
+// Internal interface. Read-only contract check; never changes service or radio.
+NSDictionary *NWBTSkywalkCompatibility(void);
+// Also checks the actual HCI nexus descriptor, without opening any channel.
+NSDictionary *NWBTNativeAvailability(void);
+// Legacy ACT and ACL call paths retain the exact inspected-device restriction.
+NSDictionary *NWBTLegacyGuard(void);
+NSDictionary *NWBTLegacyCompatibility(void);
 NSDictionary *NWBTNativeGuard(void);
 void *NWBTOpenNativeChannel(NSString *protocol, uint64_t *capacity, NSDictionary **error);
 // Called only after guarded service retirement, before consuming/sending frames.

@@ -89,7 +89,7 @@
 "bt.restored" = "Bluetooth service restored. You can turn it back on in Settings.";
 "bt.finished" = "Bluetooth diagnostic finished.";
 "bt.error.missing" = "Install the NukeWireless Bluetooth Bridge module first.";
-"bt.error.unsupported" = "This transport is only verified and enabled on iPhone XS, iOS 16.3.1, and Dopamine RootHide.";
+"bt.error.unsupported" = "Advertising is unavailable with this device’s Bluetooth interfaces.";
 "bt.error.arguments" = "The Bluetooth request is invalid.";
 "bt.error.permissions" = "The Bluetooth helper could not be accessed. Reinstall the module to restore its signature and permissions.";
 "bt.error.bluetooth_off" = "Turn Bluetooth off in iPhone Settings before starting the diagnostic.";
@@ -162,7 +162,7 @@
 "bt.lab.android_menu" = "Fixed Pixel Buds laboratory advertisement. 100 ms interval; can be stopped early. Requires Bluetooth off in Settings.";
 "bt.lab.android_receiver" = "No Android receiver available: the Fast Pair prompt remains unverified. This tests discovery advertising only; it cannot pair a real accessory.";
 
-"bt.error.advertising_sets" = "The controller does not support three simultaneous advertising sets.";
+"bt.error.advertising_sets" = "The controller cannot advertise all selected models at once.";
 "bt.lab.multi_windows_title" = "Windows: three devices (10 s)";
 "bt.lab.multi_apple_title" = "Apple: three models (10 s)";
 "bt.lab.multi_android_title" = "Android: three models (10 s)";
@@ -207,7 +207,7 @@
 "bt.catalog.emit" = "Advertise all (%lu) · 10 s";
 "bt.catalog.emit_hint" = "Or tap ▶ beside a model";
 "bt.catalog.partial" = "Only models with an available profile are advertised";
-"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app31.";
+"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app32.";
 "bt.catalog.profile_available" = "Advertising profile available";
 "bt.catalog.profile_unavailable" = "Advertising unavailable";
 "bt.catalog.emission_note" = "The advertisement includes the profile model. Manual 10 s advertising, without pairing or guaranteed notifications.";

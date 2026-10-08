@@ -77,7 +77,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertIn('firmware (>= 15.0), firmware (<< 19.0)', control)
                 info = plistlib.loads(files[prefix + app.APP + 'Info.plist'][1])
                 self.assertEqual(info['CFBundleIdentifier'], 'me.midnightchips.harpy-reloaded')
-                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '25.6.3'))
+                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '25.6.4'))
                 self.assertEqual(info['CFBundleShortVersionString'], app.VERSION)
                 self.assertIn('-Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"', script)
                 self.assertIn('ldid -S /' + prefix + inject + '/NukeWirelessInfo.dylib', script)
@@ -99,7 +99,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-rh25.5-dev52', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-rh25.5-dev53', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],
@@ -127,7 +127,8 @@ class CandidateTests(unittest.TestCase):
                     self.assertEqual(files[prefix + relative + name][1], (ARTIFACT / 'bluetooth' / name).read_bytes())
                 self.assertIn(f'chmod 4755 /{prefix}usr/bin/nwbt-run', script)
                 report = json.loads(files[prefix + 'usr/share/nukewireless-bluetooth/build-manifest.json'][1])
-                self.assertEqual(report['native_runtime_allowlist'], [{'machine': 'iPhone11,2', 'ios': '16.3.1'}])
+                self.assertEqual(report['native_admission_policy'], 'skywalk-runtime-contract-v1')
+                self.assertEqual(report['legacy_runtime_allowlist'], [{'machine': 'iPhone11,2', 'ios': '16.3.1'}])
                 self.assertEqual(report['verified_bootstrap'], 'roothide')
                 self.assertFalse(report['runtime_verified'])
 

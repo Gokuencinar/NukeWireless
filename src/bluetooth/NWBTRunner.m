@@ -2,6 +2,7 @@
 #include "../NWCatalogProfiles.h"
 #import "NWBTNative.h"
 #include "NWBTControl.h"
+#include "NWBTService.h"
 #include <dlfcn.h>
 #include <spawn.h>
 #include <unistd.h>
@@ -18,6 +19,7 @@
 #include <grp.h>
 
 static const char *service = "user/501/com.apple.bluetoothd";
+static const char *serviceDomain = "user/501";
 static NSString *bootstrapRoot;
 static BOOL recordAppRun;
 static uid_t invokingUID;
@@ -122,7 +124,7 @@ static int control(const char *verb, const char *argument, NSString **output) {
     NSString *executable = [bootstrapRoot stringByAppendingPathComponent:@"bin/launchctl"];
     char *arguments[] = {(char *)executable.fileSystemRepresentation, (char *)verb, (char *)argument, NULL, NULL};
     if (!strcmp(verb, "bootstrap")) {
-        arguments[2] = "user/501"; arguments[3] = (char *)argument;
+        arguments[2] = (char *)serviceDomain; arguments[3] = (char *)argument;
     }
     pid_t child = 0;
     int result = posix_spawn(&child, executable.fileSystemRepresentation, &actions, NULL, arguments, cleanEnvironment);
@@ -154,8 +156,22 @@ static int control(const char *verb, const char *argument, NSString **output) {
 
 static BOOL running(void) {
     NSString *state = nil;
-    return control("print", service, &state) == 0 && [state hasPrefix:@"user/501/com.apple.bluetoothd = {"] &&
+    NSString *prefix = [[NSString stringWithUTF8String:service] stringByAppendingString:@" = {"];
+    return control("print", service, &state) == 0 && [state hasPrefix:prefix] &&
         [state containsString:@"\n\tstate = running\n"];
+}
+static BOOL selectService(void) {
+    // Inspect both fixed domains without changing either. Refuse ambiguity.
+    int selected = -1;
+    for (unsigned i = 0; i < 2; ++i) {
+        service = NWBTServiceLabel(i); serviceDomain = NWBTServiceDomain(i);
+        if (!running()) continue;
+        if (selected >= 0) return NO;
+        selected = (int)i;
+    }
+    if (selected < 0) return NO;
+    service = NWBTServiceLabel((unsigned)selected); serviceDomain = NWBTServiceDomain((unsigned)selected);
+    return YES;
 }
 // Observe availability only: no frames, HCI commands or service mutations.
 // bluetoothd can be running before its HCI nexus is republished. EBUSY means
@@ -238,7 +254,7 @@ static pid_t startRecovery(const char *ownPath, int lock, int *writer) {
     posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0);
     posix_spawnattr_t attributes; posix_spawnattr_init(&attributes);
     posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSID);
-    char *arguments[] = {(char *)ownPath, "--recover", NULL}; pid_t child = -1;
+    char *arguments[] = {(char *)ownPath, "--recover", (char *)serviceDomain, NULL}; pid_t child = -1;
     int status = posix_spawn(&child, ownPath, &actions, &attributes, arguments, cleanEnvironment);
     posix_spawnattr_destroy(&attributes); posix_spawn_file_actions_destroy(&actions);
     close(reader); close(inheritedLock); close(ackWriter);
@@ -266,7 +282,10 @@ static NSString *codeForReport(NSDictionary *report) {
 static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInteger count, NSUInteger intervalMS, BOOL lab, BOOL applePairing, BOOL fastPair, NSUInteger multiPlatform, NSUInteger catalogPlatform, NSArray<NSNumber *> *catalogModels) {
     // Reject invalid options before guard, lock acquisition or service changes.
     if (address && !NWBTPingMillisecondsValid(count, intervalMS)) return errorReport(@"arguments");
-    NSDictionary *guard = NWBTVerifyBluetoothOff();
+    // The older ACL diagnostic still uses the device-specific legacy ABI.
+    // Reject it before manager initialization or any service mutation.
+    NSDictionary *guard = address ? NWBTLegacyCompatibility() : NWBTNativeAvailability();
+    if (!guard) guard = NWBTVerifyBluetoothOff();
     if (!guard) guard = NWBTNativeGuard();
     if (guard) { NSMutableDictionary *report = [guard mutableCopy]; report[@"error_code"] = codeForReport(guard); return report; }
     NSString *lockPath = [bootstrapRoot stringByAppendingPathComponent:@"var/run/nukewireless-bluetooth.lock"];
@@ -279,14 +298,16 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
     NSString *preflightStage = nil;
     NSMutableDictionary *report = nil;
     @try {
+        if (!selectService()) return errorReport(@"service");
         NSString *disabled = nil, *state = nil;
         int initialStatus = control("print", service, &state);
-        if (initialStatus || ![state hasPrefix:@"user/501/com.apple.bluetoothd = {"] || ![state containsString:@"\n\tstate = running\n"]) {
+        NSString *prefix = [[NSString stringWithUTF8String:service] stringByAppendingString:@" = {"];
+        if (initialStatus || ![state hasPrefix:prefix] || ![state containsString:@"\n\tstate = running\n"]) {
             NSMutableDictionary *details = [errorReport(@"service") mutableCopy];
             details[@"service_exit"] = @(initialStatus); details[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
             return details;
         }
-        if (control("print-disabled", "user/501", &disabled) ||
+        if (control("print-disabled", serviceDomain, &disabled) ||
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
         NSUInteger attempts = 0;
@@ -365,6 +386,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
     }
     if (!report) report = [errorReport(@"transport") mutableCopy];
     report[@"radio_state_verified_before_exclusive"] = @YES;
+    report[@"service_domain"] = [NSString stringWithUTF8String:serviceDomain];
     if (preflightStage) report[@"preflight_stage"] = preflightStage;
     if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);
@@ -388,7 +410,12 @@ int main(int argc, char **argv) {
         invokingUID = getuid(); invokingParent = getppid();
         BOOL milliseconds = argc == 5 && !strcmp(argv[1], "--ping-ms");
         recordAppRun = milliseconds || ((argc == 3 || argc == 5) && !strcmp(argv[1], "--ping"));
-        BOOL recovery = argc == 2 && !strcmp(argv[1], "--recover");
+        BOOL recovery = argc == 3 && !strcmp(argv[1], "--recover");
+        if (recovery) {
+            int index = NWBTServiceDomainIndex(argv[2]);
+            if (index < 0) return printReport(errorReport(@"arguments"));
+            service = NWBTServiceLabel((unsigned)index); serviceDomain = NWBTServiceDomain((unsigned)index);
+        }
         BOOL capabilities = argc == 2 && !strcmp(argv[1], "--le-capabilities");
         BOOL swiftPair = argc == 2 && !strcmp(argv[1], "--le-swift-pair-test");
         BOOL applePairing = argc == 2 && !strcmp(argv[1], "--le-apple-pairing-test");
@@ -436,9 +463,14 @@ int main(int argc, char **argv) {
         }
         if (argc == 2 && !strcmp(argv[1], "--status")) {
             NSDictionary *information = NWBTInspectTransport();
-            BOOL supported = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
+            BOOL reference = [information[@"machine"] isEqual:@"iPhone11,2"] && [information[@"ios"] isEqual:@"16.3.1"];
+            NSDictionary *compatibility = NWBTNativeAvailability();
+            BOOL supported = !compatibility;
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
-                @"supports_ping_options": @YES, @"supports_ping_milliseconds": @YES,
+                @"native_admission_policy": @"skywalk-runtime-contract-v1",
+                @"reference_device": @(reference),
+                @"compatibility": compatibility ?: @{@"stage": @"runtime_admitted"},
+                @"supports_ping_options": @(reference), @"supports_ping_milliseconds": @(reference),
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_app_cancel_channel": @YES,
                 @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES,

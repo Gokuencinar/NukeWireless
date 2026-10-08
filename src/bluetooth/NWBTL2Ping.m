@@ -2,6 +2,7 @@
 #import "NWBTNative.h"
 #include "NWBTHCIRead.h"
 #include "NWBTLab.h"
+#include "NWBTSkywalkABI.h"
 #include <dlfcn.h>
 #include <poll.h>
 #include <errno.h>
@@ -19,12 +20,7 @@ static void put16(uint8_t *p, uint16_t value) { p[0] = value; p[1] = value >> 8;
 // Apple XNU 8792.61.2 os_channel.h. Layout also checked against 20D67
 // bluetoothd's skywalk_write_channel at 0x100061d80: ACL header is four
 // bytes (handle/flags + length), followed by payload, with no H4 prefix.
-typedef struct {
-    uint16_t flags, length; uint32_t index;
-    uint64_t externalPointer, bufferPointer, metadataPointer; uint32_t reserved[8];
-} SlotProperties;
-_Static_assert(sizeof(SlotProperties) == 64, "Skywalk slot ABI");
-_Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer ABI");
+typedef NWBTSkywalkSlotProperties SlotProperties;
 
 @interface NWBTRing : NSObject {
     void *_channel, *_tx, *_rx;
@@ -56,7 +52,7 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
     _sync = dlsym(RTLD_DEFAULT, "os_channel_sync");
     if (!ringID || !tx || !rx || !fd || !_next || !_set || !_advance || !_sync) return nil;
     _channel = channel; _capacity = capacity;
-    _tx = tx(channel, ringID(channel, 0)); _rx = rx(channel, ringID(channel, 2)); _fd = fd(channel);
+    _tx = tx(channel, ringID(channel, NWBTSkywalkFirstTX)); _rx = rx(channel, ringID(channel, NWBTSkywalkFirstRX)); _fd = fd(channel);
     if (!_tx || !_rx || _fd < 0) return nil;
     return self;
 }
@@ -71,12 +67,12 @@ _Static_assert(offsetof(SlotProperties, bufferPointer) == 16, "Skywalk buffer AB
     memcpy((void *)(uintptr_t)properties.bufferPointer, packet.bytes, packet.length);
     properties.length = (uint16_t)packet.length;
     _set(_tx, slot, &properties);
-    if (_advance(_tx, slot) || _sync(_channel, 0)) { self.error = @"TX commit failed."; return NO; }
+    if (_advance(_tx, slot) || _sync(_channel, NWBTSkywalkSyncTX)) { self.error = @"TX commit failed."; return NO; }
     return YES;
 }
 - (NSData *)read {
     if (self.error) return nil;
-    if (_sync(_channel, 1)) { self.error = @"RX synchronization failed."; return nil; }
+    if (_sync(_channel, NWBTSkywalkSyncRX)) { self.error = @"RX synchronization failed."; return nil; }
     SlotProperties properties = {0};
     void *slot = _next(_rx, NULL, &properties);
     if (!slot) return nil;
@@ -195,7 +191,7 @@ NSDictionary *NWBTReadLECapabilities(void) {
 @end
 @implementation NWBTLabSession
 - (NSData *)command:(uint16_t)opcode parameters:(NSData *)parameters phase:(NSString *)phase cleanup:(BOOL)cleanup {
-    if (!NWBTLabReplySize(opcode) || parameters.length > 255) { self.error = @"Command outside lab allowlist."; return nil; }
+    if ((!NWBTLabReplySize(opcode) && !NWBTReadReplySize(opcode)) || parameters.length > 255) { self.error = @"Command outside lab/read allowlist."; return nil; }
     NSMutableDictionary *query = [@{@"opcode": @(opcode), @"phase": phase} mutableCopy];
     [self.queries addObject:query];
     BOOL sent = NO; double deadline = now() + 2.0;
@@ -214,7 +210,8 @@ NSDictionary *NWBTReadLECapabilities(void) {
             const uint8_t *p = self.stream.bytes; NSUInteger size = (NSUInteger)p[1] + 2;
             if (self.stream.length < size) break;
             uint8_t status = 0;
-            int match = NWBTMatchSizedReply(p, size, opcode, NWBTLabReplySize(opcode), &_credits, &status);
+            size_t expected = NWBTReadReplySize(opcode) ?: NWBTLabReplySize(opcode);
+            int match = NWBTMatchSizedReply(p, size, opcode, expected, &_credits, &status);
             if (++self.events > 256) { self.error = @"Lab HCI events exceeded their bound."; break; }
             NSData *reply = [self.stream subdataWithRange:NSMakeRange(0, size)];
             [self.stream replaceBytesInRange:NSMakeRange(0, size) withBytes:NULL length:0];
@@ -235,6 +232,24 @@ NSDictionary *NWBTReadLECapabilities(void) {
     return nil;
 }
 @end
+
+// Validate HCI framing and controller commands before touching advertising sets.
+// Reads address only the local controller. Failure still follows runner recovery.
+static BOOL verifyAdvertisingController(NWBTLabSession *session, NSMutableDictionary *report) {
+    NSData *version = [session command:0x1001 parameters:[NSData data] phase:@"transport_version" cleanup:NO];
+    NSData *commands = version ? [session command:0x1002 parameters:[NSData data] phase:@"transport_commands" cleanup:NO] : nil;
+    if (version.length != 14 || commands.length != 70 ||
+        !NWBTExtendedAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6)) {
+        if (!session.error) session.error = @"The controller lacks the required extended advertising commands.";
+        report[@"error_code"] = @"unsupported";
+        report[@"error"] = session.error;
+        report[@"controller_contract_verified"] = @NO;
+        return NO;
+    }
+    report[@"controller_contract_verified"] = @YES;
+    report[@"controller_hci_version"] = @(((const uint8_t *)version.bytes)[6]);
+    return YES;
+}
 
 static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
     if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
@@ -291,6 +306,8 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
             if (i == 31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
         }
         if (session.ring.error) session.error = session.ring.error;
+        if (session.error) { report[@"error"] = session.error; return report; }
+        if (!verifyAdvertisingController(session, report)) return report;
         uint8_t parameters[25], data[35], enable[6];
         if (fastPair || applePairing) NWBTLabFastPairParameters(parameters); else NWBTLabSwiftPairParameters(parameters);
         if (fastPair || applePairing) parameters[10] = 1;
@@ -398,6 +415,8 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
             if (i==31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
         }
         if (session.ring.error) session.error = session.ring.error;
+        if (session.error) { report[@"error"] = session.error; return report; }
+        if (!verifyAdvertisingController(session, report)) return report;
         NSData *limit = session.error ? nil : [session command:0x203b parameters:[NSData data] phase:@"set_capacity" cleanup:NO];
         if (limit.length != 7) { report[@"error"] = session.error ?: @"Advertising set capacity unavailable."; return report; }
         unsigned supported = ((const uint8_t *)limit.bytes)[6];
@@ -662,7 +681,7 @@ NSDictionary<NSString *, id> *NWBTL2PingWithMilliseconds(NSString *destination, 
         address[5 - i] = (uint8_t)strtoul(part.UTF8String, NULL, 16);
     }
     if (!memcmp(address, "\0\0\0\0\0\0", 6) || !memcmp(address, "\xff\xff\xff\xff\xff\xff", 6)) { report[@"error"] = @"Invalid target address."; return report; }
-    NSDictionary *error = NWBTNativeGuard(); if (error) return error;
+    NSDictionary *error = NWBTLegacyGuard(); if (error) return error;
     uint64_t hciCapacity = 0, aclCapacity = 0;
     void *hci = NWBTOpenExclusiveNativeChannel(@"hci", &hciCapacity, &error); if (!hci) return error;
     void *acl = NULL; NWBTPingSession *session = [NWBTPingSession new];

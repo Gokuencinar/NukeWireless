@@ -4,6 +4,12 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
+**Dev53 / app32 / compat4 en validación:** la emisión Bluetooth usa admisión por
+contrato Skywalk en iOS 15–18 y recuperación del servicio en su dominio observado.
+Se retira la dependencia de la whitelist XS/16.3.1 de las emisiones; el antiguo
+diagnóstico ACT/ACL conserva su guard específico. No se declara probado en otros
+dispositivos. Véase [port Bluetooth y evidencia de ABI](docs/BLUETOOTH-SKYWALK-PORT.md).
+
 **Compat3 compilada y empaquetada:** candidatas desde dev52 para iOS 15–18 en
 RootHide, Dopamine rootless y rootful. CI y ocho pruebas de los seis paquetes
 aprobados; interfaz en simulador iOS 18.5, 33 checks y cuatro ciclos de segundo

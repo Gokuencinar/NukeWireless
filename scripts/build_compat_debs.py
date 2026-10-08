@@ -16,7 +16,7 @@ from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "1.0.25+rh25.6~compat3"
+VERSION = "1.0.25+rh25.6~compat4"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -51,7 +51,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.3", MinimumOSVersion="15.0")
+    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.4", MinimumOSVersion="15.0")
     replacement = {
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
@@ -82,6 +82,7 @@ def package(scheme, core, artifact, output):
               "runtime_verified": False, "source_core_version": core_manifest["version"],
               "app_signing_identifier": "me.midnightchips.harpy-reloaded",
               "bluetooth_native_verified_environment": {"machine": "iPhone11,2", "ios": "16.3.1", "bootstrap": "roothide"},
+              "bluetooth_native_admission_policy": "skywalk-runtime-contract-v1",
               "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
               "core": core_manifest, "baseline_sha256": EXPECTED_SOURCE_SHA256,
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat3")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat4")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.
