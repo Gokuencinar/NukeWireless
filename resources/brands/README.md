@@ -15,4 +15,4 @@ SVG SHA-256:
 - microsoft: `f0fdaef83e59660c4da6e3988ca41fbe907e420cb86b48a94746caefec015bf9`
 - android: `ff571c5e21163f07dd7176d4670411344f55409d36eb6346b402210ad7c02c4b`
 
-Dev51: Samsung PDF CropBox [0,9,24,15] removes empty margins; paths unchanged. Rendered at 64x24 pt (48x18 in section headers).
+Dev51: Samsung PDF MediaBox/CropBox [0,7.5,18,10.5] (PDF coordinates; SVG conversion uses 0.75 scale) removes empty margins; paths unchanged. Rendered at 64x24 pt (48x18 in section headers).

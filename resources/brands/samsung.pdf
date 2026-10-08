@@ -21,7 +21,7 @@ endobj
 4 0 obj
 <<
 /Contents 5 0 R
-/MediaBox [ 0 0 18 18 ]
+/MediaBox [ 0.0 7.5 18 10.5 ]
 /Resources <<
 /Font 6 0 R
 /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
@@ -30,7 +30,7 @@ endobj
 /Trans <<
 >>
 /Type /Page
-/CropBox [ 0.0 9 24 15 ]
+/CropBox [ 0.0 7.5 18 10.5 ]
 /Parent 2 0 R
 >>
 endobj
@@ -64,9 +64,9 @@ xref
 0000000054 00000 n 
 0000000113 00000 n 
 0000000162 00000 n 
-0000000374 00000 n 
-0000002143 00000 n 
-0000002174 00000 n 
+0000000384 00000 n 
+0000002153 00000 n 
+0000002184 00000 n 
 trailer
 <<
 /Size 8
@@ -74,5 +74,5 @@ trailer
 /Info 1 0 R
 >>
 startxref
-2283
+2293
 %%EOF
