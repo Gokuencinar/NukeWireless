@@ -21,7 +21,19 @@ static UIImage *brandImage(NSString *name) {
         UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
         image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
             CGContextTranslateCTM(context.CGContext, 0, 24); CGContextScaleCTM(context.CGContext, 1, -1);
-            CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFCropBox, CGRectMake(0, 0, size.width, size.height), 0, YES));
+            if ([name isEqual:@"samsung"]) {
+                // The wordmark's PDF is smaller than its target. Explicitly
+                // magnify its cropped vector bounds as well as scaling down.
+                CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+                CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
+                CGContextTranslateCTM(context.CGContext, (size.width - box.size.width * scale) / 2,
+                    (size.height - box.size.height * scale) / 2);
+                CGContextScaleCTM(context.CGContext, scale, scale);
+                CGContextTranslateCTM(context.CGContext, -box.origin.x, -box.origin.y);
+            } else {
+                CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFCropBox,
+                    CGRectMake(0, 0, size.width, size.height), 0, YES));
+            }
             CGContextDrawPDFPage(context.CGContext, page);
         }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
