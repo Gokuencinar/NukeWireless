@@ -1,5 +1,7 @@
 # Equipos y colores — dev19 / compat2
 
+Actualización: desde [dev51](WIFI-SEARCH-ACTIONS-DEV51.md), tocar una fila abre las acciones Wi-Fi. El comportamiento de copia directa y cierre para usar acciones descrito abajo corresponde a dev19.
+
 ## Uso
 
 - En Wi-Fi, toca la lupa de la barra superior para abrir **Equipos**.

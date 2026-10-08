@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev51 instalado / trabajador app31 sin cambios:** tocar un resultado de Equipos
+abre las acciones Wi-Fi de bloquear/desbloquear, cambiar o quitar el nombre
+personalizado y copiar IP, manteniendo la búsqueda. Logo Samsung ampliado.
+Compilación, simulador (33 checks por idioma), siete pruebas de paquete,
+instalación y firma verificadas; comprobación manual de las nuevas acciones pendiente.
+Véase [acciones desde la búsqueda](docs/WIFI-SEARCH-ACTIONS-DEV51.md).
+
 **Dev50 instalado / trabajador app31 sin cambios:** las emisiones se concentran en
 Dispositivos aleatorios: generar seis modelos, emitir uno desde su tarjeta o emitir todos.
 Se retiran los botones repetidos del menú y se añaden logos de las plataformas,
