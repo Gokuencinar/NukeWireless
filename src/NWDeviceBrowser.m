@@ -26,6 +26,7 @@ static uint32_t addressNumber(NSString *text) {
 @property (nonatomic) BOOL requestedGateway;
 @property (nonatomic) BOOL snapshotScanning;
 @property (nonatomic, strong) UIBarButtonItem *sortItem;
+@property (nonatomic, weak) UIAlertController *activeAction;
 - (void)refreshSnapshot;
 - (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor;
 - (void)showRename:(NSDictionary *)row;
@@ -217,6 +218,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
 }
 - (UIViewController *)actionPresenter {
     // An active search owns a presentation; keep its text and results in place.
+    if (self.activeAction.presentingViewController) return nil;
     UIViewController *presenter = self.presentedViewController ?: self;
     return ([presenter isKindOfClass:UISearchController.class] || presenter == self) &&
         !presenter.presentedViewController ? presenter : nil;
@@ -224,8 +226,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
 - (void)showActionFailure {
     UIViewController *presenter = [self actionPresenter];
     if (!presenter) {
-        UIViewController *search = self.presentedViewController;
-        UIViewController *alert = [search isKindOfClass:UISearchController.class] ? search.presentedViewController : search;
+        UIViewController *alert = self.activeAction;
         if ([alert isKindOfClass:UIAlertController.class]) {
             [alert dismissViewControllerAnimated:YES completion:^{ [self showActionFailure]; }];
         }
@@ -235,6 +236,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"browser.actionFailed")
         message:NWText(@"browser.actionRetry") preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+    self.activeAction = alert;
     [presenter presentViewController:alert animated:YES completion:nil];
 }
 - (UIAlertController *)deviceMenu:(NSDictionary *)row anchor:(UIView *)anchor {
@@ -273,7 +275,8 @@ static __weak NWDeviceBrowserController *visibleBrowser;
 }
 - (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor {
     UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
-    [presenter presentViewController:[self deviceMenu:row anchor:anchor] animated:YES completion:nil];
+    UIAlertController *menu = [self deviceMenu:row anchor:anchor]; self.activeAction = menu;
+    [presenter presentViewController:menu animated:YES completion:nil];
 }
 - (void)renameFromMenu:(UIAlertController *)menu row:(NSDictionary *)row {
     [menu dismissViewControllerAnimated:YES completion:^{ [self showRename:row]; }];
@@ -297,6 +300,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
         if (!NWDeviceSetNickname(row, name.length ? name : nil)) [weakSelf showActionFailure];
         else [weakSelf refreshSnapshot];
     }]];
+    self.activeAction = rename;
     [presenter presentViewController:rename animated:YES completion:nil];
 }
 @end
@@ -367,28 +371,30 @@ int NWDeviceBrowserUIRegressionSelect(void) {
 }
 int NWDeviceBrowserUIRegressionMenu(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
-    UIViewController *presented = browser.presentedViewController;
-    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
-    if (![presented isKindOfClass:UIAlertController.class] || !browser.search.active ||
+    UIAlertController *menu = browser.activeAction;
+    NSDictionary *diagnostic = @{@"browser": @(browser != nil), @"search_active": @(browser.search.active),
+        @"query": browser.search.searchBar.text ?: @"", @"menu_on_screen": @(menu.view.window != nil),
+        @"presenter": menu.presentingViewController ? NSStringFromClass(menu.presentingViewController.class) : @"none"};
+    NSURL *file = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
+    [[NSJSONSerialization dataWithJSONObject:diagnostic options:0 error:NULL]
+        writeToURL:[file URLByAppendingPathComponent:@"browser-actions-state.json"] atomically:YES];
+    if (!menu.view.window || !menu.presentingViewController || !browser.search.active ||
         ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
-    UIAlertController *menu = (UIAlertController *)presented;
-    return menu.actions.count == 5 && [menu.title isEqual:@"Mesa"] && menu.actions[0].enabled ? 0 : 2;
+    return menu.preferredStyle == UIAlertControllerStyleActionSheet && menu.actions.count == 5 &&
+        [menu.title isEqual:@"Mesa"] && menu.actions[0].enabled ? 0 : 2;
 }
 int NWDeviceBrowserUIRegressionRename(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
-    UIViewController *presented = browser.presentedViewController;
-    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
-    if (![presented isKindOfClass:UIAlertController.class] || !browser.rows.count) return 1;
-    [browser renameFromMenu:(UIAlertController *)presented row:browser.rows.firstObject];
+    UIAlertController *menu = browser.activeAction;
+    if (!menu.view.window || !menu.presentingViewController || !browser.rows.count) return 1;
+    [browser renameFromMenu:menu row:browser.rows.firstObject];
     return 0;
 }
 int NWDeviceBrowserUIRegressionRenameCheck(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
-    UIViewController *presented = browser.presentedViewController;
-    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
-    if (![presented isKindOfClass:UIAlertController.class] || !browser.search.active ||
+    UIAlertController *rename = browser.activeAction;
+    if (!rename.view.window || !rename.presentingViewController || !browser.search.active ||
         ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
-    UIAlertController *rename = (UIAlertController *)presented;
     return rename.preferredStyle == UIAlertControllerStyleAlert && rename.textFields.count == 1 &&
         [rename.title isEqual:NWNativeText(@"Rename Device")] &&
         [rename.textFields.firstObject.text isEqual:@"Mesa"] ? 0 : 2;
