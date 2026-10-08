@@ -62,7 +62,7 @@
 "browser.sort.vendor" = "Fabricante";
 "browser.priority" = "iPhone y router primero";
 "browser.count" = "%lu de %lu equipos";
-"browser.hint" = "Resultados del escaneo actual. Para volver a escanear o bloquear equipos, cierra este panel y usa los controles de Wi-Fi. Toca un equipo para copiar su IP.";
+"browser.hint" = "Toca un equipo para abrir sus acciones. La búsqueda conserva el texto y los filtros.";
 "browser.noMatches" = "Ningún equipo coincide";
 "browser.empty" = "No hay resultados del escaneo";
 "browser.local" = "Este iPhone";
@@ -217,3 +217,13 @@
 "bt.catalog.single_hint" = "Toca el botón de reproducción de un modelo para emitirlo durante 10 segundos.";
 
 "bt.ui.emission" = "Emisión";
+
+"browser.actionsHint" = "Abre las acciones de este equipo.";
+
+"browser.copyIP" = "Copiar dirección IP";
+
+"browser.save" = "Guardar";
+
+"browser.actionFailed" = "No se pudo aplicar la acción";
+
+"browser.actionRetry" = "El equipo o el estado del escaneo ha cambiado. Revisa los resultados y vuelve a intentarlo.";

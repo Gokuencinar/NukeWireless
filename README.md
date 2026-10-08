@@ -9,7 +9,7 @@ Dispositivos aleatorios: generar seis modelos, emitir uno desde su tarjeta o emi
 Se retiran los botones repetidos del menú y se añaden logos de las plataformas,
 con colores dinámicos y selector adaptable. Escáner BLE, Detener, catálogo abierto
 y final silencioso conservados. Compilación, simulador, siete pruebas de paquete,
-instalación y firma verificadas; aceptación manual de la nueva UI pendiente.
+instalación y firma verificadas; el usuario confirma que todo funciona correctamente.
 Véase [Bluetooth simplificado](docs/BLUETOOTH-SIMPLIFIED-DEV50.md).
 
 **Dev49 instalado / trabajador app31:** Google/Fast Pair pasa de seis a nueve perfiles disponibles;

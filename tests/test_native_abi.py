@@ -51,7 +51,7 @@ _, length, offset = sections['__objc_classlist']
 for entry in range(offset, offset+length, 8):
     address = u64(entry); ro = class_ro(address)
     name = string(u64(ro+24))
-    if name in ['MMLANScanner','_TtC13HarpyReloaded10LanScanner','_TtC13HarpyReloaded10MCCommands']:
+    if name in ['MMLANScanner','_TtC13HarpyReloaded10LanScanner','_TtC13HarpyReloaded10MCCommands','_TtC13HarpyReloaded8MMDevice']:
         classes[name] = (methods(u64(ro+32)), methods(u64(class_ro(u64(file_offset(address)))+32)))
 
 scanner = classes['MMLANScanner'][0]
@@ -67,4 +67,9 @@ assert commands['blockGivenIPWithIp:targetMac:'] == 'v32@0:8@16@24'
 assert commands['unblockIPWithIp:'] == 'v24@0:8@16'
 assert commands['runningBlocksForIpWithIp:'] == '@24@0:8@16'
 assert commands['gatewayIP'] == '@16@0:8'
+device = classes['_TtC13HarpyReloaded8MMDevice'][0]
+assert device['nickName'] == device['ipAddress'] == device['macAddress'] == '@16@0:8'
+assert device['setNickName:'] == 'v24@0:8@16'
+assert device['isLocalDevice'] == device['isBlocking'] == 'B16@0:8'
+assert device['setIsBlocking:'] == 'v20@0:8B16'
 print('PASS: native scanner class, adapter callbacks and shared individual/bulk command ABI')

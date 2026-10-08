@@ -2,6 +2,7 @@
 #import "NWScanBridge.h"
 #import "NWResources.h"
 #import "NWAppearance.h"
+#import "NWLanguage.h"
 #import <arpa/inet.h>
 
 static NSString *const sortKey = @"NukeWirelessDeviceSort";
@@ -26,6 +27,8 @@ static uint32_t addressNumber(NSString *text) {
 @property (nonatomic) BOOL snapshotScanning;
 @property (nonatomic, strong) UIBarButtonItem *sortItem;
 - (void)refreshSnapshot;
+- (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor;
+- (void)showRename:(NSDictionary *)row;
 @end
 static __weak NWDeviceBrowserController *visibleBrowser;
 @implementation NWDeviceBrowserController
@@ -177,6 +180,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"NWBrowserDevice"];
     NWStyleCell(cell); cell.accessoryType = UITableViewCellAccessoryNone;
     UIListContentConfiguration *content = [UIListContentConfiguration subtitleCellConfiguration];
+    content.textProperties.numberOfLines = 0;
     content.secondaryTextProperties.numberOfLines = 0;
     if (!self.rows.count) {
         content.text = NWText(self.snapshot.count ? @"browser.noMatches" : (NWScanBusy() ? @"scan.scanning" : @"browser.empty"));
@@ -194,18 +198,100 @@ static __weak NWDeviceBrowserController *visibleBrowser;
         [details addObject:NWText(blocked ? @"browser.blocked" : @"browser.unblocked")];
         content.secondaryText = [details componentsJoinedByString:@"\n"];
         content.image = [UIImage systemImageNamed:blocked ? @"lock.fill" : @"wifi"];
-        cell.selectionStyle = UITableViewCellSelectionStyleDefault; cell.accessibilityHint = NWText(@"browser.copyHint");
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault; cell.accessibilityHint = NWText(@"browser.actionsHint");
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.accessibilityTraits |= UIAccessibilityTraitButton;
     }
     content.imageProperties.tintColor = NWAccentColor(); cell.contentConfiguration = content;
     return cell;
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {
-    [table deselectRowAtIndexPath:index animated:YES]; if (!self.rows.count || index.row >= (NSInteger)self.rows.count) return;
-    UIPasteboard.generalPasteboard.string = self.rows[index.row][@"ip"];
-    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"browser.copied"));
-    UIAlertController *message = [UIAlertController alertControllerWithTitle:NWText(@"browser.copied") message:nil preferredStyle:UIAlertControllerStyleAlert];
-    [message addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
-    if (!self.presentedViewController) [self presentViewController:message animated:YES completion:nil];
+    [table deselectRowAtIndexPath:index animated:YES];
+    if (index.row < 0 || index.row >= (NSInteger)self.rows.count) return;
+    NSDictionary *row = [self.rows[index.row] copy];
+    [self.view endEditing:YES];
+    [self showDeviceActions:row anchor:[table cellForRowAtIndexPath:index] ?: table];
+}
+- (UIViewController *)actionPresenter {
+    // An active search owns a presentation; keep its text and results in place.
+    UIViewController *presenter = self.presentedViewController ?: self;
+    return ([presenter isKindOfClass:UISearchController.class] || presenter == self) &&
+        !presenter.presentedViewController ? presenter : nil;
+}
+- (void)showActionFailure {
+    UIViewController *presenter = [self actionPresenter];
+    if (!presenter) {
+        UIViewController *search = self.presentedViewController;
+        UIViewController *alert = [search isKindOfClass:UISearchController.class] ? search.presentedViewController : search;
+        if ([alert isKindOfClass:UIAlertController.class]) {
+            [alert dismissViewControllerAnimated:YES completion:^{ [self showActionFailure]; }];
+        }
+        return;
+    }
+    if (!presenter.view.window) return;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"browser.actionFailed")
+        message:NWText(@"browser.actionRetry") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+    [presenter presentViewController:alert animated:YES completion:nil];
+}
+- (UIAlertController *)deviceMenu:(NSDictionary *)row anchor:(UIView *)anchor {
+    UIAlertController *menu = [UIAlertController alertControllerWithTitle:row[@"name"]
+        message:[NSString stringWithFormat:@"%@\n%@", row[@"ip"], row[@"mac"] ?: @""] preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak NWDeviceBrowserController *weakSelf = self;
+    BOOL blocked = [row[@"blocked"] boolValue];
+    UIAlertAction *toggle = [UIAlertAction actionWithTitle:NWNativeText(blocked ? @"Unblock Device" : @"Block Device")
+        style:blocked ? UIAlertActionStyleDefault : UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+            (void)action;
+            if (!NWDeviceSetBlocked(row, !blocked, ^(BOOL success) {
+                [weakSelf refreshSnapshot]; if (!success) [weakSelf showActionFailure];
+            })) [weakSelf showActionFailure];
+        }];
+    toggle.enabled = NWDeviceCanSetBlocked(row, !blocked); [menu addAction:toggle];
+    __weak UIAlertController *weakMenu = menu;
+    UIAlertAction *rename = [UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        (void)action;
+        [weakMenu dismissViewControllerAnimated:YES completion:^{ [weakSelf showRename:row]; }];
+    }];
+    rename.enabled = NWDeviceCanRename(row); [menu addAction:rename];
+    UIAlertAction *clear = [UIAlertAction actionWithTitle:NWNativeText(@"Clear Nickname") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        (void)action;
+        if (!NWDeviceSetNickname(row, nil)) [weakSelf showActionFailure];
+        else [weakSelf refreshSnapshot];
+    }];
+    clear.enabled = rename.enabled && [row[@"nickname"] length] > 0; [menu addAction:clear];
+    [menu addAction:[UIAlertAction actionWithTitle:NWText(@"browser.copyIP") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        (void)action; UIPasteboard.generalPasteboard.string = row[@"ip"];
+        UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, NWText(@"browser.copied"));
+    }]];
+    [menu addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+    menu.popoverPresentationController.sourceView = anchor;
+    menu.popoverPresentationController.sourceRect = anchor.bounds;
+    return menu;
+}
+- (void)showDeviceActions:(NSDictionary *)row anchor:(UIView *)anchor {
+    UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
+    [presenter presentViewController:[self deviceMenu:row anchor:anchor] animated:YES completion:nil];
+}
+- (void)showRename:(NSDictionary *)row {
+    UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
+    UIAlertController *rename = [UIAlertController alertControllerWithTitle:NWNativeText(@"Rename Device")
+        message:row[@"ip"] preferredStyle:UIAlertControllerStyleAlert];
+    [rename addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.placeholder = NWNativeText(@"Enter new name");
+        field.text = [row[@"nickname"] length] ? row[@"nickname"] : row[@"name"];
+        field.autocapitalizationType = UITextAutocapitalizationTypeWords;
+        field.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    __weak NWDeviceBrowserController *weakSelf = self;
+    __weak UIAlertController *weakRename = rename;
+    [rename addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
+    [rename addAction:[UIAlertAction actionWithTitle:NWText(@"browser.save") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        (void)action;
+        NSString *name = [weakRename.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        if (!NWDeviceSetNickname(row, name.length ? name : nil)) [weakSelf showActionFailure];
+        else [weakSelf refreshSnapshot];
+    }]];
+    [presenter presentViewController:rename animated:YES completion:nil];
 }
 @end
 void NWPresentDeviceBrowser(UIViewController *presenter) {
@@ -217,3 +303,65 @@ void NWPresentDeviceBrowser(UIViewController *presenter) {
     [presenter presentViewController:navigation animated:YES completion:nil];
 }
 void NWRefreshVisibleDeviceBrowser(void) { if (visibleBrowser.view.window) [visibleBrowser refreshSnapshot]; }
+#ifdef NW_UI_TESTING
+int NWDeviceBrowserUIRegressionCheck(void) {
+    if (NWDeviceActionsUIRegressionCheck()) return 1;
+    NWBeginDeviceActionsUITest();
+    @try {
+        NWDeviceBrowserController *browser = [NWDeviceBrowserController new]; [browser loadViewIfNeeded];
+        browser.search.searchBar.selectedScopeButtonIndex = 0;
+        for (NSString *query in @[@"192.0.2.42", @"44:55", @"samsUNG"]) {
+            browser.search.searchBar.text = query; [browser projectSnapshot];
+            if (browser.rows.count != 1 || ![browser.rows.firstObject[@"ip"] isEqual:@"192.0.2.42"]) return 2;
+            UITableViewCell *cell = [browser tableView:browser.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+            if (cell.accessoryType != UITableViewCellAccessoryDisclosureIndicator ||
+                ![cell.accessibilityHint isEqual:NWText(@"browser.actionsHint")]) return 3;
+            UIAlertController *menu = [browser deviceMenu:browser.rows.firstObject anchor:cell];
+            if (menu.actions.count != 5 || ![menu.actions[0].title isEqual:NWNativeText(@"Block Device")] ||
+                !menu.actions[0].enabled || !menu.actions[1].enabled || menu.actions[2].enabled) return 4;
+            if (!NWDeviceSetNickname(browser.rows.firstObject, @"Escritorio")) return 5;
+            [browser refreshSnapshot];
+            menu = [browser deviceMenu:browser.rows.firstObject anchor:cell];
+            if (!menu.actions[2].enabled) return 6;
+            NWDeviceSetNickname(browser.rows.firstObject, nil); [browser refreshSnapshot];
+        }
+        browser.search.searchBar.text = @"no-match"; [browser projectSnapshot];
+        if (browser.rows.count) return 7;
+        return 0;
+    } @finally { NWEndDeviceActionsUITest(); }
+}
+int NWDeviceBrowserUIRegressionPresent(void) {
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            if (!window.isKeyWindow) continue;
+            UIViewController *root = window.rootViewController;
+            if (root.presentedViewController) return 1;
+            NWBeginDeviceActionsUITest(); NWPresentDeviceBrowser(root); return 0;
+        }
+    }
+    return 2;
+}
+int NWDeviceBrowserUIRegressionSearch(void) {
+    NWDeviceBrowserController *browser = visibleBrowser;
+    if (!browser.view.window) return 1;
+    browser.search.searchBar.selectedScopeButtonIndex = 0;
+    browser.search.searchBar.text = @"44:55"; [browser projectSnapshot]; browser.search.active = YES;
+    return browser.rows.count == 1 ? 0 : 2;
+}
+int NWDeviceBrowserUIRegressionSelect(void) {
+    NWDeviceBrowserController *browser = visibleBrowser;
+    if (!browser.view.window || !browser.search.active || browser.rows.count != 1) return 1;
+    [browser tableView:browser.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+    return 0;
+}
+int NWDeviceBrowserUIRegressionMenu(void) {
+    NWDeviceBrowserController *browser = visibleBrowser;
+    UIViewController *presented = browser.presentedViewController;
+    if ([presented isKindOfClass:UISearchController.class]) presented = presented.presentedViewController;
+    if (![presented isKindOfClass:UIAlertController.class] || !browser.search.active ||
+        ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
+    UIAlertController *menu = (UIAlertController *)presented;
+    return menu.actions.count == 5 && [menu.title isEqual:@"Mesa"] && menu.actions[0].enabled ? 0 : 2;
+}
+#endif

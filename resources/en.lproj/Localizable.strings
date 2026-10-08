@@ -62,7 +62,7 @@
 "browser.sort.vendor" = "Vendor";
 "browser.priority" = "iPhone and router first";
 "browser.count" = "%lu of %lu devices";
-"browser.hint" = "Current scan results. To scan again or block devices, close this panel and use the Wi-Fi controls. Tap a device to copy its IP.";
+"browser.hint" = "Tap a device to open its actions. Search text and filters are preserved.";
 "browser.noMatches" = "No matching devices";
 "browser.empty" = "No scan results";
 "browser.local" = "This iPhone";
@@ -217,3 +217,13 @@
 "bt.catalog.single_hint" = "Tap a model’s play button to advertise it for 10 seconds.";
 
 "bt.ui.emission" = "Advertising";
+
+"browser.actionsHint" = "Open actions for this device.";
+
+"browser.copyIP" = "Copy IP address";
+
+"browser.save" = "Save";
+
+"browser.actionFailed" = "Could not apply the action";
+
+"browser.actionRetry" = "The device or scan state has changed. Check the results and try again.";

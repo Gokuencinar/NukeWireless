@@ -17,10 +17,11 @@ static UIImage *brandImage(NSString *name) {
     CGPDFPageRef page = CGPDFDocumentGetPage(document, 1);
     UIImage *image = nil;
     if (page) {
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(24, 24)];
+        CGSize size = CGSizeMake([name isEqual:@"samsung"] ? 64 : 24, 24);
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
         image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
             CGContextTranslateCTM(context.CGContext, 0, 24); CGContextScaleCTM(context.CGContext, 1, -1);
-            CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFMediaBox, CGRectMake(0, 0, 24, 24), 0, YES));
+            CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFCropBox, CGRectMake(0, 0, size.width, size.height), 0, YES));
             CGContextDrawPDFPage(context.CGContext, page);
         }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
@@ -150,7 +151,7 @@ static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"
     content.text = NWText(@"bt.catalog.selection");
     content.image = brandImage(self.platform == 1 ? @"android" : brandAssets()[self.platform]);
     content.imageProperties.tintColor = UIColor.secondaryLabelColor;
-    content.imageProperties.maximumSize = CGSizeMake(18, 18);
+    content.imageProperties.maximumSize = CGSizeMake(self.platform == 3 ? 48 : 18, 18);
     header.contentConfiguration = content; return header;
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {

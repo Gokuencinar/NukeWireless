@@ -29,6 +29,7 @@ static NSMutableDictionary<NSString *, id> *devices;
 static NSMutableSet<NSString *> *bulkOwned;
 static NSTimer *watchdog;
 static BOOL bulkBusy;
+static NSObject *deviceActionToken;
 static NSUInteger bulkFailures;
 static NSString *scanNetwork;
 static __weak NWLegacyScanner *activeScanner;
@@ -250,6 +251,8 @@ NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void) {
         row[@"ip"] = [ip copy];
         id nickname = readObject(device, @"nickName");
         if ([nickname isKindOfClass:NSString.class] && [nickname length]) row[@"name"] = [nickname copy];
+        row[@"nickname"] = [nickname isKindOfClass:NSString.class] ? [nickname copy] : @"";
+        row[@"generation"] = @(state.generation);
         if (![row[@"name"] length]) row[@"name"] = [NSString stringWithFormat:NWText(@"device.fallback"), ip.pathExtension];
         SEL local = NSSelectorFromString(@"isLocalDevice"); // Same getter already used by targets().
         row[@"local"] = @([device respondsToSelector:local] && ((BOOL (*)(id, SEL))objc_msgSend)(device, local));
@@ -263,6 +266,76 @@ NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void) {
     return [snapshot copy];
 }
 uint64_t NWDeviceGeneration(void) { return state.generation; }
+static id currentDevice(NSDictionary *row) {
+    if (!NSThread.isMainThread || ![row[@"ip"] isKindOfClass:NSString.class] ||
+        ![row[@"mac"] isKindOfClass:NSString.class] || ![row[@"generation"] isKindOfClass:NSNumber.class] ||
+        [row[@"generation"] unsignedLongLongValue] != state.generation ||
+        ![scanNetwork isEqualToString:networkIdentity()]) return nil;
+    id device = devices[row[@"ip"]];
+    if (!device || ![readObject(device, @"ipAddress") isEqual:row[@"ip"]] ||
+        ![(readObject(device, @"macAddress") ?: @"") isEqual:row[@"mac"]]) return nil;
+    return device;
+}
+static BOOL validMethod(Class cls, SEL selector, BOOL classMethod, const char *encoding) {
+    Method method = classMethod ? class_getClassMethod(cls, selector) : class_getInstanceMethod(cls, selector);
+    return method && strcmp(method_getTypeEncoding(method), encoding) == 0;
+}
+BOOL NWDeviceCanRename(NSDictionary *row) {
+    id device = currentDevice(row);
+    return device && !bulkBusy && validMethod(object_getClass(device), NSSelectorFromString(@"setNickName:"), NO, "v24@0:8@16");
+}
+BOOL NWDeviceSetNickname(NSDictionary *row, NSString *nickname) {
+    if (!NWDeviceCanRename(row)) return NO;
+    id device = currentDevice(row);
+    // MMDevice's optional native property accepts nil when clearing a nickname.
+    // No second preferences store or substitute device is introduced.
+    @try {
+        ((void (*)(id, SEL, id))objc_msgSend)(device, NSSelectorFromString(@"setNickName:"), nickname);
+    } @catch (NSException *exception) { (void)exception; return NO; }
+    notify(); return YES;
+}
+BOOL NWDeviceCanSetBlocked(NSDictionary *row, BOOL blocked) {
+    id device = currentDevice(row);
+    if (!device || NWScanBusy() || bulkBusy) return NO;
+    SEL local = NSSelectorFromString(@"isLocalDevice");
+    if (![device respondsToSelector:local] || ((BOOL (*)(id, SEL))objc_msgSend)(device, local)) return NO;
+    if (blocked) {
+        NSString *mac = readObject(device, @"macAddress");
+        NSRegularExpression *format = [NSRegularExpression regularExpressionWithPattern:@"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$" options:0 error:NULL];
+        if (![format firstMatchInString:mac ?: @"" options:0 range:NSMakeRange(0, mac.length)]) return NO;
+        id registered = readObject(commands(), @"runningBlocksForArp");
+        if (![registered isKindOfClass:NSArray.class] || [registered count] >= 64) return NO;
+    }
+    return validMethod(commands(), blocked ? NSSelectorFromString(@"blockGivenIPWithIp:targetMac:") :
+        NSSelectorFromString(@"unblockIPWithIp:"), YES, blocked ? "v32@0:8@16@24" : "v24@0:8@16");
+}
+static void verifyDeviceBlock(NSDictionary *row, BOOL blocked, NSObject *token, NSUInteger attempt, void (^completion)(BOOL)) {
+    if (deviceActionToken != token) return;
+    BOOL success = currentDevice(row) && isBlocked(row[@"ip"]) == blocked;
+    if (!success && currentDevice(row) && attempt < 7) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+            verifyDeviceBlock(row, blocked, token, attempt + 1, completion);
+        }); return;
+    }
+    if (currentDevice(row)) updateDeviceState(row[@"ip"]);
+    deviceActionToken = nil; bulkBusy = NO; notify();
+    if (completion) completion(success);
+}
+BOOL NWDeviceSetBlocked(NSDictionary *row, BOOL blocked, void (^completion)(BOOL success)) {
+    if (!NWDeviceCanSetBlocked(row, blocked)) return NO;
+    if (isBlocked(row[@"ip"]) == blocked) {
+        updateDeviceState(row[@"ip"]); notify(); if (completion) completion(YES); return YES;
+    }
+    NSObject *token = [NSObject new]; deviceActionToken = token; bulkBusy = YES; notify();
+    if (!currentDevice(row)) { deviceActionToken = nil; bulkBusy = NO; notify(); return NO; }
+    @try {
+        if (blocked) ((void (*)(id, SEL, id, id))objc_msgSend)(commands(), NSSelectorFromString(@"blockGivenIPWithIp:targetMac:"), row[@"ip"], row[@"mac"]);
+        else ((void (*)(id, SEL, id))objc_msgSend)(commands(), NSSelectorFromString(@"unblockIPWithIp:"), row[@"ip"]);
+    } @catch (NSException *exception) {
+        (void)exception; deviceActionToken = nil; bulkBusy = NO; notify(); return NO;
+    }
+    verifyDeviceBlock([row copy], blocked, token, 0, [completion copy]); return YES;
+}
 NSString *NWReadGatewayAddress(void) {
     uint32_t gateway = configurationGateway();
     if (!gateway) return nil;
@@ -437,6 +510,58 @@ void NWInstallScanHooks(void) {
 }
 
 #ifdef NW_UI_TESTING
+extern void NWResetDeviceCommandFixture(void);
+extern NSArray *NWDeviceCommandFixtureCalls(void);
+static NWScanState browserSavedState;
+static NSMutableDictionary *browserSavedDevices;
+static NSMutableSet *browserSavedOwned;
+static NSString *browserSavedNetwork;
+static BOOL browserSavedBusy;
+static NSObject *browserSavedActionToken;
+void NWBeginDeviceActionsUITest(void) {
+    browserSavedState = state; browserSavedDevices = devices; browserSavedOwned = bulkOwned;
+    browserSavedNetwork = scanNetwork; browserSavedBusy = bulkBusy; browserSavedActionToken = deviceActionToken;
+    state.phase = NWComplete; ++state.generation; bulkBusy = NO; deviceActionToken = nil;
+    scanNetwork = networkIdentity(); devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
+    NWResetDeviceCommandFixture();
+    for (NSArray *values in @[@[@"Mesa", @"192.0.2.42", @"00:11:22:33:44:55", @"Samsung"],
+        @[@"iPhone", @"192.0.2.43", @"00:11:22:33:44:66", @"Apple"]]) {
+        id device = [NSClassFromString(@"_TtC13HarpyReloaded8MMDevice") new];
+        setObject(device, @"setHostname:", values[0]); setObject(device, @"setIpAddress:", values[1]);
+        setObject(device, @"setMacAddress:", values[2]); setObject(device, @"setBrand:", values[3]);
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(device, NSSelectorFromString(@"setIsLocalDevice:"), [values[0] isEqual:@"iPhone"]);
+        devices[values[1]] = device;
+    }
+}
+void NWEndDeviceActionsUITest(void) {
+    state = browserSavedState; devices = browserSavedDevices; bulkOwned = browserSavedOwned;
+    scanNetwork = browserSavedNetwork; bulkBusy = browserSavedBusy; deviceActionToken = browserSavedActionToken;
+    NWResetDeviceCommandFixture();
+}
+int NWDeviceActionsUIRegressionCheck(void) {
+    NWBeginDeviceActionsUITest();
+    @try {
+        NSDictionary *row = NWDeviceSnapshot().firstObject;
+        if (!NWDeviceCanRename(row) || !NWDeviceSetNickname(row, @"Escritorio") ||
+            ![NWDeviceSnapshot().firstObject[@"name"] isEqual:@"Escritorio"]) return 1;
+        if (!NWDeviceSetNickname(row, nil) || ![NWDeviceSnapshot().firstObject[@"name"] isEqual:@"Mesa"]) return 2;
+        NSMutableDictionary *stale = [row mutableCopy]; stale[@"generation"] = @(state.generation + 1);
+        if (NWDeviceSetNickname(stale, @"Incorrecto") || NWDeviceSetBlocked(stale, YES, nil)) return 3;
+        stale = [row mutableCopy]; stale[@"mac"] = @"00:11:22:33:44:99";
+        if (NWDeviceSetNickname(stale, @"Incorrecto") || NWDeviceSetBlocked(stale, YES, nil)) return 4;
+        __block BOOL completed = NO, success = NO;
+        if (!NWDeviceSetBlocked(row, YES, ^(BOOL result) { completed = YES; success = result; }) || !completed || !success) return 5;
+        if (![NWDeviceCommandFixtureCalls() isEqual:@[@[@"block", @"192.0.2.42", @"00:11:22:33:44:55"]]] ||
+            ![NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 6;
+        if (!NWDeviceSetBlocked(row, NO, nil) || [NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 7;
+        if (NWDeviceCanSetBlocked(NWDeviceSnapshot().lastObject, YES)) return 8;
+        state.phase = NWScanning;
+        if (NWDeviceCanSetBlocked(row, YES)) return 9;
+        state.phase = NWComplete; scanNetwork = @"different-network";
+        if (NWDeviceSetNickname(row, @"Incorrecto") || NWDeviceSetBlocked(row, YES, nil)) return 10;
+        return 0;
+    } @finally { NWEndDeviceActionsUITest(); }
+}
 static NWScanState uiTestSavedScanState;
 void NWBeginWiFiScanUITest(void) { uiTestSavedScanState = state; state.phase = NWScanning; }
 void NWEndWiFiScanUITest(void) { state = uiTestSavedScanState; }

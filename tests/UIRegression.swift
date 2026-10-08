@@ -1,6 +1,18 @@
 import SwiftUI
 import UIKit
 import Combine
+@_silgen_name("NWDeviceBrowserUIRegressionCheck")
+func checkBrowserUI() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionPresent")
+func presentBrowser() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionSearch")
+func searchBrowser() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionSelect")
+func selectBrowser() -> Int32
+@_silgen_name("NWDeviceBrowserUIRegressionMenu")
+func checkBrowserMenu() -> Int32
+@_silgen_name("NWEndDeviceActionsUITest")
+func endBrowserFixture()
 @_silgen_name("NWBluetoothUIRegressionCheck")
 func checkBluetoothUI() -> Int32
 @_silgen_name("NWBluetoothCatalogUIRegressionPresent")
@@ -75,6 +87,7 @@ struct RegressionTabs: View {
                                 results.append(checkUI(2))
                                 results.append(checkBLEUI())
                                 results.append(checkBluetoothUI())
+                                results.append(checkBrowserUI())
                                 results.append(presentCatalog(0))
                                 captureCatalog(0)
                             }
@@ -100,7 +113,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 26,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 31,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -137,10 +150,28 @@ struct RegressionTabs: View {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 18], "ui-initial.json")
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 19], "ui-initial.json")
                     guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                         .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
-                    root.dismiss(animated: false) { prepareResume(0) }
+                    root.dismiss(animated: false) {
+                        let result = presentBrowser(); results.append(result)
+                        captureBrowser(0, fixture: result == 0)
+                    }
+                }
+            }
+        }
+    }
+    private func captureBrowser(_ phase: Int, fixture: Bool) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if phase == 0 { results.append(searchBrowser()); captureBrowser(1, fixture: fixture) }
+            else if phase == 1 { results.append(selectBrowser()); captureBrowser(2, fixture: fixture) }
+            else {
+                results.append(checkBrowserMenu()); snapshot("browser-actions.png")
+                guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                    .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
+                root.dismiss(animated: false) {
+                    if fixture { endBrowserFixture() }
+                    prepareResume(0)
                 }
             }
         }
