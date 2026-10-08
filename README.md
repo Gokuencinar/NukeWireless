@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**Dev50 instalado / trabajador app31 sin cambios:** las emisiones se concentran en
+Dispositivos aleatorios: generar seis modelos, emitir uno desde su tarjeta o emitir todos.
+Se retiran los botones repetidos del menú y se añaden logos de las plataformas,
+con colores dinámicos y selector adaptable. Escáner BLE, Detener, catálogo abierto
+y final silencioso conservados. Compilación, simulador, siete pruebas de paquete,
+instalación y firma verificadas; aceptación manual de la nueva UI pendiente.
+Véase [Bluetooth simplificado](docs/BLUETOOTH-SIMPLIFIED-DEV50.md).
+
 **Dev49 instalado / trabajador app31:** Google/Fast Pair pasa de seis a nueve perfiles disponibles;
 Generar elige seis modelos entre 84 selecciones, sin repetir la anterior.
 Añade Sony WF-1000XM4, Sony WH-1000XM5 y Jabra Elite 5.
