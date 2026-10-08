@@ -4,10 +4,12 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Dev48 / trabajador app30:** el catálogo genera seis modelos con perfiles disponibles
+**Dev48 instalado / trabajador app30:** el catálogo genera seis modelos con perfiles disponibles
 y añade doce entradas entre Apple, Fast Pair, Microsoft y Samsung. La restauración verifica que la interfaz HCI
 está publicada antes de liberar la operación; la espera de disponibilidad está acotada,
-sin repetir anuncios. Compilación e instalación pendientes. Véase
+sin repetir anuncios. Compilación, paquete, instalación y recepción de 26 identidades
+verificados; cinco emisiones consecutivas, cancelación temprana y emisión posterior
+comprobadas por SSH. Repetición desde la UI pendiente de aceptación manual. Véase
 [emisiones consecutivas](docs/BLUETOOTH-REPEAT-DEV48.md).
 
 **Dev47 instalado / trabajador app28:** la barra de cuatro opciones se separa del contenido
