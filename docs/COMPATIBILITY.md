@@ -1,13 +1,17 @@
-# Candidatas de compatibilidad iOS 15–18: compat3
+# Candidatas de compatibilidad iOS 15–18: compat4
 
-Preparadas desde las fuentes de **dev52**, conservando el trabajador **app31**.
-La referencia instalada y aceptada sigue siendo dev52 en iPhone XS / iOS 16.3.1 /
-Dopamine RootHide. `compat1` y `compat2` pertenecen a dev18/dev19 y no contienen
-la interfaz actual: no reutilizar sus artefactos para esta entrega.
+Preparadas desde las fuentes de **dev53**, con el trabajador **app32**.
+Dev53/app32 está instalado y verificado en iPhone XS / iOS 16.3.1 / Dopamine
+RootHide; la última aceptación manual de interfaz corresponde a dev52/app31.
+Las candidatas compat4 no se han instalado: su adaptador recompilado y los
+otros bootstraps requieren validación física propia. El usuario no dispone de
+dispositivos adicionales. Las entregas anteriores conservan sus informes;
+no reutilizar artefactos antiguos para estas fuentes.
 
-El usuario no dispone de otros dispositivos para probar. El mínimo de build
-15.0 y la dependencia de instalación `< 19.0` delimitan una candidata; **no
-acreditan funcionamiento completo en iOS 15, 17, 18 ni otros bootstraps**.
+El mínimo de build 15.0 y la dependencia `< 19.0` delimitan el rango experimental.
+La emisión ya admite sistemas que cumplan el contrato Skywalk observado, sin
+whitelist XS/16.3.1. Esto no acredita funcionamiento en cada chip o versión menor.
+Véase [port y fuentes primarias de ABI](BLUETOOTH-SKYWALK-PORT.md).
 
 ## Paquetes separados
 
@@ -23,10 +27,10 @@ de paquete y el bundle ID `me.midnightchips.harpy-reloaded` para preferencias,
 datos y permiso Bluetooth. El script de firma fija también ese identificador
 en el CodeDirectory; se corrige la omisión de las candidatas antiguas.
 
-La app tiene versión `1.0.25+rh25.6~compat3`, CFBundleVersion `25.6.3` y manifiesto
-que identifica el núcleo dev52. El marcador compilado del núcleo sigue siendo
-`NWBuild-rh25.5-dev52`. No se cambia la versión de la biblioteca Bluetooth:
-sus fuentes y restricciones no se han ampliado.
+La app tiene versión `1.0.25+rh25.6~compat4`, CFBundleVersion `25.6.4` y manifiesto
+que identifica el núcleo dev53. El marcador compilado del núcleo sigue siendo
+`NWBuild-rh25.5-dev53`. El trabajador pasa a app32 porque sus fuentes y política de admisión cambian.
+No se atribuye la validación del núcleo de desarrollo al adaptador compat4.
 
 ## Adaptación actual
 
@@ -58,16 +62,16 @@ sus fuentes y restricciones no se han ampliado.
 ## Bluetooth y funciones privadas
 
 El catálogo visual y el escáner CoreBluetooth no dependen de que esté admitida
-la emisión nativa. Los paquetes del trabajador admiten instalación en el rango
-experimental, pero `--status` y `NWBTNativeGuard` siguen restringiendo el
-transporte a **iPhone11,2 / iOS 16.3.1** y a los bytes inspeccionados de la biblioteca
-privada. Solo RootHide tiene evidencia funcional en dispositivo; cambiar el
-prefijo para Dopamine o rootful no valida restauración ni acceso al controlador.
+la emisión nativa. `--status` comprueba símbolos, firmas y descriptor HCI Skywalk.
+Antes de configurar anuncios se comprueban respuestas y comandos soportados del
+controlador. Se conservan límites, Detener, final silencioso y recuperación del
+dominio real de bluetoothd. No se añaden permisos ni controladores alternativos.
 
-No se quitan guards para aparentar soporte general. En otras combinaciones los
-controles de emisión quedan no disponibles. Para ampliarlos hay que observar
-el controlador, firmas privadas, registro IOKit y recuperación del servicio en
-la build exacta; una respuesta HCI no demuestra recepción ni aviso del receptor.
+El diagnóstico ACT y ACL antiguo mantiene la whitelist exacta y hash originales.
+Un equipo sin HCI Skywalk sigue sin emisión nativa. Solo la referencia RootHide
+tiene instalación física de app32; Dopamine convencional, rootful y los otros
+iOS necesitan pruebas propias. La respuesta HCI, recepción externa y aviso del
+receptor son evidencias distintas.
 
 El núcleo Swift original se conserva como binario, sin su fuente completa.
 Foundation/NSTask, MobileWiFi y los auxiliares pueden variar. Wi-Fi, escaneo BLE,
@@ -91,7 +95,7 @@ python3 tests/test_compat_package.py --artifact build
 navegación/segundo plano en español e inglés con macOS 15. Conserva artefactos
 privados temporales; no publica releases ni instala en dispositivos. La base
 rh25.3 se necesita localmente y está fijada por SHA-256. Los paquetes de app
-salen en `dist/compat3`; los auxiliares en `dist/bluetooth`.
+salen en `dist/compat4`; los auxiliares en `dist/bluetooth`.
 
 Cada candidata incluye `compatibility.json` y un manifiesto externo con
 `runtime_verified: false`. Consultar el informe de esta entrega para el resultado

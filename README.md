@@ -4,17 +4,22 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
-**Dev53 / app32 / compat4 en validación:** la emisión Bluetooth usa admisión por
-contrato Skywalk en iOS 15–18 y recuperación del servicio en su dominio observado.
-Se retira la dependencia de la whitelist XS/16.3.1 de las emisiones; el antiguo
-diagnóstico ACT/ACL conserva su guard específico. No se declara probado en otros
-dispositivos. Véase [port Bluetooth y evidencia de ABI](docs/BLUETOOTH-SKYWALK-PORT.md).
+**Dev53 / app32 instalado; compat4 compilada y empaquetada:** la emisión Bluetooth
+usa admisión por contrato Skywalk en iOS 15–18 y recuperación del dominio observado
+de bluetoothd. Se retira la whitelist XS/16.3.1 de las emisiones; ACT/ACL conserva
+su guard. CI, simulador iOS 18.5 y los seis paquetes de tres bootstraps aprobados.
+Dev53/app32 está instalado y firmado en la referencia RootHide; los otros iOS,
+bootstraps y el adaptador compat4 requieren validación física.
+Pruebas de emisión consecutiva, cancelación por CLI y recepción de nueve perfiles Fast Pair aprobadas.
+Véanse [port Bluetooth](docs/BLUETOOTH-SKYWALK-PORT.md),
+[validación compat4](docs/COMPAT4-VALIDATION.md) y
+[compatibilidad y límites actuales](docs/COMPATIBILITY.md).
 
-**Compat3 compilada y empaquetada:** candidatas desde dev52 para iOS 15–18 en
+**Compat3, entrega anterior compilada y empaquetada:** candidatas desde dev52 para iOS 15–18 en
 RootHide, Dopamine rootless y rootful. CI y ocho pruebas de los seis paquetes
 aprobados; interfaz en simulador iOS 18.5, 33 checks y cuatro ciclos de segundo
 plano por idioma. Las nuevas combinaciones siguen sin validación física y la
-emisión conserva el guard iPhone XS / iOS 16.3.1. Dev52 permanece instalada.
+emisión conservaba el guard iPhone XS / iOS 16.3.1. Dev52 era la versión instalada.
 Véanse [compatibilidad y límites](docs/COMPATIBILITY.md) y
 [validación compat3](docs/COMPAT3-VALIDATION.md).
 

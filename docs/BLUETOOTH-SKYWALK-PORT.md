@@ -60,4 +60,5 @@ CoreBluetooth, catálogo y navegación conservan sus funciones anteriores. El
 port habilita intentar la emisión en sistemas que cumplan el contrato observado;
 no incorpora un driver alternativo para hardware sin HCI Skywalk. iOS 15, 17,
 18, Dopamine convencional y rootful requieren pruebas físicas propias. Los
-paquetes compat4 y sus resultados se documentarán tras compilar y validarlos.
+paquetes compat4 y las pruebas de dev53/app32 en la referencia RootHide se
+registran en [validación compat4](COMPAT4-VALIDATION.md).
