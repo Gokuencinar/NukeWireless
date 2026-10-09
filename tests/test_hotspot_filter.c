@@ -51,6 +51,10 @@ int main(void) {
     assert(!parse_mac("01:11:22:33:44:55", mac, canonical));
     assert(!parse_mac("00:00:00:00:00:00", mac, canonical));
     assert(!parse_mac("02:11:22:33:44:55:66", mac, canonical));
+    char owner_mac[13]={0}, owner_prefix[64];
+    assert(client_label(OWNER "021122334455:0:1",owner_mac,owner_prefix));
+    assert(!client_label(OWNER "021122334455:0:1junk",owner_mac,owner_prefix));
+    assert(!client_label("system-hotspot-NAT",owner_mac,owner_prefix));
     strcpy(fixture[fixture_count++].label, "system-hotspot-NAT");
     strcpy(fixture[fixture_count++].label, OWNER "021122334466:0:0");
     const char *own = OWNER "021122334455:";

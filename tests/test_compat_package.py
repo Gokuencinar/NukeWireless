@@ -86,6 +86,10 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual(info['NukeWirelessWorkerVersion'], bluetooth.VERSION)
                 self.assertIn('-Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"', script)
                 self.assertIn('ldid -S /' + prefix + inject + '/NukeWirelessInfo.dylib', script)
+                self.assertIn('chmod 4755 "$BASE/nw-hotspot"', script)
+                helper = files[prefix + 'usr/libexec/harpy-reloaded/nw-hotspot'][1]
+                self.assertEqual(sha(helper), json.loads(self.apps[scheme].with_suffix('.manifest.json').read_text(encoding='utf-8'))['core']['hotspot_helper_sha256'])
+                self.assertIn((prefix + 'usr/libexec/harpy-reloaded/nw-hotspot clear').encode(), controls['prerm'][1])
                 self.assertEqual(any(name.endswith('.roothidepatch') for name in files), scheme == 'roothide')
                 self.assertFalse(any('HarpyRootHidePaths' in name for name in files))
                 self.assertIn(prefix + inject + '/NukeWirelessPaths.dylib', files)

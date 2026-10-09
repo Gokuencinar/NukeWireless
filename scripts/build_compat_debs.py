@@ -10,7 +10,7 @@ import plistlib
 import tempfile
 from pathlib import Path
 from build_manifest import ROOT, sha
-from build_nuke_info_deb import build, read_tar, APP, EXPECTED_SOURCE_SHA256
+from build_nuke_info_deb import build, read_tar, APP, EXPECTED_SOURCE_SHA256, hotspot_prerm
 from compat_manifest import compat_sources
 from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
@@ -109,7 +109,7 @@ Description: NukeWireless iOS 15-18 development diagnostic edition ({label})
     output.mkdir(parents=True, exist_ok=True)
     destination = output / f"com.gokuencinar.nukewireless_{VERSION}_{architecture}.deb"
     destination.write_bytes(pack_ar([("debian-binary", b"2.0\n"),
-        ("control.tar.gz", tar_bytes([regular("control", control), regular("postinst", maintainer_script(prefix, inject), 0o755)])),
+        ("control.tar.gz", tar_bytes([regular("control", control), regular("postinst", maintainer_script(prefix, inject), 0o755), regular("prerm", hotspot_prerm(prefix), 0o755)])),
         ("data.tar.gz", tar_bytes(ordered_entries(final)))]))
     report["package_sha256"] = sha(destination.read_bytes())
     destination.with_suffix(".manifest.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

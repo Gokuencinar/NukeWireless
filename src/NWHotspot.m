@@ -30,6 +30,10 @@ static BOOL returned, changing, checking;
 static NSTimer *watchdog;
 static NSDictionary *filterStatus;
 static NSUInteger filterGeneration;
+static dispatch_queue_t filterQueue(void) {
+    static dispatch_queue_t queue; static dispatch_once_t once;
+    dispatch_once(&once, ^{ queue=dispatch_queue_create("app.nukewireless.hotspot",DISPATCH_QUEUE_SERIAL); }); return queue;
+}
 static id object(id value, NSString *key) {
     SEL selector = NSSelectorFromString(key);
     return [value respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(value, selector) : nil;
@@ -64,6 +68,9 @@ static NSString *prefix(NSString *mac) { return [@"NukeWirelessHotspot:" stringB
 static BOOL blocked(id device) {
     if (![filterStatus[@"ok"] boolValue] || ![filterStatus[@"enabled"] boolValue]) return NO;
     NSArray *rules = filterStatus[@"rules"]; NSString *key = prefix(object(device, @"macAddress") ?: @"");
+    NSDictionary *addresses=filterStatus[@"ipv4"];
+    NSString *canonical=[[object(device,@"macAddress") stringByReplacingOccurrencesOfString:@":" withString:@""] lowercaseString];
+    if (![addresses isKindOfClass:NSDictionary.class] || ![addresses[canonical ?: @""] isEqual:object(device,@"ipAddress")]) return NO;
     return [rules isKindOfClass:NSArray.class] && [rules containsObject:[key stringByAppendingString:@"0:0"]] && [rules containsObject:[key stringByAppendingString:@"0:1"]];
 }
 static NSArray<NSDictionary *> *snapshot(void) {
@@ -123,8 +130,8 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments) {
 static void checkFilter(void) {
     if (checking || changing) return; checking=YES;
     NSUInteger generation=filterGeneration;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
-        NSDictionary *report=invoke(@[@"status"]);
+    dispatch_async(filterQueue(), ^{
+        NSDictionary *report=invoke(@[@"reconcile"]);
         dispatch_async(dispatch_get_main_queue(), ^{ checking=NO; if (generation==filterGeneration && !changing) { filterStatus=report; notify(); } });
     });
 }
@@ -236,7 +243,7 @@ static BOOL refresh(void) {
     }
     cell.contentConfiguration=content; return cell;
 }
-- (void)rename:(NSDictionary *)row {
+- (void)renameDevice:(NSDictionary *)row {
     UIAlertController *alert=[UIAlertController alertControllerWithTitle:NWNativeText(@"Rename Device") message:row[@"ip"] preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *field) { field.text=[row[@"nickname"] length] ? row[@"nickname"] : row[@"name"]; field.placeholder=NWNativeText(@"Enter new name"); field.clearButtonMode=UITextFieldViewModeWhileEditing; }];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
@@ -254,7 +261,7 @@ static BOOL refresh(void) {
 - (void)setBlocked:(BOOL)value row:(NSDictionary *)row {
     if (!current(row) || [row[@"local"] boolValue] || NWHotspotBusy() || NWScanBusy() || NWBulkBusy()) { [self message:NWText(@"browser.actionRetry")]; return; }
     changing=YES; ++filterGeneration; notify();
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
+    dispatch_async(filterQueue(), ^{
         NSDictionary *report=invoke(@[value ? @"block":@"unblock",row[@"ip"],row[@"mac"]]);
         dispatch_async(dispatch_get_main_queue(), ^{
             changing=NO; filterStatus=report; notify();
@@ -271,7 +278,7 @@ static BOOL refresh(void) {
     UIAlertController *menu=[UIAlertController alertControllerWithTitle:row[@"name"] message:[NSString stringWithFormat:@"%@\n%@\n%@",row[@"ip"],row[@"mac"],row[@"vendor"]] preferredStyle:UIAlertControllerStyleActionSheet];
     UIAlertAction *toggle=[UIAlertAction actionWithTitle:NWNativeText(value ? @"Unblock Device":@"Block Device") style:value ? UIAlertActionStyleDefault:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) { (void)action; [self setBlocked:!value row:row]; }];
     toggle.enabled=![row[@"local"] boolValue] && !NWHotspotBusy() && !NWScanBusy() && !NWBulkBusy(); [menu addAction:toggle];
-    UIAlertAction *rename=[UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; [self rename:row]; }];
+    UIAlertAction *rename=[UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; [self renameDevice:row]; }];
     rename.enabled=current(row)!=nil && !changing; [menu addAction:rename];
     UIAlertAction *clear=[UIAlertAction actionWithTitle:NWNativeText(@"Clear Nickname") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; [self setName:nil row:row]; }];
     clear.enabled=rename.enabled && [row[@"nickname"] length]>0; [menu addAction:clear];

@@ -85,6 +85,11 @@ static int neighbours(int family, const char *interface, const unsigned char mac
         }
         const struct sockaddr_dl *link = (void *)values[RTAX_GATEWAY];
         const struct sockaddr *destination = values[RTAX_DST];
+        if (family == AF_INET && message->rtm_index == index && link && destination &&
+            link->sdl_family == AF_LINK && link->sdl_alen == 6 &&
+            link->sdl_len >= offsetof(struct sockaddr_dl, sdl_data) + link->sdl_nlen + 6 &&
+            destination->sa_family == AF_INET && destination->sa_len >= sizeof(struct sockaddr_in) &&
+            ((const struct sockaddr_in *)destination)->sin_addr.s_addr == target.s_addr && memcmp(LLADDR(link), mac, 6)) *matched_v4 = -1;
         if (message->rtm_index == index && link && link->sdl_family == AF_LINK && link->sdl_alen == 6 &&
             link->sdl_len >= offsetof(struct sockaddr_dl, sdl_data) + link->sdl_nlen + 6 &&
             !memcmp(LLADDR(link), mac, 6) && destination && destination->sa_family == family) {
@@ -151,6 +156,61 @@ static int kill_client_states(const struct client_address *address) {
     }
     return 1;
 }
+static int client_label(const char *label, char canonical[13], char prefix[64]) {
+    int used=0;
+    if (sscanf(label, OWNER "%12[0123456789abcdef]:0:1%n", canonical, &used)!=1 || !used || label[used] || strlen(canonical)!=12) return 0;
+    snprintf(prefix,64,OWNER "%s:",canonical); return 1;
+}
+// Reconcile only our rules: release an address explicitly reassigned to another
+// MAC and extend an existing block when the same client gains an IPv6 address.
+// An absent ARP entry alone does not unblock a temporarily sleeping client.
+static int reconcile(void) {
+    struct owned_client { struct in_addr ip; char canonical[13], prefix[64]; } clients[64];
+    struct pfioc_rule request; int count=rules_count(&request), clients_count=0;
+    if (count<0) return 0;
+    for (int i=0;i<count;++i) {
+        if (!get_rule(&request,i)) return 0;
+        char canonical[13]={0}, prefix[64];
+        if (request.rule.af!=AF_INET || !client_label(request.rule.label,canonical,prefix)) continue;
+        if (clients_count==64) { errno=E2BIG; return 0; }
+        memcpy(&clients[clients_count].ip,&request.rule.src.addr.v.a.addr,4);
+        strcpy(clients[clients_count].canonical,canonical); strcpy(clients[clients_count++].prefix,prefix);
+    }
+    for (int i=0;i<clients_count;++i) {
+        struct owned_client *client=&clients[i]; char interface[IFNAMSIZ];
+        if (!bridge_for(client->ip,interface)) { if (!remove_rules(client->prefix)) return 0; continue; }
+        unsigned char mac[6]; unsigned bytes[6];
+        if (sscanf(client->canonical,"%2x%2x%2x%2x%2x%2x",&bytes[0],&bytes[1],&bytes[2],&bytes[3],&bytes[4],&bytes[5])!=6) { errno=EINVAL; return 0; }
+        for (int j=0;j<6;++j) mac[j]=bytes[j];
+        struct client_address addresses[MAX_ADDRESSES]={{.family=AF_INET}}; memcpy(addresses[0].bytes,&client->ip,4);
+        int matched=0, total=neighbours(AF_INET,interface,mac,addresses,1,client->ip,&matched);
+        if (total<0) return 0;
+        if (matched<0) { if (!remove_rules(client->prefix)) return 0; continue; }
+        if (!matched) continue;
+        total=neighbours(AF_INET6,interface,mac,addresses,total,client->ip,&matched); if (total<0) return 0;
+        for (int j=1;j<total;++j) {
+            int present[2]={0}, next=1; count=rules_count(&request); if (count<0) return 0;
+            for (int k=0;k<count;++k) {
+                if (!get_rule(&request,k)) return 0;
+                if (strncmp(request.rule.label,client->prefix,strlen(client->prefix))) continue;
+                int n=0, source=0, used=0;
+                if (sscanf(request.rule.label+strlen(client->prefix),"%d:%d%n",&n,&source,&used)!=2 || !used || request.rule.label[strlen(client->prefix)+used]) continue;
+                if (n>=next) next=n+1;
+                if (source<0 || source>1 || request.rule.af!=AF_INET6) continue;
+                struct pf_rule_addr *value=source ? &request.rule.src : &request.rule.dst;
+                if (!memcmp(&value->addr.v.a.addr,addresses[j].bytes,16)) present[source]=1;
+            }
+            if (present[0] && present[1]) continue;
+            if (next>=64) { errno=E2BIG; return 0; }
+            for (int source=0;source<2;++source) if (!present[source]) {
+                char label[96]; snprintf(label,sizeof(label),"%s%d:%d",client->prefix,next,source);
+                if (!add_rule(label,interface,&addresses[j],source)) return 0;
+            }
+            if (!kill_client_states(&addresses[j])) return 0;
+        }
+    }
+    return 1;
+}
 static int status(void) {
     struct pf_status state = {0}; struct pfioc_rule request;
     if (ioctl(fd, DIOCGETSTATUS, &state)) return fail("pf_contract");
@@ -168,15 +228,30 @@ static int status(void) {
         }
         putchar('"');
     }
-    printf("]}\n"); close(fd); return 0;
+    printf("],\"ipv4\":{"); written=0; unsigned long long packets=0;
+    for (int i=0;i<count;++i) {
+        if (!get_rule(&request,i)) { close(fd); return 1; }
+        if (strncmp(request.rule.label,OWNER,strlen(OWNER))) continue;
+        packets+=request.rule.packets[0]+request.rule.packets[1];
+        char canonical[13]={0}, prefix[64], address[INET_ADDRSTRLEN];
+        if (request.rule.af==AF_INET && client_label(request.rule.label,canonical,prefix) &&
+            inet_ntop(AF_INET,&request.rule.src.addr.v.a.addr,address,sizeof(address)))
+            printf("%s\"%s\":\"%s\"",written++ ? ",":"",canonical,address);
+    }
+    printf("},\"matched_packets\":%llu}\n",packets); close(fd); return 0;
 }
 int main(int argc, char **argv) {
     if (!authorized(argv[0])) { errno = EPERM; return fail("permissions"); }
     if (argc != 2 && argc != 4) { errno = EINVAL; return fail("arguments"); }
-    if (strcmp(argv[1], "status") && strcmp(argv[1], "block") && strcmp(argv[1], "unblock")) { errno = EINVAL; return fail("arguments"); }
-    if ((!strcmp(argv[1], "status")) != (argc == 2)) { errno = EINVAL; return fail("arguments"); }
+    int query=!strcmp(argv[1], "status"), repair=!strcmp(argv[1], "reconcile"), clear=!strcmp(argv[1],"clear");
+    if (!query && !repair && !clear && strcmp(argv[1], "block") && strcmp(argv[1], "unblock")) { errno = EINVAL; return fail("arguments"); }
+    if ((query || repair || clear) != (argc == 2) || (clear && getuid()!=0)) { errno = EINVAL; return fail("arguments"); }
     struct utsname os; if (uname(&os) || atoi(os.release) < 21 || atoi(os.release) > 24) return fail("unsupported");
-    fd = open("/dev/pf", !strcmp(argv[1], "status") ? O_RDONLY : O_RDWR); if (fd < 0) return fail("pf_unavailable");
+    fd = open("/dev/pf", query ? O_RDONLY : O_RDWR); if (fd < 0) return fail("pf_unavailable");
+    struct pf_status contract={0}; struct pfioc_rule contract_rules;
+    if (ioctl(fd,DIOCGETSTATUS,&contract) || rules_count(&contract_rules)<0) return fail("pf_contract");
+    if (clear && !remove_rules(OWNER)) return fail("pf_remove");
+    if (repair && !reconcile()) return fail("pf_reconcile");
     if (argc == 2) return status();
     struct in_addr ip; unsigned char mac[6]; char canonical[18], prefix[64], interface[IFNAMSIZ];
     if (inet_pton(AF_INET, argv[2], &ip) != 1 || !parse_mac(argv[3], mac, canonical)) { errno = EINVAL; return fail("arguments"); }

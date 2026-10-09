@@ -14,8 +14,11 @@ identidad ARP del cliente y la ABI PF antes de modificar reglas. Solo añade o
 quita reglas etiquetadas `NukeWirelessHotspot:<MAC>:`; conserva las reglas y NAT
 del sistema. Elimina estados del cliente seleccionado y verifica las reglas
 mediante lectura posterior. Incluye IPv6 globales ya asociados al cliente en la
-tabla de vecinos; todavía hay que comprobar el tráfico real del receptor y la
-aparición de nuevas direcciones IPv6. El estado de la regla no demuestra por sí
+tabla de vecinos y reconcilia direcciones nuevas mientras se muestra el listado.
+Retira las reglas propias cuando desaparece la red o ARP confirma que una IP se
+ha reasignado a otra MAC; una entrada ARP ausente por sí sola no desbloquea al
+cliente. Al desinstalar retira solo sus reglas. Todavía hay que comprobar el
+tráfico real del receptor y la aparición de nuevas direcciones IPv6. El estado de la regla no demuestra por sí
 solo que toda conexión del cliente se haya interrumpido.
 
 Las estructuras proceden del [XNU oficial 8792.61.2](https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/bsd/net/pfvar.h).

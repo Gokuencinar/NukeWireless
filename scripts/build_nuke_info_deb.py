@@ -63,6 +63,15 @@ def patch_hotspot_signing(script):
     if script.count(original) != 1: raise ValueError("unexpected hotspot signing script")
     return script.replace(original, original + b'ldid -Hsha256 -S/usr/share/nukewireless-roothide/hotspot.entitlements "$BASE/nw-hotspot"\nchown root:wheel "$BASE/nw-hotspot"\nchmod 4755 "$BASE/nw-hotspot"\n')
 
+def hotspot_prerm(prefix=""):
+    root = "/" + prefix.rstrip("/") if prefix else ""
+    return f'''#!/bin/sh
+case "$1" in
+  remove|deconfigure) {root}/usr/libexec/harpy-reloaded/nw-hotspot clear >/dev/null 2>&1 || true ;;
+esac
+exit 0
+'''.encode()
+
 def build(source, artifact, output):
     raw = source.read_bytes()
     if sha(raw) != EXPECTED_SOURCE_SHA256:
@@ -162,6 +171,7 @@ def build(source, artifact, output):
             data = data.replace(b"Description: Nuke Wireless ", b"Description: NukeWireless ")
             data = data.replace(b"Depends: firmware (>= 16.0)", b"Depends: firmware (>= 16.3)")
             member.size = len(data); control[i] = (member,data)
+    control.append(regular("prerm", hotspot_prerm(), 0o755))
     for member,data in control + entries:
         if member.isfile() and member.size != len(data): raise ValueError("wrong member size")
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -169,7 +179,7 @@ def build(source, artifact, output):
         ("control.tar.gz",tar_bytes(control)),("data.tar.gz",tar_bytes(entries))]))
     report = {"version":VERSION,"baseline_sha256":sha(raw),"package_sha256":sha(output.read_bytes()),
               "extension":manifest, "app_before":sha(executable),"app_after":sha(replacement[APP+"HarpyReloaded"]),
-              "changed_existing_files": sorted(replacement), "changed_control_files": ["control", "postinst"],
+              "changed_existing_files": sorted(replacement), "changed_control_files": ["control", "postinst", "prerm"],
               "app_signing_identifier": "me.midnightchips.harpy-reloaded", "release_published":False}
     output.with_suffix(".manifest.json").write_text(json.dumps(report,indent=2)+"\n", encoding="utf-8")
     print(output); print("sha256",report["package_sha256"])
