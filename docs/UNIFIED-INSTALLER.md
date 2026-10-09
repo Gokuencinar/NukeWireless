@@ -23,6 +23,9 @@ Así el gestor transfiere los archivos del trabajador anterior al paquete único
 en lugar de dejar dos propietarios o exigir una segunda instalación. El gestor
 puede mostrar la retirada del paquete auxiliar sustituido.
 
+Las relaciones siguen las reglas de
+[reemplazo de paquetes de Debian](https://www.debian.org/doc/debian-policy/ch-relationships.html#replacing-whole-packages-forcing-their-removal).
+
 Los dos scripts postinst originales se ejecutan en subprocesos de shell con fallo
 propagado; el `exit 0` de uno no puede omitir el otro. Se conservan las firmas y
 permisos existentes, incluido `nwbt-run` con 4755. El prerm original de la app
@@ -54,6 +57,11 @@ fallos. El workflow `Unified installer packaging` prueba dpkg en raíces Linux
 temporales: instalación nueva, actualización desde los dos paquetes, propietario
 de los archivos y desinstalación. Utiliza fixtures con scripts inofensivos, sin
 ejecutar binarios ni scripts iOS en Linux.
+
+Comprobaciones de entrega de las tres variantes y pruebas de shell aprobadas en
+Windows. La prueba de instalación nueva, migración de ambos paquetes, propiedad
+y desinstalación pasó en Linux: [CI 37994184452](https://github.com/Gokuencinar/NukeWireless/actions/runs/37994184452),
+commit del empaquetado `ef25ea9fa650086c9772f5b191c8fff6b23cc050`.
 
 La inspección del paquete y la migración simulada no equivalen a instalación
 verificada en iPhone. La instalación física del formato unificado está pendiente.

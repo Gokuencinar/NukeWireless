@@ -7,7 +7,7 @@ Nuke Wireless is in development. This repository is public; development builds a
 **Instalador único diagnostic5+bundle1:** reúne app y componente Bluetooth en
 un DEB por variante, conservando los binarios diagnostic5/diagnostic1 y sus
 permisos. Sustituye el paquete Bluetooth separado al actualizar. Inspección
-de paquetes aprobada; instalación física del nuevo formato pendiente.
+de paquetes y migración dpkg en Linux aprobadas; instalación física del nuevo formato pendiente.
 Véase [empaquetado unificado](docs/UNIFIED-INSTALLER.md).
 
 **2.0.0~diagnostic5: compilada, validada e instalada en RootHide.**
