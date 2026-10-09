@@ -125,7 +125,9 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(query, unified.VERSION + " install ok installed")
             owner = subprocess.check_output(["dpkg-query", "--admindir=" + str(root / "var/lib/dpkg"),
                                              "--search", "/usr/bin/nwbt-run"], text=True)
-            self.assertEqual(owner.strip(), unified.PACKAGE + ": /usr/bin/nwbt-run")
+            owner_id, separator, owned_path = owner.strip().rpartition(": ")
+            self.assertEqual((separator, owned_path), (": ", "/usr/bin/nwbt-run"))
+            self.assertIn(owner_id, {unified.PACKAGE, unified.PACKAGE + ":iphoneos-arm"})
             dpkg("--remove", unified.PACKAGE)
             self.assertFalse((root / "usr/bin/nwbt-run").exists())
             self.assertFalse((root / unified.APP / "Info.plist").exists())
