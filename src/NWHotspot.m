@@ -136,17 +136,27 @@ static void checkFilter(void) {
     });
 }
 BOOL NWHotspotBusy(void) { return changing || NWStateBusy(&scan); }
+static void armHotspotWatchdog(void) {
+    [watchdog invalidate]; uint64_t generation=scan.generation;
+    watchdog=[NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
+        if (scan.generation!=generation || !NWStateBusy(&scan)) { [timer invalidate]; return; }
+        NSOperationQueue *queue=object(nativeScanner,@"queue");
+        BOOL expired=NWStateExpired(&scan,CACurrentMediaTime());
+        if (expired || (scan.phase==NWScanning && returned && !queue.operationCount && CACurrentMediaTime()-scan.progress>2)) {
+            NWHotspotFinished(nativeAdapter, !expired && peers.count>0);
+            id scanner=nativeScanner;
+            if (expired && method(scanner,@"stop","v16@0:8")) dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
+                ((void (*)(id,SEL))objc_msgSend)(scanner,NSSelectorFromString(@"stop"));
+            });
+        }
+    }];
+}
 void NWHotspotScannerStarted(id scanner, id adapter) {
     mainBlock(^{
         nativeScanner=scanner; nativeAdapter=adapter; returned=NO;
         if (scan.phase!=NWStarting) NWStateBegin(&scan,CACurrentMediaTime());
         scan.phase=NWScanning; scan.progress=CACurrentMediaTime(); scanNetwork=network(); peers=[NSMutableDictionary new];
-        [watchdog invalidate]; uint64_t generation=scan.generation;
-        watchdog=[NSTimer scheduledTimerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
-            if (scan.generation!=generation || !NWStateBusy(&scan)) { [timer invalidate]; return; }
-            NSOperationQueue *queue=object(nativeScanner,@"queue");
-            if (NWStateExpired(&scan,CACurrentMediaTime()) || (returned && !queue.operationCount && CACurrentMediaTime()-scan.progress>2)) NWHotspotFinished(nativeAdapter, peers.count>0);
-        }];
+        armHotspotWatchdog();
         NWDiagnosticRecord(@"hotspot_scan",@"running",@{@"generation":@(scan.generation)}); notify();
     });
 }
@@ -188,7 +198,7 @@ static BOOL refresh(void) {
     }
     static const uint8_t prologue[]={0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
     if (!base || memcmp(base+0xc5a8,prologue,sizeof(prologue))) return NO;
-    NWStateBegin(&scan,CACurrentMediaTime()); notify(); NWInvokeRefresh((__bridge void *)nativeAdapter,base+0xc5a8); return YES;
+    NWStateBegin(&scan,CACurrentMediaTime()); returned=NO; armHotspotWatchdog(); notify(); NWInvokeRefresh((__bridge void *)nativeAdapter,base+0xc5a8); return YES;
 }
 @interface NWHotspotViewController : UITableViewController
 @property(nonatomic,strong) NSArray<NSDictionary *> *rows;
