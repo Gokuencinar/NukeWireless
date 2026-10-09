@@ -119,7 +119,14 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments) {
         if (waited==child || (waited<0 && errno==ECHILD)) { done=YES; break; }
         usleep(10000);
     }
-    if (!done) { kill(child,SIGKILL); while (waitpid(child,&status,0)<0 && errno==EINTR) {} }
+    if (!done) {
+        // setuid children enforce their own deadline. The caller may lack signal
+        // permission; never turn a timed-out helper into a blocking wait here.
+        kill(child,SIGKILL);
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY,0), ^{
+            int collected; while (waitpid(child,&collected,0)<0 && errno==EINTR) {}
+        });
+    }
     else { char buffer[4096]; ssize_t size; while ((size=read(descriptors[0],buffer,sizeof(buffer)))>0 && data.length<65536) [data appendBytes:buffer length:size]; }
     close(descriptors[0]);
     id report=data.length<65536 ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;

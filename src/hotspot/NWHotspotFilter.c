@@ -241,6 +241,8 @@ static int status(void) {
     printf("},\"matched_packets\":%llu}\n",packets); close(fd); return 0;
 }
 int main(int argc, char **argv) {
+    // Bound even privileged children without giving the app signal entitlements.
+    alarm(3);
     if (!authorized(argv[0])) { errno = EPERM; return fail("permissions"); }
     if (argc != 2 && argc != 4) { errno = EINVAL; return fail("arguments"); }
     int query=!strcmp(argv[1], "status"), repair=!strcmp(argv[1], "reconcile"), clear=!strcmp(argv[1],"clear");
