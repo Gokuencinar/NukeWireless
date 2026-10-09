@@ -78,3 +78,8 @@ La operación PF con el cliente físico sigue pendiente.
 Esto no sustituye la prueba del cliente cargando páginas con datos móviles
 apagados: corte al bloquear y recuperación al desbloquear siguen pendientes
 de aceptación manual. Tampoco acredita otras versiones de iOS o bootstraps.
+
+## Aceptación manual posterior de diagnostic4
+
+El usuario confirmó que el bloqueo y desbloqueo del cliente funcionan. La
+siguiente revisión solo ajusta la presentación del estado y los menús de equipos.

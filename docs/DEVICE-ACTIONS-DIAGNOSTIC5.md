@@ -19,5 +19,25 @@ campos de texto mantienen su presentación. Esto solo organiza datos de presenta
 acciones, la comprobación de generación/red y las restricciones no cambian.
 
 La regresión existente del menú comprueba filas IP/MAC, reconocimiento de un
-título heredado y rechazo de una dirección ajena al snapshot. Compilación,
-capturas, paquete e instalación de esta revisión pendientes.
+título heredado y rechazo de una dirección ajena al snapshot. La verificación de compilación, capturas, paquete e instalación se detalla debajo.
+
+## Verificación de la entrega
+
+Fuentes compiladas: `4f2f7c76ce2c570e882ca0cb6a5e9d5bbaea59ac`. Ambos trabajos aprobados:
+
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/37991460042)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/37991459957)
+
+Simulador: 46 comprobaciones por idioma y cuatro ciclos reales de segundo
+plano por idioma. Menús y cambio de nombre con la búsqueda activa aprobados;
+capturas de menús en modo oscuro y listado en claro revisadas. Paquete: 15 comprobaciones
+aprobadas. Instalación RootHide en iPhone XS/iOS 16.3.1 verificada por versiones,
+UUID/hash del código instalado, firma y permisos; sin nuevos crashes relevantes
+durante la instalación. Trabajador Bluetooth sin cambios y comprobación de
+diagnóstico sin abrir radio ni cambiar el PID de bluetoothd.
+
+La aceptación visual manual de la mano roja y del menú Wi-Fi queda pendiente.
+El usuario confirmó el bloqueo del cliente en diagnostic4; el código PF no
+cambia en esta revisión. Las otras variantes e iOS no tienen aceptación física.
+Recuperación: `/var/mobile/Documents/NukeWireless-diagnostic4-backup.deb`,
+verificada por hash antes de instalar. No se realizó reinicio general.

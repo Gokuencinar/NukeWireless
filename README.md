@@ -4,10 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**En desarrollo: 2.0.0~diagnostic5.** El cliente bloqueado del punto de acceso
-muestra una mano roja. La hoja de acciones separa nombre/fabricante/estado de
-las direcciones IP y MAC, conserva sus manejadores y se abre a altura completa.
-Compilación, paquete e instalación pendientes.
+**2.0.0~diagnostic5: compilada, validada e instalada en RootHide.**
+El cliente bloqueado del punto de acceso muestra una mano roja. La hoja de
+acciones organiza nombre/fabricante/estado y direcciones IP/MAC; conserva los
+manejadores y abre a altura completa. Pasaron 46 comprobaciones del simulador
+por idioma, cuatro ciclos de segundo plano por idioma y 15 de paquete.
+Fuentes compiladas: `4f2f7c76ce2c570e882ca0cb6a5e9d5bbaea59ac`. Confirmación visual manual pendiente.
+Detalles en [DEVICE-ACTIONS-DIAGNOSTIC5.md](docs/DEVICE-ACTIONS-DIAGNOSTIC5.md).
 
 **2.0.0~diagnostic4: compilada, validada e instalada en la referencia RootHide.**
 Obtiene el ticket de direcciones PF antes de añadir cada regla y registra
