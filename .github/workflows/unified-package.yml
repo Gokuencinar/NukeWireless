@@ -1,3 +1,4 @@
+# Independent of native compilation: this job only exercises installer fixtures.
 name: Unified installer packaging
 on:
   push:
