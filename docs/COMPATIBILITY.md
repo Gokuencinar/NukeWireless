@@ -1,5 +1,8 @@
 # Candidatas de compatibilidad iOS 15–18: compat4
 
+Edición actual para testers: [NukeWireless Dev 2.0.0~diagnostic1](DIAGNOSTIC-EDITION.md).
+Las validaciones históricas de dev53/compat4 no equivalen a aceptación de esta edición.
+
 Preparadas desde las fuentes de **dev53**, con el trabajador **app32**.
 Dev53/app32 está instalado y verificado en iPhone XS / iOS 16.3.1 / Dopamine
 RootHide; la última aceptación manual de interfaz corresponde a dev52/app31.

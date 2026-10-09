@@ -4,18 +4,18 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
-**NukeWireless Dev · 2.0.0~diagnostic1, en validación:** edición específica para
+**NukeWireless Dev · 2.0.0~diagnostic1, compilada, empaquetada e instalada en la referencia RootHide:** edición específica para
 testers con pruebas independientes y registro persistente/exportable en
 **Información → Diagnósticos**. Incluye entorno/instalación, Wi-Fi, BLE,
-controlador y emisión con recuperación. Se preparan variantes RootHide,
+controlador y emisión con recuperación. Hay variantes RootHide,
 rootless y rootful; no declara aceptación en todos los iOS o iPhones.
 Véase [guía de diagnóstico y nombres internos](docs/DIAGNOSTIC-EDITION.md).
 
-**Dev53 / app32 instalado; compat4 compilada y empaquetada:** la emisión Bluetooth
+**Entrega anterior: dev53/app32 y compat4:** la emisión Bluetooth
 usa admisión por contrato Skywalk en iOS 15–18 y recuperación del dominio observado
 de bluetoothd. Se retira la whitelist XS/16.3.1 de las emisiones; ACT/ACL conserva
 su guard. CI, simulador iOS 18.5 y los seis paquetes de tres bootstraps aprobados.
-Dev53/app32 está instalado y firmado en la referencia RootHide; los otros iOS,
+Dev53/app32 se verificó instalada y firmada en la referencia RootHide; los otros iOS,
 bootstraps y el adaptador compat4 requieren validación física.
 Pruebas de emisión consecutiva, cancelación por CLI y recepción de nueve perfiles Fast Pair aprobadas.
 Véanse [port Bluetooth](docs/BLUETOOTH-SKYWALK-PORT.md),

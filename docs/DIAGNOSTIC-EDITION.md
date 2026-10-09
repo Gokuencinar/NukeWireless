@@ -21,6 +21,9 @@ compilación no constituye una verificación en todos esos entornos.
 6. Volver y pulsar **Exportar informe JSON**. El usuario elige el destino en la
    hoja de compartir; la app no sube archivos ni contacta a nadie automáticamente.
 
+Si una prueba falla, anotar el error y exportar el informe antes de reintentar,
+cerrar la app o cambiar el estado de Bluetooth.
+
 El registro se conserva al volver a abrir la app. Los archivos están en su
 directorio Documents/NukeWireless-Diagnostics, accesible mediante Archivos. Se
 conservan `latest.json` y los cinco últimos informes exportados. Si no puede
@@ -80,7 +83,35 @@ No se han editado binarios arbitrariamente ni falseado su procedencia.
 
 ## Validación de esta edición
 
-Pendiente de compilación y pruebas de los nuevos cambios. La aceptación de
-dev53/app32 se conserva como evidencia de aquella versión, no de esta edición.
+Fuentes compiladas: `8b610e805ddf9c5485862592cc74c018e8e8684e`. Compilaciones aprobadas:
+
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/37937898633): aprobado.
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/37937898613): aprobado.
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/37937899941): aprobado.
+
+Pruebas Foundation del registro aprobadas: redacción, UUID Mach-O, sesión
+interrumpida, límites, estado pendiente, exportación, retención y borrado.
+Seis suites C locales aprobadas; MinGW es de 32 bits y se usaron dobles SSE
+para evitar la precisión extendida x87 en las aserciones exactas existentes.
+Simulador iOS 18.5: 35 comprobaciones y cuatro ciclos reales de segundo plano
+por idioma, español e inglés. Capturas de diagnóstico claro/oscuro revisadas;
+las filas admiten títulos multilínea con contenido nativo de UIKit.
+Ocho pruebas de los seis paquetes y siete del paquete intermedio aprobadas.
+
+La variante RootHide está instalada en iPhone XS / iOS 16.3.1. Se verificaron
+versiones, esquema, commit, UUID y hash de la sección de código de cuatro
+componentes después de firmarlos, identidad CodeDirectory del ejecutable y
+permisos del trabajador. `--diagnostics` devuelve la información esperada sin
+abrir canal ni enviar HCI; bluetoothd conserva su PID. No hay nuevos crashes
+relevantes ni trabajador retenido tras esta comprobación. Esto no acredita
+todavía la navegación/exportación manual de la app ni recepción de radio en
+esta edición. La aceptación de dev53/app32 corresponde a la versión anterior.
+
+Recuperación conservada en el mismo iPhone:
+`/var/mobile/Documents/NukeWireless-dev53-backup.deb` y
+`/var/mobile/Documents/NukeWireless-app32-backup.deb`, ambos verificados por hash.
+Cerrar la app antes de reinstalarlos mediante el mismo entorno del jailbreak;
+no hace falta un reinicio general por rutina.
+
 No hay dispositivos disponibles para verificar físicamente iOS 15, 17, 18,
 rootless o rootful. Cada tester debe enviar su entorno exacto y el informe.
