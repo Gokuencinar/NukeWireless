@@ -7,7 +7,9 @@ Nuke Wireless is in development. This repository is private; development builds 
 **En desarrollo: 2.0.0~diagnostic4.** Obtiene el ticket de direcciones PF antes
 de añadir cada regla; registra también `errno` en el diagnóstico del bloqueo.
 Diagnostic3 falló en la prueba manual con `pf_apply`, reproducido por SSH
-con `errno=16`. Compilación y validación física de diagnostic4 pendientes.
+con `errno=16`. Comprobaciones locales aprobadas; GitHub Actions no inició las
+compilaciones por facturación/límite de gasto de la cuenta. Diagnostic4 sigue
+sin compilar, empaquetar ni instalar; validación física pendiente.
 
 **2.0.0~diagnostic3:** nuevo listado del punto de acceso sin
 duplicados por IP, recarga y hoja de acciones compartida con Wi-Fi. El bloqueo

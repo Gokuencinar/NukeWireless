@@ -10,7 +10,12 @@ rechaza con EBUSY un ticket distinto al del pool actual, también para reglas
 simples de filtrado. La regresión simula un pool ya utilizado por Compartir
 Internet, rechaza el ticket cero y verifica el fallo de adquisición sin modificar
 reglas ajenas. Se añade `system_errno` al registro de la app. Compilación y
-validación física de esta corrección pendientes.
+validación física de esta corrección pendientes. Los jobs de diagnostic4
+`37988463847` y `37988463874` no llegaron a iniciarse: GitHub informó de pagos
+fallidos o límite de gasto. Pasaron las seis suites C locales, traducciones,
+sintaxis Python, manifiestos de fuentes y revisión de whitespace. La regresión
+PF requiere macOS y todavía no se ha ejecutado para esta revisión. No se ha
+reutilizado ningún binario anterior para empaquetar o instalar diagnostic4.
 
 El iPhone XS/iOS 16.3.1 de referencia tiene `/dev/pf` pero no `/sbin/pfctl` ni
 `/usr/sbin/pfctl`. El bloqueo heredado intentaba ejecutar ese comando y cargar
