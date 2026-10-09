@@ -92,9 +92,13 @@ void NWDiagnosticInitialize(void) {
                     NSData *encoded = [NSJSONSerialization dataWithJSONObject:safe options:0 error:NULL];
                     if (encoded && encoded.length <= 10000) [events addObject:safe];
                 }
-            if ([old isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] count])
+            if ([old isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] count]) {
+                NSMutableArray *names = [NSMutableArray new];
+                for (id name in old[@"pending_tests"]) if ([name isKindOfClass:NSString.class] && names.count < 32)
+                    [names addObject:NWDiagnosticRedact([name substringToIndex:MIN((NSUInteger)100, [name length])])];
                 [events addObject:@{@"test": @"previous_session", @"status": @"interrupted", @"time": @(NSDate.date.timeIntervalSince1970),
-                    @"details": @{ @"pending_tests": NWDiagnosticRedact(old[@"pending_tests"]), @"cause": @"unknown; interruption alone is not crash evidence"}}];
+                    @"details": @{ @"pending_test_names": names, @"cause": @"unknown; interruption alone is not crash evidence"}}];
+            }
         }
         while (events.count > maximumEvents) [events removeObjectAtIndex:0];
     });
@@ -137,6 +141,9 @@ NSURL *NWDiagnosticSaveExport(NSError **error) {
     NSMutableArray *exports = [NSMutableArray new];
     for (NSURL *item in files) if ([item.lastPathComponent hasPrefix:@"NukeWireless-"] && [item.pathExtension isEqual:@"json"]) [exports addObject:item];
     [exports sortUsingComparator:^NSComparisonResult(NSURL *a, NSURL *b) {
+        // Retain this export even when filesystem timestamps tie or the clock moves.
+        if ([a isEqual:file]) return NSOrderedAscending;
+        if ([b isEqual:file]) return NSOrderedDescending;
         NSDate *ad = nil, *bd = nil; [a getResourceValue:&ad forKey:NSURLContentModificationDateKey error:NULL];
         [b getResourceValue:&bd forKey:NSURLContentModificationDateKey error:NULL]; return [(bd ?: NSDate.distantPast) compare:ad ?: NSDate.distantPast];
     }];
