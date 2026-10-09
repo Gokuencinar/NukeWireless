@@ -164,7 +164,16 @@ static void collectEnvironment(void) {
         cell.detailTextLabel.text = [formatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:[event[@"time"] doubleValue]]];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
-    cell.imageView.tintColor = NWAccentColor(); return cell;
+    // Native list content computes multiline row heights, including long
+    // translations and larger accessibility text, with proper vertical margins.
+    UIListContentConfiguration *content = cell.defaultContentConfiguration;
+    content.text = cell.textLabel.text; content.secondaryText = cell.detailTextLabel.text;
+    content.image = cell.imageView.image;
+    content.textProperties.font = cell.textLabel.font; content.textProperties.color = cell.textLabel.textColor;
+    content.secondaryTextProperties.font = cell.detailTextLabel.font;
+    content.textProperties.numberOfLines = 0; content.secondaryTextProperties.numberOfLines = 0;
+    content.imageProperties.tintColor = NWAccentColor(); cell.contentConfiguration = content;
+    return cell;
 }
 - (void)message:(NSString *)message {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"diag.title") message:message preferredStyle:UIAlertControllerStyleAlert];
@@ -256,7 +265,7 @@ int NWDiagnosticsUIRegressionCheck(void) {
     if ([controller numberOfSectionsInTableView:controller.tableView] != 4) return 1;
     UITableViewCell *export = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:2]];
     if (![export.accessibilityIdentifier isEqual:@"nw.diagnostics.export"]) return 2;
-    if (![export.textLabel.text isEqual:NWText(@"diag.export")]) return 3;
+    if (![((UIListContentConfiguration *)export.contentConfiguration).text isEqual:NWText(@"diag.export")]) return 3;
     if (![controller.title isEqual:NWText(@"diag.title")]) return 4;
     NSDictionary *report = NWDiagnosticSnapshot();
     if (![report[@"schema_version"] isEqual:@1] || ![report[@"build"] isEqual:NW_BUILD_VERSION]) return 5;
