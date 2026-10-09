@@ -1,15 +1,19 @@
 # Nuke Wireless
 
-Nuke Wireless is in development. This repository is private; development builds are not releases.
+Nuke Wireless is in development. This repository is public; development builds are not releases.
 
 ## Desarrollo actual
 
-**En desarrollo: 2.0.0~diagnostic4.** Obtiene el ticket de direcciones PF antes
-de añadir cada regla; registra también `errno` en el diagnóstico del bloqueo.
-Diagnostic3 falló en la prueba manual con `pf_apply`, reproducido por SSH
-con `errno=16`. Comprobaciones locales aprobadas; GitHub Actions no inició las
-compilaciones por facturación/límite de gasto de la cuenta. Diagnostic4 sigue
-sin compilar, empaquetar ni instalar; validación física pendiente.
+**2.0.0~diagnostic4: compilada, validada e instalada en la referencia RootHide.**
+Obtiene el ticket de direcciones PF antes de añadir cada regla y registra
+`system_errno` en el diagnóstico. Diagnostic3 falló con `pf_apply`, reproducido
+por SSH con `errno=16`. GitHub Actions pudo ejecutar ambos trabajos tras hacer
+público el repositorio por autorización del usuario. Pasaron las pruebas PF,
+46 comprobaciones UI por idioma y cuatro ciclos de segundo plano por idioma,
+además de las 15 comprobaciones de paquete. Fuentes compiladas: `505986bcd2bb2cb612cad941adff0a181580e6f4`.
+
+La prueba física de aplicación de reglas y corte de Internet sigue pendiente. El trabajador Bluetooth conserva `2.0.0~diagnostic1`.
+Las otras variantes/iOS siguen sin aceptación física.
 
 **2.0.0~diagnostic3:** nuevo listado del punto de acceso sin
 duplicados por IP, recarga y hoja de acciones compartida con Wi-Fi. El bloqueo

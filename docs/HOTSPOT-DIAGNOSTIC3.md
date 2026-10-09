@@ -58,3 +58,23 @@ trabajador Bluetooth, firma de la app ni identidad de sus tres hosts SwiftUI.
 Pruebas previstas: operaciones PF con ioctl simulado sin tocar el firewall del
 host, duplicado local/IP, tokens obsoletos, menú y navegación reales del
 simulador en ambos idiomas, paquete y cliente físico `172.20.10.2`.
+
+## Entrega diagnostic4
+
+El bloqueo por facturación quedó superado al publicar el repositorio con
+autorización del usuario. Trabajos aprobados:
+
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/37989324581)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/37988580652)
+
+Fuentes compiladas: `505986bcd2bb2cb612cad941adff0a181580e6f4`. Paquetes inspeccionados
+(15 comprobaciones), interfaz (46 por idioma) y segundo plano (4 ciclos por
+idioma) aprobados. Instalación RootHide verificada por versiones, hash/UUID del
+código instalado, identidad CodeDirectory y permisos del ayudante. Sin nuevos
+crashes relevantes durante esa instalación; trabajador Bluetooth sin cambios.
+
+La operación PF con el cliente físico sigue pendiente.
+
+Esto no sustituye la prueba del cliente cargando páginas con datos móviles
+apagados: corte al bloquear y recuperación al desbloquear siguen pendientes
+de aceptación manual. Tampoco acredita otras versiones de iOS o bootstraps.
