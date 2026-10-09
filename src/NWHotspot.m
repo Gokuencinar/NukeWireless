@@ -364,7 +364,8 @@ int NWHotspotUIRegressionPresent(int phase) {
     }
     if (phase==2) {
         BOOL visible=controller.presentedViewController.view.window!=nil;
-        [testHotspotNavigation dismissViewControllerAnimated:NO completion:nil]; testHotspotNavigation=nil; endHotspotFixture();
+        // Dismiss the entire fixture, including its presented action sheet.
+        [testHotspotNavigation.presentingViewController dismissViewControllerAnimated:NO completion:nil]; testHotspotNavigation=nil; endHotspotFixture();
         return visible ? 0 : 4;
     }
     return 5;
