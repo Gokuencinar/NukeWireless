@@ -1,4 +1,5 @@
 #import "NWMainTabs.h"
+#import "NWBuild.h"
 #import "NWBluetooth.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
@@ -220,7 +221,7 @@ static UIViewController *resumeTop;
 static UIView *resumeNativeContent;
 static UINavigationBar *resumeWiFiBar(UIView *view) {
     if ([view isKindOfClass:UINavigationBar.class] &&
-        [((UINavigationBar *)view).topItem.title isEqualToString:@"NukeWireless"]) return (UINavigationBar *)view;
+        [((UINavigationBar *)view).topItem.title isEqualToString:NW_BUILD_NAME]) return (UINavigationBar *)view;
     for (UIView *child in view.subviews) {
         UINavigationBar *bar = resumeWiFiBar(child);
         if (bar) return bar;

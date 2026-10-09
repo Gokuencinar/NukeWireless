@@ -185,7 +185,7 @@ static NSDictionary<NSString *, NSString *> *networkDetails(void) {
 
 static void showMessage(UIViewController *controller, NSString *message) {
     if (controller.presentedViewController) return;
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"NukeWireless" message:message preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NW_BUILD_NAME message:message preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
     [controller presentViewController:alert animated:YES completion:nil];
 }
@@ -430,7 +430,7 @@ static NWActions *actions;
 static void (*originalNavigationTitle)(UINavigationItem *, SEL, NSString *);
 static NSString *displayAppTitle(NSString *title) {
     if (!title) return nil;
-    for (NSString *old in @[@NWLegacyTitleShort, @NWLegacyTitleSpaced, @NWLegacyTitleHyphenated, @NWLegacyExecutable])
+    for (NSString *old in @[@NWLegacyTitleShort, @NWLegacyTitleSpaced, @NWLegacyTitleHyphenated, @NWLegacyExecutable, @"NukeWireless"])
         if ([title caseInsensitiveCompare:old] == NSOrderedSame) return NW_BUILD_NAME;
     return title;
 }
@@ -730,6 +730,8 @@ int NWUIRegressionCheck(int phase) {
         if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
         NWInfoController *content = (NWInfoController *)info.topViewController;
         if ([content tableView:content.tableView numberOfRowsInSection:1] != 6) return 8;
+        UITableViewCell *diagnostics = [content tableView:content.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:5 inSection:1]];
+        if (![diagnostics.accessibilityIdentifier isEqual:@"nw.info.diagnostics"]) return 18;
         for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
         [host.view layoutIfNeeded];
         if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;

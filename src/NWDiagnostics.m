@@ -241,6 +241,7 @@ void NWDiagnosticsInstall(void) {
         }];
 }
 #ifdef NW_UI_TESTING
+extern int NWBluetoothUIRegressionCatalogState(int state);
 int NWDiagnosticsUIRegressionPresent(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) if ([scene isKindOfClass:UIWindowScene.class])
@@ -262,6 +263,15 @@ int NWDiagnosticsUIRegressionCheck(void) {
     NSDictionary *safe = NWDiagnosticRedact(@{@"SSID": @"private-name", @"error": @"target 192.168.1.22 01:02:03:04:05:06"});
     if (![safe[@"SSID"] isEqual:@"[redacted]"] || [safe[@"error"] containsString:@"192.168"]) return 6;
     if ([controller tableView:controller.tableView numberOfRowsInSection:1] != 5) return 7;
+    @try {
+        NWBluetoothUIRegressionCatalogState(1); [controller refresh];
+        if (!controller.navigationItem.hidesBackButton || ![controller.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.diagnostics.stop"] ||
+            !controller.navigationItem.rightBarButtonItem.enabled) return 8;
+        [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:2]];
+        if (controller.presentedViewController) return 9;
+        NWBluetoothUIRegressionCatalogState(2); [controller refresh];
+        if (controller.navigationItem.rightBarButtonItem.enabled) return 10;
+    } @finally { NWBluetoothUIRegressionCatalogState(0); [controller refresh]; }
     return 0;
 }
 #endif
