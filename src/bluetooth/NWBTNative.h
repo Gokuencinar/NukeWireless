@@ -7,6 +7,7 @@
 NSDictionary *NWBTSkywalkCompatibility(void);
 // Also checks the actual HCI nexus descriptor, without opening any channel.
 NSDictionary *NWBTNativeAvailability(void);
+NSDictionary *NWBTDiagnosticContract(void);
 // Legacy ACT and ACL call paths retain the exact inspected-device restriction.
 NSDictionary *NWBTLegacyGuard(void);
 NSDictionary *NWBTLegacyCompatibility(void);

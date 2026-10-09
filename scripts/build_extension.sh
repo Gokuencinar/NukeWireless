@@ -18,13 +18,15 @@ clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWReso
 build/audit/test_resources
 clang -Wall -Wextra -Werror -fobjc-arc -framework Foundation src/NWBLEAdvertisement.m tests/test_ble_advertisement.m -o build/audit/test_ble_advertisement
 build/audit/test_ble_advertisement
+clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_DIAGNOSTIC_TESTING -framework Foundation src/NWDiagnosticReport.m tests/test_diagnostics.m -o build/audit/test_diagnostics
+build/audit/test_diagnostics
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -fPIC -O2 -dynamiclib \
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
-  src/NukeWirelessInfo.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWDiagnosticReport.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target "$minimum_ios" --target-device iphone --target-device ipad

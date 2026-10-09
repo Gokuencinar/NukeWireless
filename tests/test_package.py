@@ -47,8 +47,12 @@ class PackageTests(unittest.TestCase):
     def test_metadata_resources_and_entitlements(self):
         info = plistlib.loads(self.after[package.APP+'Info.plist'][1])
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
-        self.assertEqual(info['CFBundleDisplayName'],'NukeWireless')
+        self.assertEqual(info['CFBundleDisplayName'],'NukeWireless Dev')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
+        self.assertEqual(info['CFBundleVersion'], '20001')
+        self.assertTrue(info['UIFileSharingEnabled'])
+        self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
+        self.assertEqual(info['NukeWirelessWorkerVersion'], package.VERSION)
         self.assertEqual(info['CFBundleLocalizations'],['en','es'])
         self.assertTrue(info['NSBluetoothAlwaysUsageDescription'])
         self.assertFalse(any('LocationUsage' in key for key in info))
@@ -107,7 +111,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
-        self.assertTrue(('NWBuild-rh25.5-' + package.VERSION.split('~')[-1]).encode() in binary, 'Compiled version marker must match package version')
+        self.assertTrue(('NWBuild-' + package.VERSION.split('~')[-1]).encode() in binary, 'Compiled version marker must match package version')
         self.assertNotIn(b'NWUIRegressionCheck',binary)
         for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
             self.assertNotIn(token,binary)

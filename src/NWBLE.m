@@ -1,4 +1,5 @@
 #import "NWBLE.h"
+#import "NWDiagnosticReport.h"
 #import "NWBLEAdvertisement.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
@@ -67,6 +68,10 @@
         @"observed_corebluetooth_scanning": @(self.observedScanning),
         @"corebluetooth_scanning": @(self.central.isScanning),
         @"discovery_callbacks": @(self.discoveries), @"device_count": @(self.records.count)};
+    NSString *status = self.requested || self.scanning ? @"running" : self.observedScanning ? (self.records.count ? @"passed" : @"empty") : @"not_run";
+    if (CBManager.authorization == CBManagerAuthorizationDenied || CBManager.authorization == CBManagerAuthorizationRestricted ||
+        (self.central && (self.central.state == CBManagerStatePoweredOff || self.central.state == CBManagerStateUnsupported))) status = @"blocked";
+    NWDiagnosticRecord(@"ble_scan", status, diagnostics);
     [NSUserDefaults.standardUserDefaults setObject:diagnostics forKey:@"NukeWirelessBLELastScan"];
     [NSUserDefaults.standardUserDefaults synchronize];
 }

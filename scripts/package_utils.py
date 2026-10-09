@@ -13,7 +13,7 @@ from pathlib import Path
 import tarfile
 
 
-SOURCE = Path(os.environ.get("HARPY_SOURCE_DEB", ""))  # Legacy builder compatibility.
+SOURCE = Path(os.environ.get("NUKEWIRELESS_SOURCE_DEB", ""))  # Legacy builder compatibility.
 
 
 

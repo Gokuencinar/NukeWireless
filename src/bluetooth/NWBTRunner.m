@@ -1,3 +1,4 @@
+#import "../NWLegacyABI.h"
 #import "NWBTBridge.h"
 #include "../NWCatalogProfiles.h"
 #import "NWBTNative.h"
@@ -106,7 +107,7 @@ static BOOL callerAllowed(char ownPath[PATH_MAX]) {
     size_t rootLength = strlen(ownPath) - strlen(suffix);
     if (strcmp(ownPath + rootLength, suffix)) return NO;
     char expected[PATH_MAX];
-    int count = snprintf(expected, sizeof(expected), "%.*s/Applications/HarpyReloaded.app/HarpyReloaded", (int)rootLength, ownPath);
+    int count = snprintf(expected, sizeof(expected), "%.*s" NWLegacyAppSuffix, (int)rootLength, ownPath);
     if (count < 0 || count >= (int)sizeof(expected) || strcmp(parent, expected) || getppid() != parentPID) return NO;
     return !lstat(parent, &info) && S_ISREG(info.st_mode) && info.st_uid == 0 && !(info.st_mode & 0022);
 }
@@ -405,6 +406,29 @@ static BOOL decimalOption(const char *text, NSUInteger *value) {
     *value = parsed; return YES;
 }
 
+static NSDictionary *diagnostics(const char *ownPath) {
+    NSMutableDictionary *report = [NWBTDiagnosticContract() mutableCopy];
+    report[@"version"] = NWBT_VERSION; report[@"operation"] = @"diagnostics";
+    report[@"invoking_uid"] = @(invokingUID);
+    struct stat info = {0};
+    if (!lstat(ownPath, &info)) report[@"runner_file"] = @{@"owner_uid": @(info.st_uid),
+        @"mode": @(info.st_mode & 07777), @"setuid": @((info.st_mode & S_ISUID) != 0),
+        @"writable_by_others": @((info.st_mode & 0022) != 0)};
+    NSString *library = [bootstrapRoot stringByAppendingPathComponent:@"usr/lib/NukeBluetoothBridge.dylib"];
+    report[@"companion_library_present"] = @(!lstat(library.fileSystemRepresentation, &info) && S_ISREG(info.st_mode));
+    NSMutableArray *services = [NSMutableArray new];
+    for (unsigned i = 0; i < 2; ++i) {
+        NSString *output = nil; const char *label = NWBTServiceLabel(i);
+        int result = control("print", label, &output);
+        NSString *first = [[output componentsSeparatedByString:@"\n"] firstObject] ?: @"";
+        [services addObject:@{@"requested_domain": [NSString stringWithUTF8String:NWBTServiceDomain(i)],
+            @"exit_code": @(result), @"running": @(!result && [output containsString:@"state = running"]),
+            @"resolved_header": [first substringToIndex:MIN((NSUInteger)160, first.length)]}];
+    }
+    report[@"service_observations"] = services;
+    return report;
+}
+
 int main(int argc, char **argv) {
     @autoreleasepool {
         invokingUID = getuid(); invokingParent = getppid();
@@ -449,6 +473,7 @@ int main(int argc, char **argv) {
         signal(SIGPIPE, SIG_IGN);
         signal(SIGCHLD, SIG_DFL);
         if (recovery) return recover();
+        if (argc == 2 && !strcmp(argv[1], "--diagnostics")) return printReport(diagnostics(ownPath));
         if (capabilities || lab) {
             if (!installCancellationSignals()) return printReport(errorReport(@"transport"));
             alarm(60);
@@ -473,6 +498,7 @@ int main(int argc, char **argv) {
                 @"supports_ping_options": @(reference), @"supports_ping_milliseconds": @(reference),
                 @"supports_le_capability_reads": @YES, @"supports_le_capability_app": @YES,
                 @"supports_app_cancel_channel": @YES,
+                @"supports_diagnostics": @YES,
                 @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES,
                 @"supports_le_catalog_six_models": @YES,
                 @"supports_le_catalog_extended_models": @YES,

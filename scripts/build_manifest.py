@@ -1,4 +1,5 @@
 """Record precise source and binary hashes for the private build artifact."""
+import subprocess
 import hashlib
 import json
 from pathlib import Path
@@ -14,6 +15,7 @@ SOURCES = ['src/NukeWirelessInfo.m', 'src/NWMainTabs.m', 'src/NWMainTabs.h', 'sr
            'src/NWRefreshThunk.S', 'scripts/build_extension.sh', 'resources/NukeLaunch.storyboard',
            'scripts/startup_resources.py',
            'resources/startup/NukeWirelessIcon.png']
+SOURCES += ['src/NWBuild.h', 'src/NWLegacyABI.h', 'src/NWDiagnostics.h', 'src/NWDiagnostics.m', 'src/NWDiagnosticReport.h', 'src/NWDiagnosticReport.m', 'tests/test_diagnostics.m']
 SOURCES += [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / 'resources/brands').iterdir()) if p.is_file()]
 
 def sha(data):
@@ -32,5 +34,6 @@ if __name__ == '__main__':
         'launch_files': {p.relative_to(out / 'NukeLaunch.storyboardc').as_posix(): sha(p.read_bytes())
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
-        'version': '1.0.25+rh25.5~dev53', 'target': args.target,
+        'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic1', 'target': args.target,
     }, indent=2) + '\n', encoding='utf-8')

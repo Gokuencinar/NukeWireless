@@ -1,4 +1,6 @@
 #import "NWBluetooth.h"
+#import "NWDiagnosticReport.h"
+#import "NWLegacyABI.h"
 #import "NWBLE.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
@@ -93,7 +95,7 @@ static NSString *advertisingSupport(NSDictionary *report, BOOL extended) {
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
 static NSString *helperPath(void) {
     NSString *app = NSBundle.mainBundle.bundlePath;
-    if (![app.lastPathComponent isEqual:@"HarpyReloaded.app"] || ![app.stringByDeletingLastPathComponent.lastPathComponent isEqual:@"Applications"]) return nil;
+    if (![app.lastPathComponent isEqual:@NWLegacyAppDirectory] || ![app.stringByDeletingLastPathComponent.lastPathComponent isEqual:@"Applications"]) return nil;
     NSString *root = app.stringByDeletingLastPathComponent.stringByDeletingLastPathComponent;
     return [root stringByAppendingPathComponent:@"usr/bin/nwbt-run"];
 }
@@ -140,6 +142,7 @@ NSString *NWBluetoothEmissionIssue(void) {
 // supplies argv, reads bounded JSON, and requests cancellation over a private
 // inherited socket. The worker's root credentials do not grant the app signals.
 static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
+    double started = NSProcessInfo.processInfo.systemUptime;
     saveInvocation(@{@"phase": @"starting"}, cancellable);
     NSString *path = helperPath();
     if (!path || ![NSFileManager.defaultManager isExecutableFileAtPath:path]) return @{@"error_code": @"missing"};
@@ -175,7 +178,7 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     if (launch) {
         saveInvocation(@{@"phase": @"spawn_failed", @"spawn_errno": @(launch)}, cancellable);
         close(out[0]); close(err[0]); if (control[1] >= 0) close(control[1]);
-        return @{@"error_code": @"permissions"};
+        return @{@"error_code": @"permissions", @"spawn_errno": @(launch)};
     }
     if (cancellable) @synchronized (workerLock) {
         worker = child; workerControl = control[1]; if (cancelling) signalChild(child, SIGTERM, YES);
@@ -217,7 +220,11 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments, BOOL cancellable) {
     saveInvocation(@{@"phase": @"finished", @"bytes": @(data.length), @"invalid": @(invalid),
         @"child_exited": @(exited), @"wait_status": @(status),
         @"stderr": [[NSString alloc] initWithData:diagnostics encoding:NSUTF8StringEncoding] ?: @""}, cancellable);
-    return [report isKindOfClass:NSDictionary.class] ? report : @{@"error_code": @"transport"};
+    NSMutableDictionary *result = [report isKindOfClass:NSDictionary.class] ? [report mutableCopy] : [@{@"error_code": @"transport"} mutableCopy];
+    result[@"worker_process"] = @{@"elapsed_seconds": @(NSProcessInfo.processInfo.systemUptime - started),
+        @"bytes": @(data.length), @"invalid": @(invalid), @"exited_before_deadline": @(exited), @"wait_status": @(status),
+        @"stderr": [[NSString alloc] initWithData:diagnostics encoding:NSUTF8StringEncoding] ?: @""};
+    return result;
 }
 
 // Emissions have one entry point; scanning remains independent.
@@ -429,6 +436,7 @@ static NSInteger menuAction(NSIndexPath *index) {
     labRunning = labOperation(operation);
     [self.view endEditing:YES];
     busy = YES; lastReport = nil;
+    NWDiagnosticRecord(operation ?: @"bluetooth", @"running", @{@"arguments": arguments});
     [NSUserDefaults.standardUserDefaults removeObjectForKey:reportKey];
     background = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"NukeWirelessBluetoothCleanup" expirationHandler:^{ [self stopCurrentOperation]; }];
     [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
@@ -451,6 +459,11 @@ static NSInteger menuAction(NSIndexPath *index) {
 }
 - (void)finishOperation:(NSDictionary *)report {
     lastReport = report; busy = NO;
+    NSString *status = [report[@"error_code"] isEqual:@"cancelled"] ? @"cancelled" :
+        (report[@"error_code"] || report[@"error"] ? @"failed" :
+        (emissionFinishedCleanly(report) || ([report[@"capabilities_verified"] boolValue] && [report[@"service_restored"] boolValue]) ? @"passed" : @"partial"));
+    if (report[@"cleanup_warning"] || (report[@"service_restored"] && ![report[@"service_restored"] boolValue])) status = @"failed";
+    NWDiagnosticRecord(report[@"operation"] ?: @"bluetooth", status, report);
     if (background != UIBackgroundTaskInvalid) { [UIApplication.sharedApplication endBackgroundTask:background]; background = UIBackgroundTaskInvalid; }
     [NSNotificationCenter.defaultCenter postNotificationName:NWBluetoothChanged object:nil];
     [self refresh:nil];
@@ -462,6 +475,19 @@ static NSInteger menuAction(NSIndexPath *index) {
 @end
 
 UIViewController *NWBluetoothController(void) { return [NWBluetoothViewController new]; }
+void NWBluetoothReadDiagnostics(void (^completion)(NSDictionary *)) {
+    if (!completion) return;
+    if (busy || NWBulkBusy()) { completion(@{@"error_code": @"busy"}); return; }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSDictionary *report = invoke(@[@"--diagnostics"], NO);
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(report); });
+    });
+}
+BOOL NWBluetoothStartCapabilityDiagnostic(void) {
+    if (!NSThread.isMainThread || busy || NWBulkBusy() || NWScanBusy()) return NO;
+    [[NWBluetoothViewController new] runArguments:@[@"--le-capabilities"] operation:@"le_capabilities"];
+    return YES;
+}
 
 #ifdef NW_UI_TESTING
 int NWBluetoothUIRegressionCatalogState(int state) {

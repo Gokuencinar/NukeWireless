@@ -4,6 +4,7 @@ on:
     branches: [audit-rh25.5]
     paths:
       - 'src/bluetooth/**'
+      - 'src/NWLegacyABI.h'
       - 'src/NWCatalogProfiles.h'
       - 'src/NWDeviceCatalog.h'
       - 'scripts/build_bluetooth_inspector.sh'

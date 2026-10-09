@@ -9,7 +9,7 @@ from compat_macho import inspect
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '0.0.3~app32'
+VERSION = '2.0.0~diagnostic1'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -62,7 +62,7 @@ def build(artifact, output, scheme='roothide'):
         if sha(data) != report['files'][name]: raise ValueError('artifact hash mismatch')
         report[name + '_macho'] = inspect(data) if name.endswith('.dylib') else inspect_tool(data)
     control = f'''Package: com.gokuencinar.nukewireless.bluetooth
-Name: NukeWireless Bluetooth Bridge (Research)
+Name: NukeWireless Dev Bluetooth Diagnostics
 Version: {PACKAGE_VERSION}
 Architecture: {architecture}
 Section: Development

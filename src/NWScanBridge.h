@@ -7,6 +7,7 @@ BOOL NWBulkBusy(void);
 NSString *NWScanSummary(void);
 NSString *NWBulkTitle(void);
 BOOL NWRefreshScan(void);
+NSDictionary *NWScanDiagnosticSnapshot(void);
 void NWMaintainWiFiScan(void);
 void NWConfirmBulk(UIViewController *presenter);
 BOOL NWCanRestartForLanguage(void);

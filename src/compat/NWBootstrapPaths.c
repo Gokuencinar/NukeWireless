@@ -1,3 +1,4 @@
+#include "../NWLegacyABI.h"
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
  * Recompiled for iOS 15; bootstrap paths and native-entry guards adapted here.
@@ -171,10 +172,10 @@ static id stored_name_for_mac(const char *group, const char *mac) {
         string_from_utf8(group));
     if (!aliases && equals(group, "NukeWirelessDeviceAliases"))
         aliases = ((id (*)(id, SEL, id))objc_msgSend)(defaults,
-            sel_registerName("dictionaryForKey:"), string_from_utf8("HarpyRHDeviceAliases"));
+            sel_registerName("dictionaryForKey:"), string_from_utf8(NWLegacyAliasesKey));
     if (!aliases && equals(group, "NukeWirelessResolvedNames"))
         aliases = ((id (*)(id, SEL, id))objc_msgSend)(defaults,
-            sel_registerName("dictionaryForKey:"), string_from_utf8("HarpyRHResolvedNames"));
+            sel_registerName("dictionaryForKey:"), string_from_utf8(NWLegacyResolvedNamesKey));
     return aliases ? ((id (*)(id, SEL, id))objc_msgSend)(aliases,
         sel_registerName("objectForKey:"), string_from_utf8(mac)) : 0;
 }
@@ -532,7 +533,7 @@ static id jailbreak_prefix(void) {
 }
 
 static int is_jailbreak_file(const char *path) {
-    return starts_with(path, "/usr/libexec/harpy-reloaded/") ||
+    return starts_with(path, NWLegacyHelperDirectory) ||
            starts_with(path, "/usr/bin/arpoison") ||
            starts_with(path, "/sbin/pfctl");
 }
@@ -551,7 +552,7 @@ static id rewrite_argument(id argument) {
     const char *root = utf8(jailbreak_prefix());
     if (!value || !root || !root[0]) return argument;
     static const char *paths[] = {
-        "/usr/libexec/harpy-reloaded/", "/usr/bin/arpoison", "/sbin/pfctl"
+        NWLegacyHelperDirectory, "/usr/bin/arpoison", "/sbin/pfctl"
     };
     size_t length = strlen(value), prefix = strlen(root);
     if (length > 65536 || prefix > 4096) return argument;
@@ -662,7 +663,7 @@ static void run_as_root(const char *path, const char **args, int count) {
         sel_registerName("setLaunchPath:"), string_from_utf8(path));
     ((void (*)(id, SEL, id))objc_msgSend)(task,
         sel_registerName("setArguments:"), array);
-    Class commands = objc_getClass("_TtC13HarpyReloaded10MCCommands");
+    Class commands = objc_getClass(NWLegacyCommandsClass);
     captured_root_task = 0;
     capture_root_task = 1;
     if (commands)
@@ -1073,7 +1074,7 @@ static void bulk_button_tapped(id self, SEL cmd, id sender) {
     }
     bulk_confirm_count = 0;
     bulk_last_failed = 0;
-    Class commands = objc_getClass("_TtC13HarpyReloaded10MCCommands");
+    Class commands = objc_getClass(NWLegacyCommandsClass);
     if (!commands || !class_getClassMethod(commands,
         sel_registerName("blockGivenIPWithIp:targetMac:"))) {
         scan_timed_out = 1;
@@ -1630,7 +1631,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
     if (capture_root_task) {
         id task_path = ((id (*)(id, SEL))objc_msgSend)(self,
             sel_registerName("launchPath"));
-        if (contains(utf8(task_path), "/harpy-reloaded/aegis"))
+        if (contains(utf8(task_path), NWLegacyHelperSuffix))
             captured_root_task = self;
     }
     if (!is_arpoison) {
@@ -1655,7 +1656,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
 __attribute__((constructor)) static void install_paths(void) {
     id bundle = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("NSBundle"), sel_registerName("mainBundle"));
     id identifier = ((id (*)(id, SEL))objc_msgSend)(bundle, sel_registerName("bundleIdentifier"));
-    if (!equals(utf8(identifier), "me.midnightchips.harpy-reloaded")) return;
+    if (!equals(utf8(identifier), NWLegacyBundleID)) return;
     Method exists = class_getInstanceMethod(objc_getClass("NSFileManager"),
         sel_registerName("fileExistsAtPath:"));
     Class task_class = objc_getClass("NSConcreteTask");
@@ -1670,14 +1671,14 @@ __attribute__((constructor)) static void install_paths(void) {
         sel_registerName("interrupt"));
     Method launch = class_getInstanceMethod(task_class,
         sel_registerName("launch"));
-    Class commands = objc_getClass("_TtC13HarpyReloaded10MCCommands");
+    Class commands = objc_getClass(NWLegacyCommandsClass);
     Method running_ip = commands ? class_getClassMethod(commands,
         sel_registerName("runningBlocksForIpWithIp:")) : 0;
     Method running_arp = commands ? class_getClassMethod(commands,
         sel_registerName("runningBlocksForArp")) : 0;
     Method did_appear = class_getInstanceMethod(objc_getClass("UIViewController"),
         sel_registerName("viewDidAppear:"));
-    Class scanner = objc_getClass("_TtC13HarpyReloaded10LanScanner");
+    Class scanner = objc_getClass(NWLegacyScannerClass);
     Method scanner_init = scanner ? class_getInstanceMethod(scanner,
         sel_registerName("initWithDelegate:andEnableHotspot:")) : 0;
     Method scanner_start = scanner ? class_getInstanceMethod(scanner,
@@ -1722,7 +1723,7 @@ __attribute__((constructor)) static void install_paths(void) {
     if (image_header && image_name && image_count) {
         for (unsigned i = 0; i < image_count(); ++i) {
             const char *name = image_name(i);
-            if (contains(name, "/HarpyReloaded.app/HarpyReloaded")) {
+            if (contains(name, "/" NWLegacyAppDirectory "/" NWLegacyExecutable)) {
                 app_header = image_header(i);
                 break;
             }

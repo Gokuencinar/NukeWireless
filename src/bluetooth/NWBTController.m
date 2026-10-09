@@ -288,6 +288,34 @@ NSDictionary *NWBTLegacyGuard(void) {
 
 NSDictionary *NWBTLegacyCompatibility(void) { return requireKnownABI(); }
 
+NSDictionary *NWBTDiagnosticContract(void) {
+    NSDictionary *contract = NWBTSkywalkCompatibility();
+    NSDictionary *availability = NWBTNativeAvailability();
+    NSMutableDictionary *symbols = [NSMutableDictionary new];
+    for (NSString *name in @[@"os_channel_create", @"os_channel_destroy", @"os_channel_attr_create",
+        @"os_channel_attr_destroy", @"os_channel_read_attr", @"os_channel_attr_get", @"os_channel_ring_id",
+        @"os_channel_tx_ring", @"os_channel_rx_ring", @"os_channel_get_next_slot",
+        @"os_channel_set_slot_properties", @"os_channel_advance_slot", @"os_channel_sync", @"os_channel_get_fd"])
+        symbols[name] = @(dlsym(RTLD_DEFAULT, name.UTF8String) != NULL);
+    Class cls = NSClassFromString(@"BluetoothManager");
+    NSMutableDictionary *methods = [NSMutableDictionary new];
+    for (NSString *name in @[@"sharedInstance", @"setSharedInstanceQueue:", @"available", @"enabled"]) {
+        Method method = [name isEqual:@"sharedInstance"] || [name isEqual:@"setSharedInstanceQueue:"] ?
+            class_getClassMethod(cls, NSSelectorFromString(name)) : class_getInstanceMethod(cls, NSSelectorFromString(name));
+        const char *encoding = method ? method_getTypeEncoding(method) : NULL;
+        methods[name] = @{@"present": @(method != NULL), @"encoding": encoding ? [NSString stringWithUTF8String:encoding] : @"missing"};
+    }
+    struct utsname system = {0}; uname(&system);
+    return @{@"machine": [NSString stringWithUTF8String:system.machine],
+        @"kernel_release": [NSString stringWithUTF8String:system.release],
+        @"ios_version": NSProcessInfo.processInfo.operatingSystemVersionString,
+        @"skywalk_contract": contract ?: @{@"stage": @"runtime_admitted"},
+        @"hci_registry": availability ?: @{@"stage": @"descriptor_present"},
+        @"symbols": symbols, @"bluetooth_manager_methods": methods,
+        @"channel_opened": @NO, @"hci_commands_submitted": @0,
+        @"service_state_changed": @NO, @"functional_compatibility_proven": @NO};
+}
+
 static void *nativeOpenFailure(NSDictionary **error, NSDictionary *report) { *error = report; return NULL; }
 
 static NSString *nativeNexus(NSString *wanted, NSDictionary **error) {

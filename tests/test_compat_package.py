@@ -77,8 +77,13 @@ class CandidateTests(unittest.TestCase):
                 self.assertIn('firmware (>= 15.0), firmware (<< 19.0)', control)
                 info = plistlib.loads(files[prefix + app.APP + 'Info.plist'][1])
                 self.assertEqual(info['CFBundleIdentifier'], 'me.midnightchips.harpy-reloaded')
-                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '25.6.4'))
+                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20001'))
                 self.assertEqual(info['CFBundleShortVersionString'], app.VERSION)
+                self.assertEqual(info['NukeWirelessPackageScheme'], scheme)
+                self.assertEqual(info['CFBundleDisplayName'], 'NukeWireless Dev')
+                self.assertTrue(info['UIFileSharingEnabled'])
+                self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
+                self.assertEqual(info['NukeWirelessWorkerVersion'], bluetooth.VERSION)
                 self.assertIn('-Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"', script)
                 self.assertIn('ldid -S /' + prefix + inject + '/NukeWirelessInfo.dylib', script)
                 self.assertEqual(any(name.endswith('.roothidepatch') for name in files), scheme == 'roothide')
@@ -99,7 +104,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-rh25.5-dev53', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-diagnostic1', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],

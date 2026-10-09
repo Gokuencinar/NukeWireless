@@ -7,6 +7,9 @@
 #import "NWAppearance.h"
 #import "NWDeviceBrowser.h"
 #import "NWBluetooth.h"
+#import "NWDiagnostics.h"
+#import "NWBuild.h"
+#import "NWLegacyABI.h"
 #import "NWMainTabs.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -19,7 +22,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 
-__attribute__((used)) static const char buildMarker[] = "NWBuild-rh25.5-dev53";
+__attribute__((used)) static const char buildMarker[] = NW_BUILD_MARKER;
 @interface NWGridBackground : UIView
 @end
 @implementation NWGridBackground
@@ -303,7 +306,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
     });
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
-- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 5 : (section == 2 ? 6 : 1)); }
+- (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section { (void)table; return section == 0 ? 1 : (section == 1 ? 6 : (section == 2 ? 6 : 1)); }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.title") : nil; }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section { (void)table; return section == 2 ? NWText(@"network.copyHint") : nil; }
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)index {
@@ -320,16 +323,17 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
         [NSLayoutConstraint activateConstraints:@[[stack.topAnchor constraintEqualToAnchor:g.topAnchor],[stack.bottomAnchor constraintEqualToAnchor:g.bottomAnchor],[stack.leadingAnchor constraintEqualToAnchor:g.leadingAnchor],[stack.trailingAnchor constraintEqualToAnchor:g.trailingAnchor]]]; return cell;
     }
     if (index.section == 1) {
-        NSArray *labels = @[@"GitHub · GokuEn", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title")];
+        NSArray *labels = @[@"GitHub · GokuEn", NWText(@"coffee.title"), NWText(@"advanced.title"), NWText(@"language.title"), NWText(@"appearance.title"), NWText(@"diag.title")];
         NSString *detail = index.row == 3 ? ([NWLanguageCode() isEqualToString:@"es"] ? @"Español" : @"English") :
             (index.row == 4 ? NWText([@"appearance." stringByAppendingString:NWAccentName()]) : nil);
         UITableViewCell *cell = textCell(labels[index.row], detail, YES);
-        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette"];
+        NSArray *symbols = @[@"chevron.left.forwardslash.chevron.right", @"cup.and.saucer.fill", @"slider.horizontal.3", @"globe", @"paintpalette", @"stethoscope"];
         decorateCell(cell, symbols[index.row], NO);
+        if (index.row == 5) cell.accessibilityIdentifier = @"nw.info.diagnostics";
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator; return cell;
     }
     if (index.section == 3) {
-        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"1.0.25+rh25.5~dev53", NO);
+        UITableViewCell *cell = textCell(NWText(@"version"), [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: NW_BUILD_VERSION, NO);
         decorateCell(cell, @"app.badge", NO); return cell;
     }
     NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -351,6 +355,8 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
             [self chooseLanguage];
         } else if (index.row == 4) {
             [self.navigationController pushViewController:NWAppearanceSettingsController() animated:YES];
+        } else if (index.row == 5) {
+            [self.navigationController pushViewController:NWDiagnosticsController() animated:YES];
         }
     } else if (index.section == 2) {
         NSArray *keys = @[@"SSID",@"BSSID",@"IPv4",@"Puerta de enlace",@"Máscara",@"DNS"];
@@ -424,8 +430,8 @@ static NWActions *actions;
 static void (*originalNavigationTitle)(UINavigationItem *, SEL, NSString *);
 static NSString *displayAppTitle(NSString *title) {
     if (!title) return nil;
-    for (NSString *old in @[@"Harpy", @"Harpy Reloaded", @"Harpy-Reloaded", @"HarpyReloaded"])
-        if ([title caseInsensitiveCompare:old] == NSOrderedSame) return @"NukeWireless";
+    for (NSString *old in @[@NWLegacyTitleShort, @NWLegacyTitleSpaced, @NWLegacyTitleHyphenated, @NWLegacyExecutable])
+        if ([title caseInsensitiveCompare:old] == NSOrderedSame) return NW_BUILD_NAME;
     return title;
 }
 static void navigationTitle(UINavigationItem *item, SEL sel, NSString *title) {
@@ -486,7 +492,7 @@ static void bindButton(UIButton *button, SEL action) {
 }
 static UINavigationBar *wifiNavigationBar(UIView *view) {
     if ([view isKindOfClass:UINavigationBar.class] &&
-        [((UINavigationBar *)view).topItem.title isEqualToString:@"NukeWireless"])
+        [((UINavigationBar *)view).topItem.title isEqualToString:NW_BUILD_NAME])
         return (UINavigationBar *)view;
     for (UIView *child in view.subviews) {
         UINavigationBar *bar = wifiNavigationBar(child);
@@ -655,8 +661,9 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: extension dev53 loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic1 extension loaded");
     NWInstallLanguageHooks();
+    NWDiagnosticsInstall();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -698,8 +705,8 @@ int NWUIRegressionCheck(int phase) {
     if (phase == 0) {
         hosts = [tab.viewControllers copy];
         UINavigationItem *item = [UINavigationItem new];
-        item.title = @"Harpy";
-        if (![item.title isEqualToString:@"NukeWireless"]) return 2;
+        item.title = @NWLegacyTitleShort;
+        if (![item.title isEqualToString:NW_BUILD_NAME]) return 2;
         item.title = @"Current network";
         if (![item.title isEqualToString:@"Current network"]) return 3;
         BOOL spanish = [NWLanguageCode() isEqualToString:@"es"];
@@ -722,7 +729,7 @@ int NWUIRegressionCheck(int phase) {
         if (!info || info.parentViewController != host || !info.view.window) return 6;
         if (![info.topViewController isKindOfClass:NWInfoController.class]) return 7;
         NWInfoController *content = (NWInfoController *)info.topViewController;
-        if ([content tableView:content.tableView numberOfRowsInSection:1] != 5) return 8;
+        if ([content tableView:content.tableView numberOfRowsInSection:1] != 6) return 8;
         for (UIView *child in host.view.subviews) if (child != info.view && !child.hidden) return 9;
         [host.view layoutIfNeeded];
         if (!CGSizeEqualToSize(info.view.bounds.size, host.view.bounds.size)) return 10;

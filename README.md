@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
+**NukeWireless Dev · 2.0.0~diagnostic1, en validación:** edición específica para
+testers con pruebas independientes y registro persistente/exportable en
+**Información → Diagnósticos**. Incluye entorno/instalación, Wi-Fi, BLE,
+controlador y emisión con recuperación. Se preparan variantes RootHide,
+rootless y rootful; no declara aceptación en todos los iOS o iPhones.
+Véase [guía de diagnóstico y nombres internos](docs/DIAGNOSTIC-EDITION.md).
+
 **Dev53 / app32 instalado; compat4 compilada y empaquetada:** la emisión Bluetooth
 usa admisión por contrato Skywalk en iOS 15–18 y recuperación del dominio observado
 de bluetoothd. Se retira la whitelist XS/16.3.1 de las emisiones; ACT/ACL conserva
@@ -200,7 +207,7 @@ Consulta [el informe de auditoría](docs/AUDIT-rh25.5.md) para conocer las causa
 
 Este proyecto contiene una extensión y herramientas de adaptación; **no contiene el código Swift original completo**. Se conservan las dos bibliotecas de rutas y los auxiliares del paquete base. En el ejecutable original solo se sustituyen dos textos visibles manteniendo exactamente su longitud; dev18 también sustituye la llamada de color y el nombre de imagen de SplashView con guardas del binario fijado.
 
-Las rutas `HarpyReloaded.app`, las clases Swift `_TtC13HarpyReloaded…`, el bundle ID `me.midnightchips.harpy-reloaded` y las preferencias existentes son identificadores de compatibilidad. No deben renombrarse. `src/HarpyRootHidePaths.c`, `scripts/build_deb.py` y el parche de Aegis son material histórico: no se recompilan ni aplican al generar esta versión.
+Las rutas `HarpyReloaded.app`, las clases Swift `_TtC13HarpyReloaded…`, el bundle ID `me.midnightchips.harpy-reloaded` y las preferencias existentes son identificadores de compatibilidad. No deben renombrarse. `src/NWBootstrapPathsHistorical.c`, `scripts/build_deb.py` y el parche de Aegis son material histórico: no se recompilan ni aplican al generar esta versión.
 
 Versión instalada comprobada: iOS 16.3.1 con Dopamine RootHide. Las variantes nuevas apuntan a iOS 15–18 y siguen pendientes de validación funcional. SSID/BSSID se consultan mediante MobileWiFi sin solicitar ubicación; el acceso efectivo depende del dispositivo.
 

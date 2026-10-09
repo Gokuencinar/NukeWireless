@@ -1,6 +1,10 @@
 import SwiftUI
 import UIKit
 import Combine
+@_silgen_name("NWDiagnosticsUIRegressionCheck")
+func checkDiagnosticsUI() -> Int32
+@_silgen_name("NWDiagnosticsUIRegressionPresent")
+func presentDiagnostics() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionCheck")
 func checkBrowserUI() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionPresent")
@@ -89,6 +93,7 @@ struct RegressionTabs: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                                 results.append(checkUI(4))
                                 results.append(checkUI(2))
+                                results.append(checkDiagnosticsUI())
                                 results.append(checkBLEUI())
                                 results.append(checkBluetoothUI())
                                 results.append(checkBrowserUI())
@@ -117,7 +122,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 33,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 35,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -154,7 +159,7 @@ struct RegressionTabs: View {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 19], "ui-initial.json")
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 20], "ui-initial.json")
                     guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                         .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
                     root.dismiss(animated: false) {
@@ -178,7 +183,16 @@ struct RegressionTabs: View {
                     .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
                 root.dismiss(animated: false) {
                     if fixture { endBrowserFixture() }
-                    prepareResume(0)
+                    results.append(presentDiagnostics())
+                    setDark(false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        snapshot("diagnostics.png")
+                        setDark(true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            snapshot("diagnostics-dark.png")
+                            root.dismiss(animated: false) { prepareResume(0) }
+                        }
+                    }
                 }
             }
         }

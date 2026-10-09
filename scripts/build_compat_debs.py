@@ -16,7 +16,7 @@ from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "1.0.25+rh25.6~compat4"
+VERSION = "2.0.0~diagnostic1"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -51,7 +51,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="25.6.4", MinimumOSVersion="15.0")
+    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="20001", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
     replacement = {
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
@@ -92,7 +92,7 @@ def package(scheme, core, artifact, output):
     predepends = "Pre-Depends: rootless-compat (>= 0.9)\n" if scheme == "roothide" else ""
     hooks = "ellekit" if scheme == "roothide" else "mobilesubstrate"
     control = f'''Package: com.gokuencinar.nukewireless
-Name: NukeWireless
+Name: NukeWireless Dev
 Version: {VERSION}
 Architecture: {architecture}
 Author: GokuEn
@@ -101,7 +101,7 @@ Section: Utilities
 {predepends}Depends: firmware (>= 15.0), firmware (<< 19.0), ldid, arpoison, network-cmds, {hooks}
 Conflicts: xyz.cypwn.harpy-reloaded
 Replaces: xyz.cypwn.harpy-reloaded
-Description: NukeWireless iOS 15-18 experimental compatibility candidate ({label})
+Description: NukeWireless iOS 15-18 development diagnostic edition ({label})
 '''.encode()
     output.mkdir(parents=True, exist_ok=True)
     destination = output / f"com.gokuencinar.nukewireless_{VERSION}_{architecture}.deb"
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/compat4")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic1")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.
