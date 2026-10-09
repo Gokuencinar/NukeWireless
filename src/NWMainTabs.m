@@ -21,6 +21,7 @@
 - (void)restoreBar;
 @end
 static char mainTabsKey;
+NSString *const NWMainTabReselected = @"NWMainTabReselected";
 @implementation NWMainTabs
 - (instancetype)init {
     self = [super init];
@@ -85,6 +86,7 @@ static char mainTabsKey;
     UITabBarController *tab = self.owner;
     if (!tab || tag < 0 || tag > 3) return;
     BOOL wantsBluetooth = tag == 3;
+    BOOL reselected = (self.bluetoothSelected ? 3 : (NSInteger)tab.selectedIndex) == tag;
     NSUInteger nativeIndex = wantsBluetooth ? 0 : (NSUInteger)tag;
     UIViewController *nativeHost = tab.viewControllers[nativeIndex];
     id<UITabBarControllerDelegate> delegate = tab.delegate;
@@ -135,6 +137,8 @@ static char mainTabsKey;
     if ([delegate respondsToSelector:@selector(tabBarController:didSelectViewController:)])
         [delegate tabBarController:tab didSelectViewController:nativeHost];
     [self restoreBar];
+    if (reselected && !NWBluetoothBusy())
+        [NSNotificationCenter.defaultCenter postNotificationName:NWMainTabReselected object:tab userInfo:@{@"tag": @(tag)}];
 }
 - (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
     (void)tabBar; [self selectTag:item.tag];
@@ -181,6 +185,9 @@ void NWStyleMainTabs(UITabBarController *tab) {
     [tabs style]; [tabs restoreBar];
 }
 #ifdef NW_UI_TESTING
+void NWMainTabsUIRegressionSelect(UITabBarController *tab, NSInteger tag) {
+    [(NWMainTabs *)objc_getAssociatedObject(tab, &mainTabsKey) selectTag:tag];
+}
 int NWMainTabsRegressionCheck(UITabBarController *tab, BOOL selectBluetooth) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs || tabs.bar.items.count != 4 || tabs.bar.superview != tab.view) return 20;

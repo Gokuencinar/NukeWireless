@@ -1,4 +1,4 @@
-# NukeWireless Dev · 2.0.0~diagnostic1
+# NukeWireless Dev · 2.0.0~diagnostic2
 
 Edición de desarrollo para recoger evidencia de compatibilidad en iOS 15–18.
 Se generan paquetes separados para RootHide, rootless y rootful. Compartir una
@@ -6,7 +6,8 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Instalar la app y el trabajador Bluetooth de la **misma variante y versión**.
+1. Instalar la app `2.0.0~diagnostic2` y el trabajador Bluetooth
+   `2.0.0~diagnostic1` de la **misma variante**. El trabajador no cambia en esta revisión.
    Esta edición actualiza los paquetes existentes; no instala otra app en paralelo.
 2. Abrir **Información → Diagnósticos → Comprobar entorno e instalación**.
 3. Ejecutar por separado las pruebas Wi-Fi y BLE. BLE abre el escáner habitual;
@@ -18,6 +19,8 @@ compilación no constituye una verificación en todos esos entornos.
 5. Para probar emisión, abrir su opción, entrar al catálogo y emitir uno o todos.
    Mantener el receptor preparado; añadir después su modelo, versión de sistema,
    modelo emitido y resultado mediante **Añadir observación del receptor**.
+   Atrás vuelve a Diagnósticos; tocar de nuevo Información vuelve a su menú.
+   Durante una operación activa se mantiene Detener y se bloquea ese retorno.
 6. Volver y pulsar **Exportar informe JSON**. El usuario elige el destino en la
    hoja de compartir; la app no sube archivos ni contacta a nadie automáticamente.
 
@@ -81,7 +84,20 @@ componentes antiguos. Los binarios baseline/prebuilt, fixtures de ABI, historial
 licencias y documentación de procedencia conservan esos nombres deliberadamente.
 No se han editado binarios arbitrariamente ni falseado su procedencia.
 
-## Validación de esta edición
+## Corrección de navegación en diagnostic2
+
+La entrada de emisión desde Diagnósticos utilizaba el menú Bluetooth con Ayuda
+en el margen izquierdo, ocultando el botón Atrás nativo. Ayuda ocupa ahora el
+margen derecho y cede su lugar a Detener durante una operación. Volver a tocar
+Información regresa a su raíz cuando no hay una operación Bluetooth ni una
+presentación modal. Se conservan los tres hosts y el delegado de SwiftUI.
+
+La regresión recorre la ruta real Información → Diagnósticos → emisión, comprueba
+Atrás y la reselección de Información, y simula estados activo/deteniendo para
+verificar que Detener sigue accesible. Compilación, paquetes e instalación de
+esta revisión pendientes hasta completar su validación.
+
+## Validación anterior: diagnostic1
 
 Fuentes compiladas: `8b610e805ddf9c5485862592cc74c018e8e8684e`. Compilaciones aprobadas:
 

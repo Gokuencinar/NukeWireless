@@ -41,6 +41,8 @@ func setFixtureLanguage(_ spanish: Int32)
 func prepareResumeTest(_ tag: Int32) -> Int32
 @_silgen_name("NWUIRegressionCheckResume")
 func checkResumeTest() -> Int32
+@_silgen_name("NWUIRegressionDiagnosticNavigation")
+func checkDiagnosticNavigation(_ phase: Int32) -> Int32
 
 @main
 struct UIRegressionApp: App {
@@ -122,7 +124,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 35,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 42,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -190,11 +192,21 @@ struct RegressionTabs: View {
                         setDark(true)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             snapshot("diagnostics-dark.png")
-                            root.dismiss(animated: false) { prepareResume(0) }
+                            root.dismiss(animated: false) { diagnosticNavigation(0) }
                         }
                     }
                 }
             }
+        }
+    }
+    private func diagnosticNavigation(_ phase: Int32) {
+        results.append(checkDiagnosticNavigation(phase))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if phase == 2 { snapshot("diagnostic-emission.png") }
+            if phase == 3 { snapshot("diagnostic-back.png") }
+            if phase == 5 { snapshot("diagnostic-info.png") }
+            if phase < 6 { diagnosticNavigation(phase + 1) }
+            else { prepareResume(0) }
         }
     }
     private func prepareResume(_ phase: Int) {

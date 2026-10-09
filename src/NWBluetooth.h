@@ -7,3 +7,6 @@ void NWBluetoothStop(void);
 NSString *NWBluetoothEmissionIssue(void);
 void NWBluetoothReadDiagnostics(void (^completion)(NSDictionary *report));
 BOOL NWBluetoothStartCapabilityDiagnostic(void);
+#ifdef NW_UI_TESTING
+int NWBluetoothUIRegressionCatalogState(int state);
+#endif

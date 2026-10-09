@@ -106,7 +106,7 @@ cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
 cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"
 cp "$container/Documents/bluetooth-dark.png" "$out/$language-bluetooth-dark.png"
-for snapshot in diagnostics diagnostics-dark catalog-0 catalog-1 catalog-2 catalog-3 catalog-dark catalog-single catalog-active catalog-stopping catalog-error browser-actions browser-rename; do
+for snapshot in diagnostic-emission diagnostic-back diagnostic-info diagnostics diagnostics-dark catalog-0 catalog-1 catalog-2 catalog-3 catalog-dark catalog-single catalog-active catalog-stopping catalog-error browser-actions browser-rename; do
   cp "$container/Documents/$snapshot.png" "$out/$language-$snapshot.png"
 done
 done

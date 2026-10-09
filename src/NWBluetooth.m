@@ -253,11 +253,6 @@ static NSInteger menuAction(NSIndexPath *index) {
     }
     self.tableView.rowHeight = UITableViewAutomaticDimension; self.tableView.estimatedRowHeight = 64;
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
-        initWithImage:[UIImage systemImageNamed:@"questionmark.circle"] style:UIBarButtonItemStylePlain
-        target:self action:@selector(showHelp)];
-    self.navigationItem.leftBarButtonItem.accessibilityLabel = NWText(@"bt.ui.help_title");
-    self.navigationItem.leftBarButtonItem.accessibilityIdentifier = @"nw.bluetooth.help";
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:NWBluetoothChanged object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:NWAppearanceChanged object:nil];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:) name:UIContentSizeCategoryDidChangeNotification object:nil];
@@ -291,10 +286,8 @@ static NSInteger menuAction(NSIndexPath *index) {
 - (void)refresh:(NSNotification *)notification {
     (void)notification; [self.tableView reloadData];
     self.tableView.backgroundColor = NWCanvasColor(); self.tableView.tintColor = NWAccentColor();
-    self.navigationItem.leftBarButtonItem.tintColor = NWAccentColor();
     self.navigationController.interactivePopGestureRecognizer.enabled = !busy;
     self.navigationItem.hidesBackButton = busy;
-    self.navigationItem.leftBarButtonItem.enabled = !busy;
     if (busy) {
         BOOL stopping = cancellationRequested();
         UIBarButtonItem *stop = [[UIBarButtonItem alloc] initWithTitle:NWText(stopping ? @"bt.stopping" : @"bt.stop")
@@ -302,7 +295,16 @@ static NSInteger menuAction(NSIndexPath *index) {
         stop.enabled = !stopping; stop.tintColor = UIColor.systemRedColor;
         stop.accessibilityIdentifier = @"nw.bluetooth.stop";
         self.navigationItem.rightBarButtonItem = stop;
-    } else self.navigationItem.rightBarButtonItem = nil;
+    } else {
+        // This menu can also be pushed from Diagnostics. Keep UIKit's Back
+        // button free; Help yields its trailing position to Stop while busy.
+        UIBarButtonItem *help = [[UIBarButtonItem alloc]
+            initWithImage:[UIImage systemImageNamed:@"questionmark.circle"] style:UIBarButtonItemStylePlain
+            target:self action:@selector(showHelp)];
+        help.accessibilityLabel = NWText(@"bt.ui.help_title");
+        help.accessibilityIdentifier = @"nw.bluetooth.help";
+        help.tintColor = NWAccentColor(); self.navigationItem.rightBarButtonItem = help;
+    }
 }
 - (void)showHelp {
     if (self.presentedViewController) return;
@@ -529,7 +531,8 @@ int NWBluetoothUIRegressionCheck(void) {
         if (cell.selectionStyle != UITableViewCellSelectionStyleDefault ||
             ![cell.accessibilityIdentifier isEqual:@"nw.bluetooth.catalog"]) return 46;
         if (NWBluetoothCatalogUIRegressionCheck()) return 47;
-        if (controller.navigationItem.leftBarButtonItem.action != @selector(showHelp)) return 45;
+        [controller refresh:nil];
+        if (controller.navigationItem.leftBarButtonItem || controller.navigationItem.rightBarButtonItem.action != @selector(showHelp)) return 45;
         lastReport = @{@"operation": @"le_catalog_test", @"controller_advertising_acknowledged": @YES,
             @"advertising_stopped_acknowledged": @YES, @"advertising_set_removed": @YES, @"service_restored": @YES};
         if ([controller tableView:controller.tableView numberOfRowsInSection:3] || NWBluetoothEmissionIssue()) return 10;
@@ -552,7 +555,7 @@ int NWBluetoothUIRegressionCheck(void) {
             ![((UIListContentConfiguration *)cell.contentConfiguration).text isEqual:NWText(@"bt.stopping")]) return 26;
         [controller stopCurrentOperation];
         busy = NO; [controller refresh:nil];
-        if (controller.navigationItem.rightBarButtonItem) return 27;
+        if (controller.navigationItem.rightBarButtonItem.action != @selector(showHelp)) return 27;
         busy = NO; capturedCatalogArguments = nil; captureCatalogArguments = YES;
         controller.capabilities = @{@"supported": @YES, @"supports_le_catalog_test": @YES, @"supports_le_catalog_identity_v2": @YES, @"supports_le_catalog_six_models": @YES, @"supports_le_catalog_extended_models": @YES};
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];

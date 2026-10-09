@@ -414,6 +414,7 @@ static void applyAppearance(void);
 - (void)changed:(NSNotification *)notification;
 - (void)browse:(id)sender;
 - (void)appearanceChanged:(NSNotification *)notification;
+- (void)tabReselected:(NSNotification *)notification;
 @end
 @implementation NWActions
 - (void)refresh:(id)sender {
@@ -425,6 +426,14 @@ static void applyAppearance(void);
 - (void)changed:(NSNotification *)notification { (void)notification; updateWiFi(); }
 - (void)browse:(id)sender { (void)sender; NWPresentDeviceBrowser(activeTab.selectedViewController); }
 - (void)appearanceChanged:(NSNotification *)notification { (void)notification; applyAppearance(); }
+- (void)tabReselected:(NSNotification *)notification {
+    UITabBarController *tab = notification.object;
+    if ([notification.userInfo[@"tag"] integerValue] != 2 || tab.selectedIndex != 2 ||
+        NWBluetoothTabSelected(tab) || NWBluetoothBusy()) return;
+    UINavigationController *info = objc_getAssociatedObject(tab.selectedViewController, &infoOverlayKey);
+    if (info.presentedViewController) return;
+    [info popToRootViewControllerAnimated:NO];
+}
 @end
 static NWActions *actions;
 static void (*originalNavigationTitle)(UINavigationItem *, SEL, NSString *);
@@ -661,13 +670,14 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic1 extension loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic2 extension loaded");
     NWInstallLanguageHooks();
     NWDiagnosticsInstall();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];
+        [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(tabReselected:) name:NWMainTabReselected object:nil];
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(changed:) name:NWStateChanged object:nil];
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(appearanceChanged:) name:NWAppearanceChanged object:nil];
         Method method = class_getInstanceMethod(UIViewController.class,@selector(viewDidAppear:));
@@ -698,6 +708,57 @@ __attribute__((constructor)) static void installExtension(void) {
 void NWUIRegressionSetLanguage(int spanish) { NWSetLanguage(spanish ? @"es" : @"en"); }
 int NWUIRegressionPrepareResume(int tag) { return NWMainTabsResumePrepare(activeTab, tag); }
 int NWUIRegressionCheckResume(void) { return NWMainTabsResumeCheck(activeTab); }
+int NWUIRegressionDiagnosticNavigation(int phase) {
+    static UINavigationController *navigation;
+    static UIViewController *diagnostics;
+    static NSArray *hosts;
+    static id<UITabBarControllerDelegate> delegate;
+    UITabBarController *tab = activeTab;
+    if (!tab || tab.viewControllers.count != 3) return 80;
+    if (phase == 0) {
+        hosts = [tab.viewControllers copy]; delegate = tab.delegate;
+        NWMainTabsUIRegressionSelect(tab, 2); return 0;
+    }
+    if (![hosts isEqual:tab.viewControllers] || delegate != tab.delegate || tab.selectedIndex != 2) return 81;
+    navigation = objc_getAssociatedObject(tab.selectedViewController, &infoOverlayKey);
+    if (!navigation || !navigation.view.window) return 82;
+    if (phase == 1) {
+        NWInfoController *info = (NWInfoController *)navigation.topViewController;
+        if (![info isKindOfClass:NWInfoController.class]) return 83;
+        [info tableView:info.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:5 inSection:1]];
+        diagnostics = navigation.topViewController;
+    } else if (phase == 2 || phase == 4) {
+        if (navigation.topViewController != diagnostics || ![diagnostics.title isEqual:NWText(@"diag.title")]) return 84;
+        UITableViewController *table = (UITableViewController *)diagnostics;
+        [table tableView:table.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:4 inSection:1]];
+        if (navigation.topViewController == diagnostics) return 85;
+    } else if (phase == 3) {
+        UIViewController *menu = navigation.topViewController;
+        if (![menu.title isEqual:NWText(@"bt.title")] || menu.navigationItem.leftBarButtonItem ||
+            menu.navigationItem.hidesBackButton || navigation.navigationBar.backItem != diagnostics.navigationItem ||
+            ![menu.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.help"]) return 86;
+        @try {
+            NWBluetoothUIRegressionCatalogState(1);
+            NWMainTabsUIRegressionSelect(tab, 2);
+            if (navigation.topViewController != menu || !menu.navigationItem.hidesBackButton ||
+                navigation.interactivePopGestureRecognizer.enabled ||
+                ![menu.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.stop"]) return 87;
+            NWBluetoothUIRegressionCatalogState(2);
+            if (menu.navigationItem.rightBarButtonItem.enabled) return 88;
+        } @finally { NWBluetoothUIRegressionCatalogState(0); }
+        if (menu.navigationItem.hidesBackButton || !navigation.interactivePopGestureRecognizer.enabled ||
+            ![menu.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.help"]) return 89;
+        [navigation popViewControllerAnimated:NO];
+        if (navigation.topViewController != diagnostics) return 90;
+    } else if (phase == 5) {
+        NWMainTabsUIRegressionSelect(tab, 2);
+        if (navigation.viewControllers.count != 1 || ![navigation.topViewController isKindOfClass:NWInfoController.class]) return 91;
+    } else if (phase == 6) {
+        NWMainTabsUIRegressionSelect(tab, 0);
+        if (tab.selectedIndex != 0 || NWBluetoothTabSelected(tab)) return 92;
+    }
+    return 0;
+}
 int NWUIRegressionCheck(int phase) {
     static NSArray<UIViewController *> *hosts;
     UITabBarController *tab = activeTab;
