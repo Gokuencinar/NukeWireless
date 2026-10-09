@@ -6,9 +6,13 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Instalar la app `2.0.0~diagnostic5` y el trabajador Bluetooth
-   `2.0.0~diagnostic1` de la **misma variante**. El trabajador no cambia en esta revisión.
+1. Cerrar NukeWireless e instalar **un único DEB** `2.0.0~diagnostic5+bundle1`
+   de la variante correcta: RootHide, Dopamine/rootless o rootful. Incluye la app
+   diagnostic5 y el trabajador Bluetooth diagnostic1, sin cambios en los binarios.
    Esta edición actualiza los paquetes existentes; no instala otra app en paralelo.
+   El gestor puede proponer retirar el paquete Bluetooth separado, sustituido por
+   el integrado. No instalar ambos formatos a la vez. Véase
+   [empaquetado unificado y recuperación](UNIFIED-INSTALLER.md).
 2. Abrir **Información → Diagnósticos → Comprobar entorno e instalación**.
 3. Ejecutar por separado las pruebas Wi-Fi y BLE. BLE abre el escáner habitual;
    pulsar su botón de explorar y esperar o detenerlo. Un resultado vacío puede

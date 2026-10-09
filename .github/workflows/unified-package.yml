@@ -1,0 +1,18 @@
+name: Unified installer packaging
+on:
+  push:
+    branches: [audit-rh25.5]
+    paths:
+      - 'scripts/build_unified_deb.py'
+      - 'tests/test_unified_package.py'
+      - '.github/workflows/unified-package.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test fresh install, split-package upgrade, ownership and removal in disposable dpkg roots
+        run: sudo python3 tests/test_unified_package.py
