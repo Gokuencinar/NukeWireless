@@ -4,7 +4,7 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
-**NukeWireless Dev · 2.0.0~diagnostic2, en validación:** corrige el retorno desde
+**NukeWireless Dev · 2.0.0~diagnostic2, compilada, validada e instalada en RootHide:** corrige el retorno desde
 Diagnósticos → emisión: Atrás queda disponible, Ayuda pasa a la derecha y volver
 a tocar Información regresa a su menú cuando no hay una operación activa.
 Conserva Detener y el trabajador `2.0.0~diagnostic1`.

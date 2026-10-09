@@ -94,8 +94,26 @@ presentación modal. Se conservan los tres hosts y el delegado de SwiftUI.
 
 La regresión recorre la ruta real Información → Diagnósticos → emisión, comprueba
 Atrás y la reselección de Información, y simula estados activo/deteniendo para
-verificar que Detener sigue accesible. Compilación, paquetes e instalación de
-esta revisión pendientes hasta completar su validación.
+verificar que Detener sigue accesible. Fuentes compiladas: `2543f0fca94d7b274bbc3b0402f4a1f9f6352a32`.
+
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/37945116263): aprobado.
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/37945116207): aprobado.
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/37945119372): aprobado.
+
+Simulador iOS 18.5: 42 comprobaciones por idioma (español e inglés), incluyendo
+la ruta desde Información, Atrás, reselección y estados activo/deteniendo, más
+cuatro ciclos reales de segundo plano por idioma. Capturas de emisión, regreso
+a Diagnósticos y menú Información revisadas. Ocho pruebas de los paquetes de
+las tres variantes y siete del paquete intermedio aprobadas.
+
+App diagnostic2 instalada por SSH en iPhone XS / iOS 16.3.1 / RootHide. Versión,
+commit, firma, UUID/hash de código y permisos verificados. Se mantiene el
+trabajador diagnostic1 instalado anteriormente, con sus dos imágenes intactas.
+La consulta de solo lectura funciona sin HCI ni cambiar el PID de bluetoothd;
+no hay nuevos crashes relevantes ni trabajador retenido. Pendiente aceptación
+manual de este arreglo de navegación en la app. Los demás iOS y bootstraps
+siguen sin verificación física. Copia de recuperación adicional:
+`/var/mobile/Documents/NukeWireless-diagnostic1-backup.deb` (app).
 
 ## Validación anterior: diagnostic1
 
