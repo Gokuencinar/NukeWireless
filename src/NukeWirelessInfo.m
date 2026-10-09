@@ -695,7 +695,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic3 extension loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic4 extension loaded");
     NWInstallLanguageHooks();
     NWInstallDeviceActionPresentation();
     NWDiagnosticsInstall();

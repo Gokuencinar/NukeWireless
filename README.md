@@ -4,11 +4,16 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
-**En desarrollo: 2.0.0~diagnostic3.** Nuevo listado del punto de acceso sin
+**En desarrollo: 2.0.0~diagnostic4.** Obtiene el ticket de direcciones PF antes
+de añadir cada regla; registra también `errno` en el diagnóstico del bloqueo.
+Diagnostic3 falló en la prueba manual con `pf_apply`, reproducido por SSH
+con `errno=16`. Compilación y validación física de diagnostic4 pendientes.
+
+**2.0.0~diagnostic3:** nuevo listado del punto de acceso sin
 duplicados por IP, recarga y hoja de acciones compartida con Wi-Fi. El bloqueo
 de clientes utiliza un ayudante PF limitado y comprueba las reglas aplicadas:
 en la referencia no existe el `pfctl` que invocaba el código heredado.
-Compilación, paquete y prueba física pendientes. Detalles en
+Compilación, paquete e instalación aprobados; bloqueo físico fallido. Detalles en
 [HOTSPOT-DIAGNOSTIC3.md](docs/HOTSPOT-DIAGNOSTIC3.md).
 
 **NukeWireless Dev · 2.0.0~diagnostic2, compilada, validada e instalada en RootHide:** corrige el retorno desde

@@ -1,4 +1,4 @@
-# NukeWireless Dev · 2.0.0~diagnostic2
+# NukeWireless Dev · 2.0.0~diagnostic4
 
 Edición de desarrollo para recoger evidencia de compatibilidad en iOS 15–18.
 Se generan paquetes separados para RootHide, rootless y rootful. Compartir una
@@ -6,7 +6,7 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Instalar la app `2.0.0~diagnostic2` y el trabajador Bluetooth
+1. Instalar la app `2.0.0~diagnostic4` y el trabajador Bluetooth
    `2.0.0~diagnostic1` de la **misma variante**. El trabajador no cambia en esta revisión.
    Esta edición actualiza los paquetes existentes; no instala otra app en paralelo.
 2. Abrir **Información → Diagnósticos → Comprobar entorno e instalación**.
@@ -83,6 +83,21 @@ archivos/paquetes originales identifican entradas fijadas por hash o eliminan
 componentes antiguos. Los binarios baseline/prebuilt, fixtures de ABI, historial,
 licencias y documentación de procedencia conservan esos nombres deliberadamente.
 No se han editado binarios arbitrariamente ni falseado su procedencia.
+
+## Punto de acceso y acciones en diagnostic3
+
+El punto de acceso agrupa equipos por IP y ofrece recarga y arrastre. Sus
+acciones y las del buscador Wi-Fi se presentan en una hoja con iconos. Los
+nombres personalizados conservan el almacén nativo. El propio iPhone no se
+puede bloquear. Véase [el cambio y sus límites](HOTSPOT-DIAGNOSTIC3.md).
+
+Para comprobar el acceso del cliente, conectar el segundo iPhone a Compartir
+Internet y desactivar temporalmente **sus datos móviles**: así no sustituye la
+conexión bloqueada por su red móvil. Confirmar primero que carga una página
+nueva; bloquear, volver a comprobar y desbloquear para verificar recuperación.
+El cliente puede seguir asociado a Wi-Fi aunque no pueda acceder a Internet.
+Registrar IP mostrada, texto del error y resultado; el estado de una regla PF
+por sí solo no demuestra el corte del tráfico. La prueba física está pendiente.
 
 ## Corrección de navegación en diagnostic2
 

@@ -1,14 +1,24 @@
 # Punto de acceso y acciones de equipos: diagnostic3
 
-Estado: fuentes preparadas; compilación y validación física pendientes.
+Diagnostic3: compilación, simulador, paquete e instalación aprobados. La prueba
+manual del bloqueo falló con `pf_apply`; por SSH se reprodujo `errno=16`.
+
+Diagnostic4 obtiene el ticket `DIOCBEGINADDRS` y lo transmite en `pool_ticket`
+antes de añadir cada regla. El contrato de
+[XNU 8792.61.2, pf_ioctl.c](https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/bsd/net/pf_ioctl.c)
+rechaza con EBUSY un ticket distinto al del pool actual, también para reglas
+simples de filtrado. La regresión simula un pool ya utilizado por Compartir
+Internet, rechaza el ticket cero y verifica el fallo de adquisición sin modificar
+reglas ajenas. Se añade `system_errno` al registro de la app. Compilación y
+validación física de esta corrección pendientes.
 
 El iPhone XS/iOS 16.3.1 de referencia tiene `/dev/pf` pero no `/sbin/pfctl` ni
 `/usr/sbin/pfctl`. El bloqueo heredado intentaba ejecutar ese comando y cargar
 un `pf.conf` con una tabla IPv4 en bridge100. Iniciar ese proceso no demostraba
 que se hubiese aplicado el bloqueo.
 
-El nuevo `nw-hotspot` acepta únicamente estado, bloquear y desbloquear un
-cliente IPv4/MAC. Requiere root o el proceso instalado de NukeWireless bajo el
+El nuevo `nw-hotspot` acepta estado, reconciliación, bloquear y desbloquear un
+cliente IPv4/MAC; la limpieza de desinstalación solo admite root. Requiere root o el proceso instalado de NukeWireless bajo el
 mismo bootstrap. La app no recibe permisos nuevos. Valida la red bridge, la
 identidad ARP del cliente y la ABI PF antes de modificar reglas. Solo añade o
 quita reglas etiquetadas `NukeWirelessHotspot:<MAC>:`; conserva las reglas y NAT
@@ -25,6 +35,8 @@ Las estructuras proceden del [XNU oficial 8792.61.2](https://github.com/apple-os
 `src/hotspot/vendor/SOURCES.json` fija procedencia, hash original y cambios de
 inclusiones para el SDK. No se modifican estructuras ABI. La admisión Darwin
 21–24 exige que respondan los ioctl; otros dispositivos siguen sin prueba física.
+La lectura de vecinos usa el empaquetado de 32 bits documentado en el
+[ndp oficial de Apple](https://github.com/apple-oss-distributions/network_cmds/blob/main/ndp.tproj/ndp.c).
 
 El listado UIKit se contiene dentro del host SwiftUI original de Punto de acceso
 y conserva el escáner y delegado nativos. Cada IP produce una única fila. La IP

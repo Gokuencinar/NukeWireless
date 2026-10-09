@@ -289,7 +289,7 @@ static BOOL refresh(void) {
             changing=NO; filterStatus=report; notify();
             id device=current(row);
             BOOL success=[report[@"ok"] boolValue] && device && blocked(device)==value;
-            NWDiagnosticRecord(@"hotspot_block",success ? @"applied":@"failed",@{@"error_code":report[@"error_code"] ?: @"",@"block_requested":@(value)});
+            NWDiagnosticRecord(@"hotspot_block",success ? @"applied":@"failed",@{@"error_code":report[@"error_code"] ?: @"",@"system_errno":report[@"errno"] ?: @0,@"block_requested":@(value)});
             if (!success) [self message:[NSString stringWithFormat:NWText(@"hotspot.blockFailed"),report[@"error_code"] ?: @"verification"]];
         });
     });

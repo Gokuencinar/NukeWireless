@@ -139,6 +139,12 @@ static void address_rule(struct pf_rule_addr *rule, const struct client_address 
 static int add_rule(const char *label, const char *interface, const struct client_address *address, int source) {
     struct pfioc_rule request = {0}; request.rule.action = PF_DROP; request.action = PF_CHANGE_GET_TICKET;
     if (ioctl(fd, DIOCCHANGERULE, &request)) return 0;
+    // XNU pf_ioctl.c requires the current address-pool ticket even for a plain
+    // filter rule with no routing/NAT pool. A zero ticket becomes stale as soon
+    // as Internet Sharing configures its own pools (EBUSY).
+    struct pfioc_pooladdr pool = {0};
+    if (ioctl(fd, DIOCBEGINADDRS, &pool)) return 0;
+    request.pool_ticket = pool.ticket;
     request.action = PF_CHANGE_ADD_HEAD; request.rule.quick = 1; request.rule.af = address->family;
     request.rule.direction = PF_INOUT; request.rule.rtableid = (unsigned)-1;
     strlcpy(request.rule.ifname, interface, sizeof(request.rule.ifname)); strlcpy(request.rule.label, label, sizeof(request.rule.label));
@@ -264,7 +270,7 @@ int main(int argc, char **argv) {
     if (!bridge_for(ip, interface)) { errno = EADDRNOTAVAIL; return fail("hotspot_network"); }
     struct client_address addresses[MAX_ADDRESSES] = {{.family = AF_INET}}; memcpy(addresses[0].bytes, &ip, 4);
     int matched = 0, count = neighbours(AF_INET, interface, mac, addresses, 1, ip, &matched);
-    if (count < 0 || !matched) { errno = EADDRNOTAVAIL; return fail("hotspot_identity"); }
+    if (count < 0 || matched != 1) { errno = EADDRNOTAVAIL; return fail("hotspot_identity"); }
     count = neighbours(AF_INET6, interface, mac, addresses, count, ip, &matched); if (count < 0) return fail("hotspot_neighbors");
     struct pf_status state = {0}; struct pfioc_rule probe;
     if (ioctl(fd, DIOCGETSTATUS, &state) || rules_count(&probe) < 0) return fail("pf_contract");
