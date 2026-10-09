@@ -740,9 +740,10 @@ int NWUIRegressionDiagnosticNavigation(int phase) {
         @try {
             NWBluetoothUIRegressionCatalogState(1);
             NWMainTabsUIRegressionSelect(tab, 2);
-            if (navigation.topViewController != menu || !menu.navigationItem.hidesBackButton ||
-                navigation.interactivePopGestureRecognizer.enabled ||
-                ![menu.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.stop"]) return 87;
+            if (navigation.topViewController != menu) return 87;
+            if (!menu.navigationItem.hidesBackButton) return 93;
+            if (navigation.interactivePopGestureRecognizer.enabled) return 94;
+            if (![menu.navigationItem.rightBarButtonItem.accessibilityIdentifier isEqual:@"nw.bluetooth.stop"]) return 95;
             NWBluetoothUIRegressionCatalogState(2);
             if (menu.navigationItem.rightBarButtonItem.enabled) return 88;
         } @finally { NWBluetoothUIRegressionCatalogState(0); }

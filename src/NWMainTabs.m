@@ -87,6 +87,9 @@ NSString *const NWMainTabReselected = @"NWMainTabReselected";
     if (!tab || tag < 0 || tag > 3) return;
     BOOL wantsBluetooth = tag == 3;
     BOOL reselected = (self.bluetoothSelected ? 3 : (NSInteger)tab.selectedIndex) == tag;
+    // UIKit can pop a native navigation host on reselection before our own
+    // notification. Preserve the visible Stop control throughout recovery.
+    if (reselected && NWBluetoothBusy()) { [self restoreBar]; return; }
     NSUInteger nativeIndex = wantsBluetooth ? 0 : (NSUInteger)tag;
     UIViewController *nativeHost = tab.viewControllers[nativeIndex];
     id<UITabBarControllerDelegate> delegate = tab.delegate;
