@@ -37,7 +37,9 @@ static BOOL titleMatches(UIAlertAction *action, NSString *title) {
     return [action.title isEqual:NWNativeText(title)];
 }
 static BOOL isDeviceMenu(UIAlertController *menu) {
-    if (menu.preferredStyle != UIAlertControllerStyleActionSheet) return NO;
+    // A device menu can be presented as either UIKit alert style. Never
+    // reinterpret a text-entry dialog such as the native rename prompt.
+    if (menu.textFields.count) return NO;
     BOOL block = NO, rename = NO;
     for (UIAlertAction *action in menu.actions) {
         block |= titleMatches(action, @"Block Device") || titleMatches(action, @"Unblock Device");
@@ -189,10 +191,15 @@ int NWDeviceActionUIRegressionCheck(UIAlertController *menu) {
         UIListContentConfiguration *content = (id)cell.contentConfiguration;
         if (![content.secondaryText isEqual:sheet.device[row == 0 ? @"ip" : @"mac"]]) return 2;
     }
-    UIAlertController *legacy = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"Old name\nVendor\n%@\nLocal Device",sheet.device[@"ip"]] message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *legacy = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"Old name\nVendor\n%@\nLocal Device",sheet.device[@"ip"]] message:nil preferredStyle:UIAlertControllerStyleAlert];
+    for (NSString *title in @[@"Block Device",@"Rename Device"])
+        [legacy addAction:[UIAlertAction actionWithTitle:NWNativeText(title) style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; }]];
+    if (!isDeviceMenu(legacy)) return 5;
     if (![deviceForMenu(legacy)[@"ip"] isEqual:sheet.device[@"ip"]]) return 3;
     legacy.title = @"An address that is not a device: 192.0.2.250";
     if (deviceForMenu(legacy)) return 4;
+    [legacy addTextFieldWithConfigurationHandler:nil];
+    if (isDeviceMenu(legacy)) return 6;
     return 0;
 }
 #endif

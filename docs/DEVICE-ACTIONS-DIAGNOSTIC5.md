@@ -13,7 +13,9 @@ cierre, texto adaptable, VoiceOver y modo oscuro.
 Los menús de Equipos y Punto de acceso adjuntan una copia de presentación del
 equipo. Para menús heredados reconocidos se busca una IP exacta y única en el
 snapshot Wi-Fi; si no existe una coincidencia inequívoca se conserva el texto
-original. Esto solo organiza datos de presentación: los manejadores de las
+original. Se reconocen los menús UIKit de ambos estilos cuando contienen las
+acciones esperadas y todos sus manejadores están capturados; los diálogos con
+campos de texto mantienen su presentación. Esto solo organiza datos de presentación: los manejadores de las
 acciones, la comprobación de generación/red y las restricciones no cambian.
 
 La regresión existente del menú comprueba filas IP/MAC, reconocimiento de un
