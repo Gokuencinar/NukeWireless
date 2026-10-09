@@ -2,6 +2,7 @@
 // Never opens /dev/pf or modifies the build host's firewall.
 #define PRIVATE 1
 #include "../src/hotspot/vendor/pfvar.h"
+#undef PRIVATE
 #include <sys/ioctl.h>
 #include <stdarg.h>
 #include <assert.h>

@@ -19,6 +19,7 @@ SOURCES += ['src/NWBuild.h', 'src/NWLegacyABI.h', 'src/NWDiagnostics.h', 'src/NW
 SOURCES += ['src/NWDeviceActions.h', 'src/NWDeviceActions.m', 'src/NWHotspot.h', 'src/NWHotspot.m',
             'src/hotspot/NWHotspotFilter.c', 'src/hotspot/vendor/pfvar.h',
             'src/hotspot/vendor/libkern/tree.h', 'src/hotspot/vendor/SOURCES.json', 'tests/test_hotspot_filter.c']
+SOURCES += ['src/hotspot/vendor/net/route.h', 'src/hotspot/vendor/net/if_dl.h']
 SOURCES += [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / 'resources/brands').iterdir()) if p.is_file()]
 
 def sha(data):

@@ -2,6 +2,7 @@
 // Only NukeWireless-labelled rules and the selected hotspot client's states change.
 #define PRIVATE 1
 #include "vendor/pfvar.h"
+#undef PRIVATE
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
 #include <sys/utsname.h>

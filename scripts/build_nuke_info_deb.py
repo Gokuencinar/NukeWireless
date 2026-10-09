@@ -118,6 +118,11 @@ def build(source, artifact, output):
                     "platform-application": True, "com.apple.private.security.no-sandbox": True})),
                 regular("usr/share/nukewireless-roothide/Hotspot-PF-Sources.json", (ROOT / "src/hotspot/vendor/SOURCES.json").read_bytes()),
                 regular("usr/share/nukewireless-roothide/Hotspot-PF-License.txt", (ROOT / "src/hotspot/vendor/pfvar.h").read_bytes().split(b"#ifndef _NET_PFVAR_H_")[0])]
+    # Include the complete covered headers and modifications with binary deliveries.
+    vendor = "usr/share/nukewireless-roothide/hotspot-source/"
+    entries += [directory(vendor), directory(vendor + "net/"), directory(vendor + "libkern/")]
+    for name in ["pfvar.h", "libkern/tree.h", "net/route.h", "net/if_dl.h", "SOURCES.json"]:
+        entries.append(regular(vendor + name, (ROOT / "src/hotspot/vendor" / name).read_bytes()))
     launch = artifact / "NukeLaunch.storyboardc"
     launch_files = {p.relative_to(launch).as_posix(): sha(p.read_bytes()) for p in sorted(launch.rglob("*")) if p.is_file()}
     if not launch_files or launch_files != manifest.get("launch_files"):
