@@ -66,6 +66,14 @@
 "browser.noMatches" = "Ningún equipo coincide";
 "browser.empty" = "No hay resultados del escaneo";
 "browser.local" = "Este iPhone";
+"device.actions" = "Acciones del equipo";
+"device.blockHint" = "Restringir el acceso a la red de este equipo";
+"device.unblockHint" = "Restaurar el acceso a la red de este equipo";
+"device.renameHint" = "Poner un nombre personalizado para encontrarlo fácilmente";
+"hotspot.empty" = "No hay equipos conectados";
+"hotspot.emptyHint" = "Activa Compartir Internet, conecta un equipo y pulsa recargar.";
+"hotspot.refreshUnavailable" = "Espera a que termine la búsqueda o acción actual. Si es la primera búsqueda, mantén Compartir Internet activado y vuelve a intentarlo.";
+"hotspot.blockFailed" = "No se ha podido verificar la regla del punto de acceso (%@). Recarga la lista y vuelve a intentarlo.";
 "browser.router" = "Router";
 "browser.copyHint" = "Toca para copiar la dirección IP.";
 "browser.copied" = "Dirección IP copiada";

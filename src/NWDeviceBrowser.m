@@ -3,6 +3,7 @@
 #import "NWResources.h"
 #import "NWAppearance.h"
 #import "NWLanguage.h"
+#import "NWDeviceActions.h"
 #import <arpa/inet.h>
 
 static NSString *const sortKey = @"NukeWirelessDeviceSort";
@@ -279,7 +280,8 @@ static __weak NWDeviceBrowserController *visibleBrowser;
     [presenter presentViewController:menu animated:YES completion:nil];
 }
 - (void)renameFromMenu:(UIAlertController *)menu row:(NSDictionary *)row {
-    [menu dismissViewControllerAnimated:YES completion:^{ [self showRename:row]; }];
+    if (menu.presentingViewController) [menu dismissViewControllerAnimated:YES completion:^{ [self showRename:row]; }];
+    else [self showRename:row];
 }
 - (void)showRename:(NSDictionary *)row {
     UIViewController *presenter = [self actionPresenter]; if (!presenter.view.window) return;
@@ -372,13 +374,14 @@ int NWDeviceBrowserUIRegressionSelect(void) {
 int NWDeviceBrowserUIRegressionMenu(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
     UIAlertController *menu = browser.activeAction;
+    UIViewController *sheet = NWDeviceActionPresentedController(menu);
     NSDictionary *diagnostic = @{@"browser": @(browser != nil), @"search_active": @(browser.search.active),
-        @"query": browser.search.searchBar.text ?: @"", @"menu_on_screen": @(menu.view.window != nil),
-        @"presenter": menu.presentingViewController ? NSStringFromClass(menu.presentingViewController.class) : @"none"};
+        @"query": browser.search.searchBar.text ?: @"", @"menu_on_screen": @(sheet.view.window != nil),
+        @"presenter": sheet.presentingViewController ? NSStringFromClass(sheet.presentingViewController.class) : @"none"};
     NSURL *file = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     [[NSJSONSerialization dataWithJSONObject:diagnostic options:0 error:NULL]
         writeToURL:[file URLByAppendingPathComponent:@"browser-actions-state.json"] atomically:YES];
-    if (!menu.view.window || !menu.presentingViewController || !browser.search.active ||
+    if (!sheet.view.window || !sheet.presentingViewController || !browser.search.active ||
         ![browser.search.searchBar.text isEqual:@"44:55"]) return 1;
     return menu.preferredStyle == UIAlertControllerStyleActionSheet && menu.actions.count == 5 &&
         [menu.title isEqual:@"Mesa"] && menu.actions[0].enabled ? 0 : 2;
@@ -386,8 +389,9 @@ int NWDeviceBrowserUIRegressionMenu(void) {
 int NWDeviceBrowserUIRegressionRename(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
     UIAlertController *menu = browser.activeAction;
-    if (!menu.view.window || !menu.presentingViewController || !browser.rows.count) return 1;
-    [browser renameFromMenu:menu row:browser.rows.firstObject];
+    UIViewController *sheet = NWDeviceActionPresentedController(menu);
+    if (!sheet.view.window || !sheet.presentingViewController || !browser.rows.count) return 1;
+    [sheet dismissViewControllerAnimated:YES completion:^{ [browser showRename:browser.rows.firstObject]; }];
     return 0;
 }
 int NWDeviceBrowserUIRegressionRenameCheck(void) {

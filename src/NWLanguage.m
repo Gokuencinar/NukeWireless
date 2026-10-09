@@ -4,6 +4,7 @@
 #import <TargetConditionals.h>
 #if TARGET_OS_IOS
 #import <UIKit/UIKit.h>
+#import "NWDeviceActions.h"
 #endif
 
 static NSString *const languageKey = @"NukeWirelessLanguage";
@@ -73,7 +74,8 @@ static NSString *localized(NSBundle *bundle, SEL sel, NSString *key, NSString *v
 #if TARGET_OS_IOS
 static id (*oldAction)(id, SEL, NSString *, UIAlertActionStyle, void (^)(UIAlertAction *));
 static id action(id cls, SEL sel, NSString *title, UIAlertActionStyle style, void (^handler)(UIAlertAction *)) {
-    return oldAction(cls, sel, NWNativeText(title), style, handler);
+    UIAlertAction *result = oldAction(cls, sel, NWNativeText(title), style, handler);
+    NWCaptureDeviceAction(result, handler); return result;
 }
 static id (*oldAlert)(id, SEL, NSString *, NSString *, UIAlertControllerStyle);
 static id alert(id cls, SEL sel, NSString *title, NSString *message, UIAlertControllerStyle style) {

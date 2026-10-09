@@ -1,4 +1,5 @@
 #import "NWScanBridge.h"
+#import "NWHotspot.h"
 #import "NWDiagnosticReport.h"
 #import "NWLegacyABI.h"
 #import "NWPolicy.h"
@@ -174,6 +175,7 @@ static void foundDevice(id adapter, SEL sel, id device) {
         if ([brand isEqualToString:@"Unknown"] || [brand isEqualToString:@"Unknown Brand"])
             setObject(device, @"setBrand:", NWText(@"device.unknownVendor"));
         // Display placeholders apply to both WiFi and Hotspot; scan ownership does not.
+        NWHotspotFound(adapter, device);
         if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
         state.progress = CACurrentMediaTime();
         uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
@@ -195,14 +197,17 @@ static void foundDevice(id adapter, SEL sel, id device) {
 }
 static void finishedScan(id adapter, SEL sel, int status) {
     oldFinished(adapter, sel, status);
+    NWHotspotFinished(adapter, status == 0);
     onMain(^{ if (adapter == wifiAdapter) finish(state.generation, status == 0, status, @"native_finished"); });
 }
 static void failedScan(id adapter, SEL sel) {
     oldFailed(adapter, sel);
+    NWHotspotFinished(adapter, NO);
     onMain(^{ if (adapter == wifiAdapter) finish(state.generation, NO, 1, @"native_failed"); });
 }
 static void scanProgress(id adapter, SEL sel, float pinged, NSInteger total) {
     if (oldProgress) oldProgress(adapter, sel, pinged, total);
+    NWHotspotProgress(adapter);
     onMain(^{
         if (adapter != wifiAdapter || !NWStateAccepts(&state, state.generation)) return;
         state.progress = CACurrentMediaTime();
@@ -211,7 +216,13 @@ static void scanProgress(id adapter, SEL sel, float pinged, NSInteger total) {
 
 static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
     id adapter = scanner.delegate;
-    if (scanner.enableHotspot || ![adapter isKindOfClass:NSClassFromString(@NWLegacyScannerClass)]) {
+    if (scanner.enableHotspot && [adapter isKindOfClass:NSClassFromString(@NWLegacyScannerClass)]) {
+        NWHotspotScannerStarted(scanner, adapter);
+        @try { oldStart(scanner, sel); }
+        @catch (NSException *exception) { (void)exception; NWHotspotFinished(adapter, NO); }
+        NWHotspotStartReturned(scanner); return;
+    }
+    if (![adapter isKindOfClass:NSClassFromString(@NWLegacyScannerClass)]) {
         oldStart(scanner, sel); return;
     }
     NSObject *token = [NSObject new];
@@ -303,7 +314,7 @@ BOOL NWDeviceSetNickname(NSDictionary *row, NSString *nickname) {
 }
 BOOL NWDeviceCanSetBlocked(NSDictionary *row, BOOL blocked) {
     id device = currentDevice(row);
-    if (!device || NWScanBusy() || bulkBusy) return NO;
+    if (!device || NWScanBusy() || bulkBusy || NWHotspotBusy()) return NO;
     SEL local = NSSelectorFromString(@"isLocalDevice");
     if (![device respondsToSelector:local] || ((BOOL (*)(id, SEL))objc_msgSend)(device, local)) return NO;
     if (blocked) {
@@ -361,7 +372,7 @@ static const uint8_t *appExecutableBase(void) {
     return NULL;
 }
 static BOOL refreshScan(BOOL manual) {
-    if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || !wifiAdapter) return NO;
+    if (!NSThread.isMainThread || NWScanBusy() || bulkBusy || NWHotspotBusy() || !wifiAdapter) return NO;
     // Native start stops a previous queue synchronously; wait for it to drain.
     if (activeScanner.queue.operationCount) return NO;
     const uint8_t *base = appExecutableBase();
@@ -436,7 +447,7 @@ static NSArray<NSString *> *activeIPs(void) {
 }
 BOOL NWCanRestartForLanguage(void) {
     id registered = readObject(commands(), @"runningBlocksForArp");
-    return NSThread.isMainThread && !NWScanBusy() && !bulkBusy &&
+    return NSThread.isMainThread && !NWScanBusy() && !bulkBusy && !NWHotspotBusy() &&
         (![registered isKindOfClass:NSArray.class] || [registered count] == 0) && !activeIPs().count;
 }
 NSString *NWBulkTitle(void) {
@@ -484,7 +495,7 @@ static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOO
     });
 }
 void NWConfirmBulk(UIViewController *presenter) {
-    if (!NSThread.isMainThread || bulkBusy || !presenter || presenter.presentedViewController) return;
+    if (!NSThread.isMainThread || bulkBusy || NWHotspotBusy() || !presenter || presenter.presentedViewController) return;
     NSArray<NSString *> *active = activeIPs(); BOOL unblock = active.count > 0;
     if (!unblock && (NWScanBusy() || state.phase != NWComplete || ![scanNetwork isEqualToString:networkIdentity()])) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"bulk.block") message:NWText(@"bulk.scanRequired") preferredStyle:UIAlertControllerStyleAlert];

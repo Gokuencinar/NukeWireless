@@ -34,6 +34,7 @@ jobs:
           name: nuke-wireless-compatibility
           path: |
             build/audit/NukeWirelessInfo_ios.dylib
+            build/audit/nw-hotspot
             build/audit/NukeWirelessPaths_ios.dylib
             build/audit/build-manifest.json
             build/audit/compat-manifest.json

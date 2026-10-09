@@ -19,6 +19,10 @@ func checkBrowserMenu() -> Int32
 func renameBrowser() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionRenameCheck")
 func checkBrowserRename() -> Int32
+@_silgen_name("NWHotspotUIRegressionCheck")
+func checkHotspotUI() -> Int32
+@_silgen_name("NWHotspotUIRegressionPresent")
+func presentHotspot(_ phase: Int32) -> Int32
 @_silgen_name("NWEndDeviceActionsUITest")
 func endBrowserFixture()
 @_silgen_name("NWBluetoothUIRegressionCheck")
@@ -124,7 +128,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 42,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 46,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -185,14 +189,27 @@ struct RegressionTabs: View {
                     .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
                 root.dismiss(animated: false) {
                     if fixture { endBrowserFixture() }
-                    results.append(presentDiagnostics())
-                    setDark(false)
+                    results.append(checkHotspotUI()); results.append(presentHotspot(0)); setDark(false)
+                    captureHotspot(0)
+                }
+            }
+        }
+    }
+    private func captureHotspot(_ phase: Int32) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if phase == 0 {
+                snapshot("hotspot.png"); results.append(presentHotspot(1)); setDark(true); captureHotspot(1)
+            } else {
+                snapshot("hotspot-actions-dark.png"); results.append(presentHotspot(2))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    results.append(presentDiagnostics()); setDark(false)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        snapshot("diagnostics.png")
-                        setDark(true)
+                        snapshot("diagnostics.png"); setDark(true)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             snapshot("diagnostics-dark.png")
-                            root.dismiss(animated: false) { diagnosticNavigation(0) }
+                            let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                                .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController
+                            root?.dismiss(animated: false) { diagnosticNavigation(0) }
                         }
                     }
                 }

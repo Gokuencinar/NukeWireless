@@ -6,6 +6,8 @@
 #import "NWLanguage.h"
 #import "NWAppearance.h"
 #import "NWDeviceBrowser.h"
+#import "NWDeviceActions.h"
+#import "NWHotspot.h"
 #import "NWBluetooth.h"
 #import "NWDiagnostics.h"
 #import "NWBuild.h"
@@ -402,7 +404,7 @@ static void decorateCell(UITableViewCell *cell, NSString *symbol, BOOL networkVa
 static void (*originalViewDidAppear)(UIViewController *, SEL, BOOL);
 static void (*originalViewWillAppear)(UIViewController *, SEL, BOOL);
 static char baseInsetKey, bulkBoundKey;
-static char infoOverlayKey, refreshItemKey, themedBarKey, themedTabKey, browserItemKey;
+static char infoOverlayKey, hotspotOverlayKey, refreshItemKey, themedBarKey, themedTabKey, browserItemKey;
 static __weak UITabBarController *activeTab;
 static const NSInteger refreshTag = 90730;
 static BOOL installingUI, layingOut;
@@ -494,6 +496,28 @@ static UIScrollView *largestScroll(UIView *view) {
         if (candidate.bounds.size.width * candidate.bounds.size.height > best.bounds.size.width * best.bounds.size.height) best = candidate;
     }
     return best;
+}
+static void prepareHotspotTab(UITabBarController *tab) {
+    if (!tab || installingUI || NWBluetoothTabSelected(tab) || tab.selectedIndex != 1) return;
+    UIViewController *host = tab.selectedViewController;
+    if (!host) return;
+    installingUI = YES;
+    UINavigationController *navigation = objc_getAssociatedObject(host, &hotspotOverlayKey);
+    if (!navigation) {
+        navigation = [[UINavigationController alloc] initWithRootViewController:NWHotspotController()];
+        [host addChildViewController:navigation]; navigation.view.translatesAutoresizingMaskIntoConstraints = NO;
+        [host.view addSubview:navigation.view];
+        [NSLayoutConstraint activateConstraints:@[
+            [navigation.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
+            [navigation.view.bottomAnchor constraintEqualToAnchor:host.view.bottomAnchor],
+            [navigation.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
+            [navigation.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor]
+        ]];
+        [navigation didMoveToParentViewController:host];
+        objc_setAssociatedObject(host, &hotspotOverlayKey, navigation, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UIView *view in host.view.subviews) if (view != navigation.view) view.hidden = YES;
+    [host.view bringSubviewToFront:navigation.view]; installingUI = NO;
 }
 static void bindButton(UIButton *button, SEL action) {
     [button removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
@@ -621,7 +645,7 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
-    NWPrepareMainTabs(tab); prepareInfoTab(tab);
+    NWPrepareMainTabs(tab); prepareInfoTab(tab); prepareHotspotTab(tab);
     activeTab = tab; installingUI = YES;
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
         UITabBarAppearance *appearance = [UITabBarAppearance new];
@@ -668,10 +692,12 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
     originalViewWillAppear(controller, sel, animated);
     prepareInfoTab(tabForController(controller));
+    prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic2 extension loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic3 extension loaded");
     NWInstallLanguageHooks();
+    NWInstallDeviceActionPresentation();
     NWDiagnosticsInstall();
     NWInstallScanHooks();
     // Install UI and task wrappers after both legacy dylib constructors.

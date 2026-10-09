@@ -16,7 +16,7 @@ from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "2.0.0~diagnostic2"
+VERSION = "2.0.0~diagnostic3"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -31,6 +31,9 @@ for executable in "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
 done
 ldid -S {root}/{inject}/NukeWirelessPaths.dylib
 ldid -S {root}/{inject}/NukeWirelessInfo.dylib
+ldid -Hsha256 -S{root}/usr/share/nukewireless-roothide/hotspot.entitlements "$BASE/nw-hotspot"
+chown root:wheel "$BASE/nw-hotspot"
+chmod 4755 "$BASE/nw-hotspot"
 chown root:wheel "$BASE/aegis"
 chmod 6755 "$BASE/aegis"
 if command -v uicache >/dev/null 2>&1; then
@@ -51,7 +54,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="20002", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
+    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="20003", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
     replacement = {
         APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
@@ -116,7 +119,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic2")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic3")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.

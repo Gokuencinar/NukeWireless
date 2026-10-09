@@ -14,11 +14,11 @@ import plistlib
 import tarfile
 from build_manifest import source_hashes, sha
 from language_catalog import native_strings
-from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, tar_bytes
+from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, symlink, tar_bytes
 from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.0.0~diagnostic2"
+VERSION = "2.0.0~diagnostic3"
 WORKER_VERSION = "2.0.0~diagnostic1"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
@@ -58,6 +58,11 @@ done'''
         raise ValueError("unexpected baseline signing script")
     return script.replace(original, corrected, 1)
 
+def patch_hotspot_signing(script):
+    original = b'ldid -S /usr/lib/TweakInject/NukeWirelessInfo.dylib\n'
+    if script.count(original) != 1: raise ValueError("unexpected hotspot signing script")
+    return script.replace(original, original + b'ldid -Hsha256 -S/usr/share/nukewireless-roothide/hotspot.entitlements "$BASE/nw-hotspot"\nchown root:wheel "$BASE/nw-hotspot"\nchmod 4755 "$BASE/nw-hotspot"\n')
+
 def build(source, artifact, output):
     raw = source.read_bytes()
     if sha(raw) != EXPECTED_SOURCE_SHA256:
@@ -66,8 +71,11 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text(encoding="utf-8"))
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-diagnostic2" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-diagnostic3" not in library:
         raise ValueError("wrong development library version")
+    helper = (artifact / "nw-hotspot").read_bytes()
+    if manifest.get("hotspot_helper_sha256") != sha(helper):
+        raise ValueError("stale or mismatched hotspot helper")
     if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
         raise ValueError("unexpected location-permission API")
     parts = read_ar(raw)
@@ -85,7 +93,7 @@ def build(source, artifact, output):
         raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless Dev", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="20002",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="20003",
                     NukeWirelessPackageScheme="roothide", NukeWirelessWorkerVersion=WORKER_VERSION,
                     NukeWirelessSourceCommit=manifest.get("source_commit", "unknown"),
                     UIFileSharingEnabled=True, LSSupportsOpeningDocumentsInPlace=True,
@@ -104,6 +112,12 @@ def build(source, artifact, output):
         if name in replacement:
             data = replacement[name]; member.size = len(data); entries[i] = (member,data)
     entries.append(regular(APP + "NWBootPic.png", startup_image))
+    entries += [regular("usr/libexec/harpy-reloaded/nw-hotspot", helper, 0o755),
+                symlink("usr/libexec/harpy-reloaded/nw-hotspot.roothidepatch", "/usr/lib/DynamicPatches/AutoPatches.dylib"),
+                regular("usr/share/nukewireless-roothide/hotspot.entitlements", plistlib.dumps({
+                    "platform-application": True, "com.apple.private.security.no-sandbox": True})),
+                regular("usr/share/nukewireless-roothide/Hotspot-PF-Sources.json", (ROOT / "src/hotspot/vendor/SOURCES.json").read_bytes()),
+                regular("usr/share/nukewireless-roothide/Hotspot-PF-License.txt", (ROOT / "src/hotspot/vendor/pfvar.h").read_bytes().split(b"#ifndef _NET_PFVAR_H_")[0])]
     launch = artifact / "NukeLaunch.storyboardc"
     launch_files = {p.relative_to(launch).as_posix(): sha(p.read_bytes()) for p in sorted(launch.rglob("*")) if p.is_file()}
     if not launch_files or launch_files != manifest.get("launch_files"):
@@ -133,7 +147,7 @@ def build(source, artifact, output):
     entries.append(regular(bundle + "CreditsAvatar.png", (ROOT / "resources/CreditsAvatar.png").read_bytes()))
     for i,(member,data) in enumerate(control):
         if member.name.lstrip("./") == "postinst":
-            data = patch_app_signing_identity(data)
+            data = patch_hotspot_signing(patch_app_signing_identity(data))
             member.size = len(data); control[i] = (member,data)
         if member.name.lstrip("./") == "control":
             before = b"Version: 1.0.25+rh25.3\n"

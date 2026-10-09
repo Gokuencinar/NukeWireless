@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is private; development builds 
 
 ## Desarrollo actual
 
+**En desarrollo: 2.0.0~diagnostic3.** Nuevo listado del punto de acceso sin
+duplicados por IP, recarga y hoja de acciones compartida con Wi-Fi. El bloqueo
+de clientes utiliza un ayudante PF limitado y comprueba las reglas aplicadas:
+en la referencia no existe el `pfctl` que invocaba el código heredado.
+Compilación, paquete y prueba física pendientes. Detalles en
+[HOTSPOT-DIAGNOSTIC3.md](docs/HOTSPOT-DIAGNOSTIC3.md).
+
 **NukeWireless Dev · 2.0.0~diagnostic2, compilada, validada e instalada en RootHide:** corrige el retorno desde
 Diagnósticos → emisión: Atrás queda disponible, Ayuda pasa a la derecha y volver
 a tocar Información regresa a su menú cuando no hay una operación activa.

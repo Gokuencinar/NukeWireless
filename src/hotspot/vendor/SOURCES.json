@@ -1,0 +1,12 @@
+{
+  "pfvar.h": {
+    "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/xnu-8792.61.2/bsd/net/pfvar.h",
+    "sha256": "217b51a54d3f788f5ccdfeb071149ad90621651eb042da2d28a206691a9e94c1",
+    "modifications": "Userspace builds include net/if.h; kernel-only net/radix.h and net/if_var.h remain guarded. No ABI structures changed.",
+    "vendored_sha256_lf": "1185454ba25064b9d2872c3bc49f9789f2b484b0dc41b00709f77dfdc6488695"
+  },
+  "libkern/tree.h": {
+    "url": "https://raw.githubusercontent.com/apple-oss-distributions/xnu/xnu-8792.61.2/libkern/libkern/tree.h",
+    "sha256": "7bde9f6ba98f15e326813b82dc0e5e9e2d3013c025a91c946f9cd238e80e4939"
+  }
+}

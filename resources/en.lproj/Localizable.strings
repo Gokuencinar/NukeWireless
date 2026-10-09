@@ -66,6 +66,14 @@
 "browser.noMatches" = "No matching devices";
 "browser.empty" = "No scan results";
 "browser.local" = "This iPhone";
+"device.actions" = "Device actions";
+"device.blockHint" = "Restrict this device’s network access";
+"device.unblockHint" = "Restore this device’s network access";
+"device.renameHint" = "Set a custom name to find it easily";
+"hotspot.empty" = "No connected devices";
+"hotspot.emptyHint" = "Enable Personal Hotspot and connect a device, then refresh.";
+"hotspot.refreshUnavailable" = "Wait for the current scan or action to finish. If this is the first scan, keep Personal Hotspot enabled and try again.";
+"hotspot.blockFailed" = "The hotspot rule could not be verified (%@). Refresh the list and try again.";
 "browser.router" = "Router";
 "browser.copyHint" = "Tap to copy the IP address.";
 "browser.copied" = "IP address copied";
