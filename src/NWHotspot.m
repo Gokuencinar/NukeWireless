@@ -64,12 +64,17 @@ static BOOL method(id device, NSString *name, const char *encoding) {
     Method m = class_getInstanceMethod(object_getClass(device), NSSelectorFromString(name));
     return m && !strcmp(method_getTypeEncoding(m), encoding);
 }
-static NSString *prefix(NSString *mac) { return [@"NukeWirelessHotspot:" stringByAppendingFormat:@"%@:", [[mac stringByReplacingOccurrencesOfString:@":" withString:@""] lowercaseString]]; }
+static NSString *canonicalMAC(NSString *mac) {
+    unsigned bytes[6]; int used=0;
+    if (!mac || sscanf(mac.UTF8String,"%2x:%2x:%2x:%2x:%2x:%2x%n",&bytes[0],&bytes[1],&bytes[2],&bytes[3],&bytes[4],&bytes[5],&used)!=6 || mac.UTF8String[used]) return @"";
+    return [NSString stringWithFormat:@"%02x%02x%02x%02x%02x%02x",bytes[0],bytes[1],bytes[2],bytes[3],bytes[4],bytes[5]];
+}
+static NSString *prefix(NSString *mac) { return [@"NukeWirelessHotspot:" stringByAppendingFormat:@"%@:", canonicalMAC(mac)]; }
 static BOOL blocked(id device) {
     if (![filterStatus[@"ok"] boolValue] || ![filterStatus[@"enabled"] boolValue]) return NO;
     NSArray *rules = filterStatus[@"rules"]; NSString *key = prefix(object(device, @"macAddress") ?: @"");
     NSDictionary *addresses=filterStatus[@"ipv4"];
-    NSString *canonical=[[object(device,@"macAddress") stringByReplacingOccurrencesOfString:@":" withString:@""] lowercaseString];
+    NSString *canonical=canonicalMAC(object(device,@"macAddress"));
     if (![addresses isKindOfClass:NSDictionary.class] || ![addresses[canonical ?: @""] isEqual:object(device,@"ipAddress")]) return NO;
     return [rules isKindOfClass:NSArray.class] && [rules containsObject:[key stringByAppendingString:@"0:0"]] && [rules containsObject:[key stringByAppendingString:@"0:1"]];
 }
@@ -331,6 +336,7 @@ int NWHotspotUIRegressionCheck(void) {
     beginHotspotFixture();
     @try {
         NSArray *rows=snapshot(); if (rows.count!=2 || ![rows[0][@"local"] boolValue] || [rows[1][@"local"] boolValue]) return 1;
+        if (![canonicalMAC(@"2:11:22:33:44:5") isEqual:canonicalMAC(@"02:11:22:33:44:05")]) return 8;
         if (![object(peers[@"172.20.10.1"],@"hostname") isEqual:@"iPhone"]) return 2;
         NSDictionary *row=rows[1]; if (!current(row)) return 3;
         NSMutableDictionary *stale=[row mutableCopy]; stale[@"generation"]=@(scan.generation+1); if (current(stale)) return 4;
