@@ -1,4 +1,4 @@
-# NukeWireless Dev · 2.0.0~diagnostic4
+# NukeWireless Dev · 2.0.0~diagnostic5
 
 Edición de desarrollo para recoger evidencia de compatibilidad en iOS 15–18.
 Se generan paquetes separados para RootHide, rootless y rootful. Compartir una
@@ -6,7 +6,7 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Instalar la app `2.0.0~diagnostic4` y el trabajador Bluetooth
+1. Instalar la app `2.0.0~diagnostic5` y el trabajador Bluetooth
    `2.0.0~diagnostic1` de la **misma variante**. El trabajador no cambia en esta revisión.
    Esta edición actualiza los paquetes existentes; no instala otra app en paralelo.
 2. Abrir **Información → Diagnósticos → Comprobar entorno e instalación**.

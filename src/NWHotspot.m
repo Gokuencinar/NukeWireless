@@ -261,6 +261,7 @@ static BOOL refresh(void) {
         NSString *state=[row[@"local"] boolValue] ? NWText(@"browser.local") : [row[@"blocked"] boolValue] ? NWText(@"browser.blocked") : row[@"vendor"];
         content.secondaryText=[NSString stringWithFormat:@"%@ · %@\n%@",row[@"ip"],state,row[@"mac"]];
         content.image=[UIImage systemImageNamed:[row[@"local"] boolValue] ? @"iphone" : [row[@"blocked"] boolValue] ? @"hand.raised.fill" : @"network"];
+        content.imageProperties.tintColor=[row[@"blocked"] boolValue] ? UIColor.systemRedColor : NWAccentColor();
         cell.accessoryType=UITableViewCellAccessoryDisclosureIndicator; cell.accessibilityHint=NWText(@"browser.actionsHint");
     }
     cell.contentConfiguration=content; return cell;
@@ -298,6 +299,7 @@ static BOOL refresh(void) {
     [table deselectRowAtIndexPath:index animated:YES]; if (!self.rows.count || self.presentedViewController) return;
     NSDictionary *row=self.rows[index.row]; BOOL value=[row[@"blocked"] boolValue];
     UIAlertController *menu=[UIAlertController alertControllerWithTitle:row[@"name"] message:[NSString stringWithFormat:@"%@\n%@\n%@",row[@"ip"],row[@"mac"],row[@"vendor"]] preferredStyle:UIAlertControllerStyleActionSheet];
+    NWConfigureDeviceMenu(menu,row);
     UIAlertAction *toggle=[UIAlertAction actionWithTitle:NWNativeText(value ? @"Unblock Device":@"Block Device") style:value ? UIAlertActionStyleDefault:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) { (void)action; [self setBlocked:!value row:row]; }];
     toggle.enabled=![row[@"local"] boolValue] && !NWHotspotBusy() && !NWScanBusy() && !NWBulkBusy(); [menu addAction:toggle];
     UIAlertAction *rename=[UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; [self renameDevice:row]; }];
@@ -362,7 +364,7 @@ int NWHotspotUIRegressionPresent(int phase) {
         [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
         UINavigationController *localMenu=(id)controller.presentedViewController;
         UITableViewController *sheet=(id)localMenu.topViewController;
-        UITableViewCell *blockCell=[sheet tableView:sheet.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
+        UITableViewCell *blockCell=[sheet tableView:sheet.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:2]];
         if (!(blockCell.accessibilityTraits & UIAccessibilityTraitNotEnabled)) return 3;
         [localMenu dismissViewControllerAnimated:NO completion:^{
             [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:0]];

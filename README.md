@@ -4,6 +4,11 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**En desarrollo: 2.0.0~diagnostic5.** El cliente bloqueado del punto de acceso
+muestra una mano roja. La hoja de acciones separa nombre/fabricante/estado de
+las direcciones IP y MAC, conserva sus manejadores y se abre a altura completa.
+Compilación, paquete e instalación pendientes.
+
 **2.0.0~diagnostic4: compilada, validada e instalada en la referencia RootHide.**
 Obtiene el ticket de direcciones PF antes de añadir cada regla y registra
 `system_errno` en el diagnóstico. Diagnostic3 falló con `pf_apply`, reproducido
@@ -12,7 +17,8 @@ público el repositorio por autorización del usuario. Pasaron las pruebas PF,
 46 comprobaciones UI por idioma y cuatro ciclos de segundo plano por idioma,
 además de las 15 comprobaciones de paquete. Fuentes compiladas: `505986bcd2bb2cb612cad941adff0a181580e6f4`.
 
-La prueba física de aplicación de reglas y corte de Internet sigue pendiente. El trabajador Bluetooth conserva `2.0.0~diagnostic1`.
+El usuario confirmó que el bloqueo y desbloqueo del cliente funcionan en diagnostic4.
+El trabajador Bluetooth conserva `2.0.0~diagnostic1`.
 Las otras variantes/iOS siguen sin aceptación física.
 
 **2.0.0~diagnostic3:** nuevo listado del punto de acceso sin

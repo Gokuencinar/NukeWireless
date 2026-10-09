@@ -243,6 +243,7 @@ static __weak NWDeviceBrowserController *visibleBrowser;
 - (UIAlertController *)deviceMenu:(NSDictionary *)row anchor:(UIView *)anchor {
     UIAlertController *menu = [UIAlertController alertControllerWithTitle:row[@"name"]
         message:[NSString stringWithFormat:@"%@\n%@", row[@"ip"], row[@"mac"] ?: @""] preferredStyle:UIAlertControllerStyleActionSheet];
+    NWConfigureDeviceMenu(menu,row);
     __weak NWDeviceBrowserController *weakSelf = self;
     BOOL blocked = [row[@"blocked"] boolValue];
     UIAlertAction *toggle = [UIAlertAction actionWithTitle:NWNativeText(blocked ? @"Unblock Device" : @"Block Device")
@@ -375,6 +376,7 @@ int NWDeviceBrowserUIRegressionMenu(void) {
     NWDeviceBrowserController *browser = regressionBrowser;
     UIAlertController *menu = browser.activeAction;
     UIViewController *sheet = NWDeviceActionPresentedController(menu);
+    if (NWDeviceActionUIRegressionCheck(menu)) return 3;
     NSDictionary *diagnostic = @{@"browser": @(browser != nil), @"search_active": @(browser.search.active),
         @"query": browser.search.searchBar.text ?: @"", @"menu_on_screen": @(sheet.view.window != nil),
         @"presenter": sheet.presentingViewController ? NSStringFromClass(sheet.presentingViewController.class) : @"none"};

@@ -67,6 +67,7 @@
 "browser.empty" = "No scan results";
 "browser.local" = "This iPhone";
 "device.actions" = "Device actions";
+"device.addresses" = "Network addresses";
 "device.blockHint" = "Restrict this device’s network access";
 "device.unblockHint" = "Restore this device’s network access";
 "device.renameHint" = "Set a custom name to find it easily";

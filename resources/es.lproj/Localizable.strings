@@ -67,6 +67,7 @@
 "browser.empty" = "No hay resultados del escaneo";
 "browser.local" = "Este iPhone";
 "device.actions" = "Acciones del equipo";
+"device.addresses" = "Direcciones de red";
 "device.blockHint" = "Restringir el acceso a la red de este equipo";
 "device.unblockHint" = "Restaurar el acceso a la red de este equipo";
 "device.renameHint" = "Poner un nombre personalizado para encontrarlo fácilmente";
