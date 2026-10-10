@@ -4,10 +4,19 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**Instalador único diagnostic5+bundle1:** reúne app y componente Bluetooth en
-un DEB por variante, conservando los binarios diagnostic5/diagnostic1 y sus
-permisos. Sustituye el paquete Bluetooth separado al actualizar. Inspección
-de paquetes y migración dpkg en Linux aprobadas; instalación física del nuevo formato pendiente.
+**2.0.0~diagnostic6+bundle1: compilada, validada e instalada en RootHide.**
+Corrige la lectura de identidad del router usada por el bloqueo Wi-Fi: cabecera
+Darwin de 92 bytes, alineación de cuatro bytes y coincidencia de IP/interfaz.
+El corte y recuperación del tráfico siguen pendientes de aceptación manual.
+Pasaron siete suites C locales, 46 comprobaciones UI y cuatro ciclos de segundo
+plano por idioma, 15 comprobaciones de los paquetes y las pruebas del instalador.
+Fuentes compiladas: `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
+Véase [evidencia y límites del arreglo](docs/WIFI-BLOCK-DIAGNOSTIC6.md).
+
+**Instalador único diagnostic6+bundle1:** reúne app y componente Bluetooth en
+un DEB por variante, conservando los permisos. Sustituye el paquete Bluetooth
+separado al actualizar. Migración dpkg en Linux e instalación física en
+iPhone XS / iOS 16.3.1 / RootHide verificadas; otros entornos pendientes.
 Véase [empaquetado unificado](docs/UNIFIED-INSTALLER.md).
 
 **2.0.0~diagnostic5: compilada, validada e instalada en RootHide.**

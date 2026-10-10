@@ -1,15 +1,15 @@
-# Instalador único · diagnostic5+bundle1
+# Instalador único · diagnostic6+bundle1
 
 Cada variante RootHide, Dopamine/rootless y rootful se distribuye ahora en un DEB
-`com.gokuencinar.nukewireless_2.0.0~diagnostic5+bundle1_<arquitectura>.deb`.
-Contiene la aplicación diagnostic5 y el componente Bluetooth diagnostic1.
+`com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle1_<arquitectura>.deb`.
+Contiene la aplicación diagnostic6 y el componente Bluetooth diagnostic1.
 Las etiquetas Debian identifican el bootstrap, no las arquitecturas del código.
 
-El sufijo `+bundle1` cambia la revisión del instalador para que pueda actualizar
-diagnostic5. La app sigue indicando diagnostic5 y su CFBundleVersion 20005;
-el trabajador mantiene diagnostic1. No se han recompilado ni modificado los
-binarios, entitlements, identidad de firma, rutas, interfaz o funciones.
-Las fuentes nativas de la app son `4f2f7c76ce2c570e882ca0cb6a5e9d5bbaea59ac`.
+El sufijo `+bundle1` identifica la revisión del instalador. La app indica
+diagnostic6 y CFBundleVersion 20006; el trabajador mantiene diagnostic1.
+El empaquetador conserva los binarios y permisos de sus dos DEB de entrada;
+no equivale a conservar los binarios de diagnostic5. Las fuentes nativas de
+esta entrega son `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
 
 ## Instalación y actualización
 
@@ -46,8 +46,8 @@ registra los hashes de entrada/salida en otro manifiesto. No ejecuta scripts de
 mantenimiento en el equipo de compilación.
 
 ```sh
-python scripts/build_unified_deb.py --inputs /ruta/diagnostic5 --output /ruta/diagnostic5-unified
-python tests/test_unified_package.py --inputs /ruta/diagnostic5 --output /ruta/diagnostic5-unified
+python scripts/build_unified_deb.py --inputs /ruta/diagnostic6 --output /ruta/diagnostic6-unified
+python tests/test_unified_package.py --inputs /ruta/diagnostic6 --output /ruta/diagnostic6-unified
 ```
 
 La prueba de entrega compara todos los archivos y sus permisos con las entradas,
@@ -59,12 +59,28 @@ de los archivos y desinstalación. Utiliza fixtures con scripts inofensivos, sin
 ejecutar binarios ni scripts iOS en Linux.
 
 Comprobaciones de entrega de las tres variantes y pruebas de shell aprobadas en
-Windows. La prueba de instalación nueva, migración de ambos paquetes, propiedad
-y desinstalación pasó en Linux: [CI 37994184452](https://github.com/Gokuencinar/NukeWireless/actions/runs/37994184452),
-commit del empaquetado `ef25ea9fa650086c9772f5b191c8fff6b23cc050`.
+Windows. Instalación nueva, migración, propiedad y desinstalación pasaron con
+fixtures Linux: [CI 38012032208](https://github.com/Gokuencinar/NukeWireless/actions/runs/38012032208).
 
-La inspección del paquete y la migración simulada no equivalen a instalación
-verificada en iPhone. La instalación física del formato unificado está pendiente.
-Las evidencias físicas de diagnostic5 corresponden al formato anterior en
-iPhone XS / iOS 16.3.1 / RootHide. iOS 15, 17, 18, rootless y rootful requieren
-pruebas en los dispositivos de los testers.
+El DEB unificado diagnostic6+bundle1 se instaló en iPhone XS / iOS 16.3.1 /
+RootHide. dpkg sustituyó el paquete Bluetooth separado y el paquete principal
+pasó a ser propietario de `nwbt-run`. Versiones, firma, código y permisos
+verificados; diagnóstico de solo lectura sin alterar el servicio Bluetooth.
+La prueba del corte/restauración del tráfico Wi-Fi está pendiente de aceptación
+manual. iOS 15, 17, 18, rootless y rootful requieren pruebas físicas.
+
+## Dependencias del bootstrap
+
+La app, Bluetooth Bridge, runner, inspector y ayudantes de red propios están
+incluidos. Se mantienen como dependencias externas `arpoison`, `network-cmds`,
+`ldid` y el proveedor de hooks del jailbreak (`ellekit` en RootHide,
+`mobilesubstrate` en las otras variantes). RootHide exige también
+`rootless-compat (>= 0.9)`. El gestor debe resolver sus bibliotecas transitivas.
+
+Para el tester se recomienda abrir un solo DEB con Sileo y aceptar las
+dependencias de los repositorios de su bootstrap. Fuentes oficiales:
+[Procursus](https://apt.procurs.us/), [RootHide](https://roothide.github.io/) y
+[ElleKit](https://ellekit.space/). RootHide emplea sus propias variantes de
+Procursus. No es un paquete offline que incluya todo el bootstrap ni sustituye
+el motor de inyección. El índice RootHide consultado para la referencia declara
+`libnet9` y `libiosexec1` para `arpoison`; incluir solo su ejecutable no las reúne.

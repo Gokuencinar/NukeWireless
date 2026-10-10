@@ -25,8 +25,35 @@ informe exportable. `captured` solo acredita identidad disponible, no el corte
 real del tráfico. No cambia los permisos de la app o el ayudante.
 
 App diagnostic6, CFBundleVersion 20006. El trabajador Bluetooth permanece en
-diagnostic1. La entrega conserva un instalador único por bootstrap. Compilación,
-paquete, instalación y comprobación de bloqueo/desbloqueo pendientes.
+diagnostic1. La entrega conserva un instalador único por bootstrap.
+
+## Validación y entrega
+
+Fuentes compiladas: `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
+Los trabajos [compatibilidad](https://github.com/Gokuencinar/NukeWireless/actions/runs/38011950750),
+[desarrollo](https://github.com/Gokuencinar/NukeWireless/actions/runs/38011950828) e
+[instalador](https://github.com/Gokuencinar/NukeWireless/actions/runs/38012032208) pasaron.
+El primer intento detectó que la constante del parser era 96 en vez de 92;
+se corrigieron el tamaño, las fixtures y los asserts de offsets antes de empaquetar.
+Siete suites C locales, ocho comprobaciones de compatibilidad y siete del paquete
+intermedio aprobadas. Simulador: 46 comprobaciones por idioma y cuatro ciclos
+reales de segundo plano por idioma, con el mismo PID. Capturas del menú Bluetooth
+oscuro y la hoja de acciones Wi-Fi revisadas.
+
+Se inspeccionaron los tres DEB unificados: componentes propios, enlaces nativos,
+dependencias, scripts, permisos, hashes y procedencia. El DEB RootHide
+`2.0.0~diagnostic6+bundle1` se instaló en el iPhone XS / iOS 16.3.1. dpkg transfirió
+el trabajador al paquete principal y dejó el auxiliar sin instalar. Firma del
+ejecutable, CFBundleVersion 20006, commit e identidad del código instalado
+verificados. Diagnóstico Bluetooth de solo lectura sin HCI, sin cambiar el PID
+del servicio y sin nuevos crashes relevantes durante la instalación.
+
+SHA-256 RootHide: `e9599a0197091567ea6415cbbf386591cf60218c52d22dba37ffd541d9fa56a7`.
+Recuperación: cerrar la app, retirar el paquete unificado sin purgar datos e
+instalar `/var/mobile/Documents/NukeWireless-diagnostic5-backup.deb` junto a
+`/var/mobile/Documents/NukeWireless-diagnostic1-bluetooth-backup.deb`.
+No se requiere un reinicio general por rutina. Pendientes: aceptación del corte
+y restauración de tráfico Wi-Fi y verificación física en los otros entornos.
 
 ## Reporte externo recibido
 
