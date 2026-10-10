@@ -36,9 +36,14 @@ sus fuentes, protocolos, permisos ni controles de compatibilidad.
 
 - Local: pruebas del ejecutable SHA-fijado, dependencias obligatorias, rechazo
   de dependencias débiles/duplicadas y conservación del cuerpo nativo.
-- CI pendiente: compilación iOS, navegación real del simulador en ambos idiomas,
-  cuatro ciclos de segundo plano y migración/retirada dpkg de las tres variantes.
-- Paquetes finales y aceptación física: pendientes.
+- CI aprobada: compilación iOS, 46 comprobaciones de navegación por idioma y
+  cuatro ciclos reales de segundo plano por idioma. Migración/retirada dpkg
+  aislada aprobada en las tres variantes, incluida la actualización desde
+  diagnostic7 con bibliotecas externas.
+- Tres DEB finales inspeccionados: 7 pruebas del core, 8 de candidatos, 6 comprobaciones
+  ejecutables del instalador, 3 del enlace integrado y 3 de rutas/whitelist.
+  Las 3 pruebas dpkg omitidas en Windows pasaron en Linux.
+- Aceptación física en el dispositivo del tester: pendiente.
 
 Los tests del simulador enlazan la interfaz directamente y comprueban una única
 copia cargada, la inicialización del adaptador de prueba y la ocultación del
@@ -49,3 +54,13 @@ Prueba física necesaria: instalar el DEB de su esquema, abrir Información,
 Bluetooth y Diagnósticos, volver desde segundo plano y repetir con la inyección
 de tweaks deshabilitada únicamente para NukeWireless. La carga de esta interfaz
 no prueba por sí sola el bloqueo Wi-Fi ni las funciones privadas Bluetooth.
+
+Fuentes compiladas: `1196dcf2` (commit completo en cada manifiesto).
+
+- [CI de compatibilidad](https://github.com/Gokuencinar/NukeWireless/actions/runs/38071471679)
+- [CI de desarrollo](https://github.com/Gokuencinar/NukeWireless/actions/runs/38071471666)
+- [CI de migración](https://github.com/Gokuencinar/NukeWireless/actions/runs/38071471691)
+
+Los DEB finales están en `outputs/diagnostic8-unified` del directorio de esta
+conversación, con manifiestos y `VERIFICACION-DIAGNOSTIC8.json`. No se han
+instalado en el dispositivo ni publicado en GokuEnREPO como parte de esta entrega.
