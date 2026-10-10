@@ -9,7 +9,9 @@ Sustituye los logos template y su estilizado en botones configurados por bitmaps
 coloreados con CoreGraphics y botones custom. Conserva alineación, marcas,
 accesibilidad, apariencia y controles de emisión. La traza del iPhone 8 Plus
 apunta a CoreUI/CoreImage al dibujar una imagen; no demuestra todavía la causa
-raíz ni una reparación física. Compilación y aceptación pendientes.
+raíz ni una reparación física. Ambas compilaciones, 46 comprobaciones UI por idioma,
+cuatro ciclos de segundo plano y las pruebas de paquete/instalador han pasado.
+Capturas revisadas; aceptación física de diagnostic9 pendiente.
 El error independiente de transporte Bluetooth no está corregido por este cambio.
 Véase [investigación del cierre](docs/CATALOG-GRAPHICS-DIAGNOSTIC9.md).
 

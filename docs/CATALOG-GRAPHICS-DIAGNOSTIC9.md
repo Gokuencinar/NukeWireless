@@ -59,9 +59,25 @@ selectores. Se conserva la regresión de generación, reproducción individual,
 emisión conjunta y Detener con el backend simulado. Esto no reproduce el driver
 gráfico de un A11 ni acredita emisión en ese dispositivo.
 
-Pendiente: build y revisión de capturas; instalar la variante rootless en el
-iPhone 8 Plus, abrir/cerrar el catálogo repetidamente y cambiar de marca y tema.
-La aceptación del catálogo y la disponibilidad de radio son pruebas separadas.
+Fuentes compiladas: `57a6e91d504e28df08110efcc61a740d50866771`.
+
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38088747679): aprobado.
+- [Compatibilidad con destino iOS 15](https://github.com/Gokuencinar/NukeWireless/actions/runs/38088747594): aprobado.
+- [Migración dpkg Linux](https://github.com/Gokuencinar/NukeWireless/actions/runs/38088747704): aprobado.
+- 46 comprobaciones UI y cuatro ciclos reales de segundo plano por idioma,
+  español e inglés, en ambas compilaciones. Incluyen los bitmaps ya coloreados.
+- Core: 7 comprobaciones; candidatos: 8; unificados: 6 locales y 3 exclusivas
+  de Linux en CI; loader: 3; rutas/whitelist: 3. Todas aprobadas.
+- Capturas claro/oscuro revisadas, con marcas orientadas y alineadas.
+
+Los tres DEB unificados y manifiestos están en `outputs/diagnostic9-unified`
+del directorio de esta conversación. El informe de investigación conserva una
+comparación sin identificadores personales de las tres trazas. No se ha instalado
+esta candidata en un dispositivo ni publicado en el repositorio APT.
+
+Pendiente: instalar la variante rootless en el iPhone 8 Plus, abrir/cerrar el
+catálogo repetidamente y cambiar de marca y tema. La aceptación del catálogo y
+la disponibilidad de radio son pruebas separadas.
 
 Referencia pública de renderingMode:
 https://developer.apple.com/documentation/uikit/uiimage/renderingmode-swift.enum/alwaysoriginal
