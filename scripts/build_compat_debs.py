@@ -66,7 +66,7 @@ def package(scheme, core, artifact, output):
     checks = {}; final = []
     for member, data in entries:
         name = member.name.removeprefix("./").strip("/")
-        if not name or name.startswith(("usr/lib/TweakInject/HarpyRootHidePaths", "usr/share/harpy-reloaded-roothide")):
+        if name in ("", ".") or name.startswith(("usr/lib/TweakInject/HarpyRootHidePaths", "usr/share/harpy-reloaded-roothide")):
             continue
         if scheme != "roothide" and name.endswith(".roothidepatch"):
             continue

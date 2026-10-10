@@ -5,6 +5,9 @@ on:
     branches: [audit-rh25.5]
     paths:
       - 'scripts/build_unified_deb.py'
+      - 'scripts/compat_layout.py'
+      - 'scripts/build_compat_debs.py'
+      - 'scripts/repair_rootless_package_list.sh'
       - 'tests/test_unified_package.py'
       - '.github/workflows/unified-package.yml'
   workflow_dispatch:

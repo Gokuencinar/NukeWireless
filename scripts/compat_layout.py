@@ -16,10 +16,13 @@ def ordered_entries(entries):
     files, dirs = {}, {}
     for member, data in entries:
         name = member.name.removeprefix("./").strip("/")
-        if not name:
-            continue
-        if ".." in PurePosixPath(name).parts:
+        if ".." in name.split("/"):
             raise ValueError("unsafe package path: " + name)
+        # tar root entries and embedded dot components must not become owned
+        # paths such as /var/jb/.: dpkg cannot rmdir that path on removal.
+        name = PurePosixPath(name).as_posix()
+        if name == ".":
+            continue
         member = copy.copy(member)
         member.name = "./" + name
         if member.isdir():

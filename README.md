@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic6+bundle3: corrección de rutas del instalador rootless.**
+Elimina las entradas de directorio con componentes `.` que registraban
+`/var/jb/.` y bloqueaban la desinstalación en Dopamine. No distribuir los DEB
+rootless anteriores bundle1/bundle2. Se conserva la política sin límites de iOS
+del instalador. Compilación y validación de esta revisión en curso; la reparación
+del registro antiguo se describe en [recuperación rootless](docs/ROOTLESS-PACKAGE-RECOVERY.md).
+
 **2.0.0~diagnostic6+bundle2: revisión del instalador sin límites de iOS.**
 Retira las dependencias `firmware` y `MinimumOSVersion` del DEB unificado de
 las tres variantes. Conserva el mínimo compilado real iOS 15.0, los binarios de diagnostic6/Bluetooth diagnostic1 y
@@ -11,7 +18,8 @@ las comprobaciones de compatibilidad en ejecución. No acredita funcionamiento
 en sistemas nuevos ni corrige el crash externo del catálogo aún sin informe.
 Los tres DEB pasaron la inspección local. En Linux pasaron instalación nueva,
 migración, propiedad, retirada e instalación sin proveedor `firmware` sin ignorar
-dependencias. Instalación física de bundle2 pendiente.
+dependencias. Esas pruebas dpkg cubrían rootful, no la retirada rootless;
+el fallo de rutas rootless se detectó después. Instalación física de bundle2 pendiente.
 Véase [empaquetado unificado](docs/UNIFIED-INSTALLER.md).
 
 **2.0.0~diagnostic6+bundle1: compilada, validada e instalada en RootHide.**

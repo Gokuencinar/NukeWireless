@@ -17,7 +17,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import build_unified_deb as unified
-from package_utils import pack_ar, regular, tar_bytes
+from package_utils import directory, pack_ar, regular, tar_bytes
 
 INPUTS = OUTPUT = None
 BASH = shutil.which("bash") if os.name != "nt" else next(
@@ -53,8 +53,13 @@ def fixture(folder, scheme, worker):
         report = {"core": {"sources": unified.source_hashes(), "binary_sha256": unified.sha(b"extension"),
                            "hotspot_helper_sha256": unified.sha(b"hotspot"), "source_commit": "fixture"},
                   "adapter": {"sources": unified.compat_sources(), "path_library_sha256": unified.sha(b"adapter")}}
+    entries = unified.ordered_entries([regular(n, b, 0o755) for n, b in files.items()])
+    # Reproduce the old app archive's root directory after bootstrap prefixing.
+    # Bypass ordered_entries here intentionally: the unified builder must fix it.
+    if not worker:
+        entries.append(directory(prefix + "."))
     path.write_bytes(pack_ar([("debian-binary", b"2.0\n"), ("control.tar.gz", tar_bytes(controls)),
-                             ("data.tar.gz", tar_bytes(unified.ordered_entries([regular(n, b, 0o755) for n, b in files.items()])))]))
+                             ("data.tar.gz", tar_bytes(entries))]))
     report.update(package_sha256=unified.sha(path.read_bytes()), scheme=scheme, architecture=architecture, version=version)
     path.with_suffix(".manifest.json").write_text(json.dumps(report), encoding="utf-8")
     return path
@@ -67,6 +72,20 @@ class FixtureTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_archive_paths_are_canonical_and_traversal_is_rejected(self):
+        entries = unified.ordered_entries([
+            directory("."), directory("var/jb/."), directory("var/jb"),
+            regular("var//jb/./usr/bin/tool", b"tool")])
+        names = [m.name for m, _ in entries]
+        self.assertEqual(len(names), len(set(names)))
+        self.assertNotIn("./.", names)
+        self.assertNotIn("./var/jb/.", names)
+        self.assertIn("./var/jb/usr/bin/tool", names)
+        with self.assertRaisesRegex(ValueError, "unsafe package path"):
+            unified.ordered_entries([regular("var/jb/../escape", b"bad")])
+        with self.assertRaisesRegex(ValueError, "duplicate package file"):
+            unified.ordered_entries([regular("a/./b", b"one"), regular("a/b", b"two")])
 
     def test_installer_removes_only_firmware_limits(self):
         for scheme in unified.SCHEMES:
@@ -142,13 +161,17 @@ class FixtureTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform.startswith("linux") and shutil.which("dpkg") and os.geteuid() == 0,
                          "dpkg migration requires isolated Linux CI as root")
     def test_dpkg_fresh_install_upgrade_ownership_and_removal(self):
-        app, worker = fixture(self.folder, "rootful", False), fixture(self.folder, "rootful", True)
-        combined = self.folder / "unified.deb"
-        unified.build(app, worker, combined, "rootful")
-        for upgrade in (False, True):
-            root = self.folder / ("upgrade" if upgrade else "fresh")
+        for scheme, (prefix, _, architecture, _) in unified.SCHEMES.items():
+          app, worker = fixture(self.folder, scheme, False), fixture(self.folder, scheme, True)
+          combined = self.folder / (scheme + ".deb")
+          unified.build(app, worker, combined, scheme)
+          for upgrade in (False, True):
+            root = self.folder / (scheme + ("-upgrade" if upgrade else "-fresh"))
             (root / "var/lib/dpkg").mkdir(parents=True)
             (root / "var/lib/dpkg/status").touch()
+            bootstrap = root / "var/jb/keep-bootstrap"
+            bootstrap.parent.mkdir(parents=True, exist_ok=True)
+            bootstrap.write_text("untouched", encoding="utf-8")
             log = root / "script-log"
             env = dict(os.environ, NW_TEST_LOG=str(log))
             def dpkg(*args):
@@ -165,13 +188,62 @@ class FixtureTests(unittest.TestCase):
                                              "--show", "--showformat=${Version} ${Status}", unified.PACKAGE], text=True)
             self.assertEqual(query, unified.VERSION + " install ok installed")
             owner = subprocess.check_output(["dpkg-query", "--admindir=" + str(root / "var/lib/dpkg"),
-                                             "--search", "/usr/bin/nwbt-run"], text=True)
+                                             "--search", "/" + prefix + "usr/bin/nwbt-run"], text=True)
             owner_id, separator, owned_path = owner.strip().rpartition(": ")
-            self.assertEqual((separator, owned_path), (": ", "/usr/bin/nwbt-run"))
-            self.assertIn(owner_id, {unified.PACKAGE, unified.PACKAGE + ":iphoneos-arm"})
+            self.assertEqual((separator, owned_path), (": ", "/" + prefix + "usr/bin/nwbt-run"))
+            self.assertIn(owner_id, {unified.PACKAGE, unified.PACKAGE + ":" + architecture})
             dpkg("--remove", unified.PACKAGE)
-            self.assertFalse((root / "usr/bin/nwbt-run").exists())
-            self.assertFalse((root / unified.APP / "Info.plist").exists())
+            self.assertFalse((root / prefix / "usr/bin/nwbt-run").exists())
+            self.assertFalse((root / prefix / unified.APP / "Info.plist").exists())
+            self.assertEqual(bootstrap.read_text(encoding="utf-8"), "untouched")
+
+    @unittest.skipUnless(sys.platform.startswith("linux") and shutil.which("dpkg") and os.geteuid() == 0,
+                         "dpkg recovery requires isolated Linux CI as root")
+    def test_old_rootless_failure_and_targeted_record_repair(self):
+        app, worker = fixture(self.folder, "rootless", False), fixture(self.folder, "rootless", True)
+        combined = self.folder / "legacy.deb"
+        unified.build(app, worker, combined, "rootless")
+        raw = combined.read_bytes()
+        controls = unified.members(raw, "control.tar")
+        control = unified.fields(controls["control"][1])
+        control["Version"] = "2.0.0~diagnostic5+bundle1"
+        controls["control"] = regular("control", ("\n".join(f"{k}: {v}" for k, v in control.items())+"\n").encode())
+        entries = list(unified.members(raw, "data.tar").values()) + [directory("var/jb/.")]
+        combined.write_bytes(pack_ar([("debian-binary", b"2.0\n"),
+                                     ("control.tar.gz", tar_bytes(list(controls.values()))),
+                                     ("data.tar.gz", tar_bytes(entries))]))
+        root = self.folder / "broken-rootless"
+        admin = root / "var/lib/dpkg"
+        admin.mkdir(parents=True)
+        (admin / "status").touch()
+        sentinel = root / "var/jb/keep-bootstrap"
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_text("untouched", encoding="utf-8")
+        env = dict(os.environ, NW_TEST_LOG=str(root / "script-log"))
+        command = ["dpkg", "--root="+str(root), "--force-script-chrootless",
+                   "--force-architecture", "--force-depends"]
+        result = subprocess.run(command+["--install", str(combined)], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        result = subprocess.run(command+["--remove", unified.PACKAGE], env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertIn("Invalid argument", result.stderr)
+        self.assertIn("/var/jb/.", result.stderr)
+        record, = list((admin / "info").glob(unified.PACKAGE+"*.list"))
+        before = record.read_bytes()
+        self.assertIn(b"/var/jb/.\n", before)
+        repair = ["sh", str(ROOT / "scripts/repair_rootless_package_list.sh"), str(admin)]
+        result = subprocess.run(repair, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual(record.read_bytes(), b"".join(line for line in before.splitlines(keepends=True)
+                                                     if line != b"/var/jb/.\n"))
+        backup, = list((admin / "info").glob(record.name+".nw-backup.*"))
+        self.assertEqual(backup.read_bytes(), before)
+        # A second invocation must leave the already repaired database alone.
+        result = subprocess.run(repair, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        result = subprocess.run(command+["--remove", unified.PACKAGE], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "untouched")
 
 
 class DeliveryTests(unittest.TestCase):
@@ -197,6 +269,10 @@ class DeliveryTests(unittest.TestCase):
                     prefix+"usr/share/nukewireless-roothide/compatibility.json"})
                 for original in (app[2], worker[2]):
                     for name, (member, data) in original.items():
+                        name = PurePosixPath(name).as_posix()
+                        if name == ".":
+                            self.assertTrue(member.isdir())
+                            continue
                         actual, content = files[name]
                         self.assertEqual((actual.mode, actual.uid, actual.gid, actual.type, actual.linkname),
                                          (member.mode, member.uid, member.gid, member.type, member.linkname), name)
@@ -231,6 +307,9 @@ class DeliveryTests(unittest.TestCase):
                 seen = set()
                 for member, _ in unified.read_tar(unified.get_tar_member(unified.read_ar(raw), "data.tar")):
                     name = member.name.removeprefix("./").rstrip("/")
+                    self.assertEqual(name, PurePosixPath(name).as_posix())
+                    self.assertNotEqual(name, ".")
+                    self.assertNotIn("..", name.split("/"))
                     self.assertNotIn(name, seen)
                     for parent in PurePosixPath(name).parents:
                         if parent.as_posix() != ".":

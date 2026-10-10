@@ -20,7 +20,7 @@ from package_utils import get_tar_member, pack_ar, regular, read_ar, tar_bytes
 
 PACKAGE = "com.gokuencinar.nukewireless"
 WORKER_PACKAGE = PACKAGE + ".bluetooth"
-VERSION = APP_VERSION + "+bundle2"
+VERSION = APP_VERSION + "+bundle3"
 INSTALLATION_POLICY = {"minimum_ios": None, "maximum_ios_exclusive": None, "binary_minimum_ios": "15.0",
                        "scope": "installer-only", "runtime_checks_unchanged": True}
 PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py"]

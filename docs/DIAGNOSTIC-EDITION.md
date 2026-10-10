@@ -6,13 +6,15 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Cerrar NukeWireless e instalar **un único DEB** `2.0.0~diagnostic6+bundle2`
+1. Cerrar NukeWireless e instalar **un único DEB** `2.0.0~diagnostic6+bundle3`
    de la variante correcta: RootHide, Dopamine/rootless o rootful. Incluye la app
    diagnostic6 y el trabajador Bluetooth diagnostic1. Diagnostic6 corrige la
    lectura de identidad del router; el usuario confirmó bloqueo y desbloqueo
    en el iPhone XS / iOS 16.3.1 / RootHide.
    Esta edición actualiza los paquetes existentes; no instala otra app en paralelo.
-   Bundle2 retira los límites de iOS del instalador y del Info.plist; conserva el
+   Bundle3 corrige las rutas del DEB rootless. Si una edición antigua falla al
+   retirarse con `/var/jb/.`, seguir [la reparación del registro](ROOTLESS-PACKAGE-RECOVERY.md).
+   Conserva la retirada de los límites de iOS del instalador y del Info.plist; conserva el
    mínimo compilado iOS 15.0 y los controles en ejecución. No acredita compatibilidad
    fuera de los entornos probados, ni apertura de la app en sistemas anteriores.
    El gestor puede proponer retirar el paquete Bluetooth separado, sustituido por
