@@ -29,7 +29,8 @@ Al escribirla no se muestran caracteres; es normal.
 Si una copia antigua del script muestra `awk: not found`, sustituirla por la
 actual y repetir el mismo comando. Esa copia se detenía antes de reemplazar
 el registro original. La revisión actual filtra la línea con funciones internas
-de `sh`; la prueba de recuperación utiliza un PATH sin `awk`.
+de `sh`; la prueba de recuperación utiliza un PATH sin `awk` y pasó en
+[CI 38061585653](https://github.com/Gokuencinar/NukeWireless/actions/runs/38061585653).
 
 El script comprueba el paquete y su versión, hace una copia de seguridad y
 elimina **solo la línea exacta `/var/jb/.`** de su registro `.list`. Conserva las
