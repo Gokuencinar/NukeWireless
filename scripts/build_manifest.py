@@ -15,7 +15,7 @@ SOURCES = ['src/NukeWirelessInfo.m', 'src/NWMainTabs.m', 'src/NWMainTabs.h', 'sr
            'src/NWRefreshThunk.S', 'scripts/build_extension.sh', 'resources/NukeLaunch.storyboard',
            'scripts/startup_resources.py',
            'resources/startup/NukeWirelessIcon.png']
-SOURCES += ['src/NWBuild.h', 'src/NWLegacyABI.h', 'src/NWDiagnostics.h', 'src/NWDiagnostics.m', 'src/NWDiagnosticReport.h', 'src/NWDiagnosticReport.m', 'tests/test_diagnostics.m']
+SOURCES += ['src/NWBuild.h', 'src/NWLegacyABI.h', 'src/NWInstallLayout.h', 'src/NWDiagnostics.h', 'src/NWDiagnostics.m', 'src/NWDiagnosticReport.h', 'src/NWDiagnosticReport.m', 'tests/test_diagnostics.m']
 SOURCES += ['src/NWDeviceActions.h', 'src/NWDeviceActions.m', 'src/NWHotspot.h', 'src/NWHotspot.m',
             'src/hotspot/NWHotspotFilter.c', 'src/hotspot/vendor/pfvar.h',
             'src/hotspot/vendor/libkern/tree.h', 'src/hotspot/vendor/SOURCES.json', 'tests/test_hotspot_filter.c']
@@ -40,5 +40,5 @@ if __name__ == '__main__':
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic6', 'target': args.target,
+        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic7', 'target': args.target,
     }, indent=2) + '\n', encoding='utf-8')

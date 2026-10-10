@@ -1,4 +1,5 @@
 #import "../NWLegacyABI.h"
+#import "../NWInstallLayout.h"
 #import "NWBTBridge.h"
 #include "../NWCatalogProfiles.h"
 #import "NWBTNative.h"
@@ -107,7 +108,7 @@ static BOOL callerAllowed(char ownPath[PATH_MAX]) {
     size_t rootLength = strlen(ownPath) - strlen(suffix);
     if (strcmp(ownPath + rootLength, suffix)) return NO;
     char expected[PATH_MAX];
-    int count = snprintf(expected, sizeof(expected), "%.*s" NWLegacyAppSuffix, (int)rootLength, ownPath);
+    int count = snprintf(expected, sizeof(expected), "%.*s" NWInstalledAppSuffix, (int)rootLength, ownPath);
     if (count < 0 || count >= (int)sizeof(expected) || strcmp(parent, expected) || getppid() != parentPID) return NO;
     return !lstat(parent, &info) && S_ISREG(info.st_mode) && info.st_uid == 0 && !(info.st_mode & 0022);
 }

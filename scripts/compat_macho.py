@@ -6,6 +6,7 @@ Its equivalent is installed in the arm64 slice; all other native code stays.
 """
 import hashlib
 import struct
+from install_layout import AEGIS_SUFFIX, APP_SUFFIX
 
 ARM64 = 0x100000C
 HELPER_SHA = "878dab6af6d1b2a45d10c1e0e7fa5ca46eac2873eb7d723871a510bec55a00fb"
@@ -75,6 +76,23 @@ def compatible_aegis(data):
     payload = bytearray(slices[(ARM64, 0x80000002)][0x7000:0x70FE])
     if payload[0xB0:] != b"/usr/libexec/harpy-reloaded/aegis/Applications/HarpyReloaded.app/HarpyReloaded":
         raise ValueError("unexpected parent whitelist")
+    # Keep both ADR targets and the stack ABI unchanged. Only the exact path
+    # suffixes and their checked lengths change; the shared-root check remains.
+    helper, app = AEGIS_SUFFIX.encode(), APP_SUFFIX.encode()
+    if len(helper) > 33 or len(app) > 45:
+        raise ValueError("new paths exceed the pinned literal slots")
+    immediates = [(0x24, 0x7100867F, 10, len(helper)),  # cmp w19, #33
+                  (0x2C, 0x51008675, 10, len(helper)),  # sub w21, w19, #33
+                  (0x3C, 0x52800422, 5, len(helper)),   # mov w2, #33
+                  (0x5C, 0x1100B6A0, 10, len(app)),     # add w0, w21, #45
+                  (0x88, 0x528005A2, 5, len(app))]      # mov w2, #45
+    for offset, expected, shift, length in immediates:
+        if struct.unpack_from("<I", payload, offset)[0] != expected:
+            raise ValueError("unexpected parent whitelist length instruction")
+        mask = (0xFFFF if shift == 5 else 0xFFF) << shift
+        struct.pack_into("<I", payload, offset, (expected & ~mask) | length << shift)
+    payload[0xB0:0xD1] = helper.ljust(33, b"\0")
+    payload[0xD1:0xFE] = app.ljust(45, b"\0")
     if any(result[0x7000:0x7000 + len(payload)]):
         raise ValueError("occupied arm64 cave")
     if result[0x7CF4:0x7D00] != bytes.fromhex("801300301f2003d5e1230091"):

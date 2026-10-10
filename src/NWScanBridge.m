@@ -2,6 +2,7 @@
 #import "NWHotspot.h"
 #import "NWDiagnosticReport.h"
 #import "NWLegacyABI.h"
+#import "NWInstallLayout.h"
 #import "NWPolicy.h"
 #import "NWResources.h"
 #import <objc/runtime.h>
@@ -366,7 +367,7 @@ static const uint8_t *appExecutableBase(void) {
         const char *path = _dyld_get_image_name(index);
         if (!path) continue;
         const char *name = strrchr(path, '/');
-        if (name && strcmp(name + 1, NWLegacyExecutable) == 0)
+        if (name && strcmp(name + 1, NWInstalledExecutable) == 0)
             return (const uint8_t *)_dyld_get_image_header(index);
     }
     return NULL;

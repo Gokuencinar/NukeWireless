@@ -1,6 +1,7 @@
 #import "NWBluetooth.h"
 #import "NWDiagnosticReport.h"
 #import "NWLegacyABI.h"
+#import "NWInstallLayout.h"
 #import "NWBLE.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
@@ -95,7 +96,7 @@ static NSString *advertisingSupport(NSDictionary *report, BOOL extended) {
 BOOL NWBluetoothBusy(void) { return busy; } // Main-thread UI state.
 static NSString *helperPath(void) {
     NSString *app = NSBundle.mainBundle.bundlePath;
-    if (![app.lastPathComponent isEqual:@NWLegacyAppDirectory] || ![app.stringByDeletingLastPathComponent.lastPathComponent isEqual:@"Applications"]) return nil;
+    if (![app.lastPathComponent isEqual:@NWInstalledAppDirectory] || ![app.stringByDeletingLastPathComponent.lastPathComponent isEqual:@"Applications"]) return nil;
     NSString *root = app.stringByDeletingLastPathComponent.stringByDeletingLastPathComponent;
     return [root stringByAppendingPathComponent:@"usr/bin/nwbt-run"];
 }

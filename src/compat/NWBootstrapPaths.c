@@ -1,4 +1,5 @@
 #include "../NWLegacyABI.h"
+#include "../NWInstallLayout.h"
 #include "../NWRouteNeighbors.h"
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
@@ -481,7 +482,7 @@ static id jailbreak_prefix(void) {
 }
 
 static int is_jailbreak_file(const char *path) {
-    return starts_with(path, NWLegacyHelperDirectory) ||
+    return starts_with(path, NWInstalledHelperDirectory) ||
            starts_with(path, "/usr/bin/arpoison") ||
            starts_with(path, "/sbin/pfctl");
 }
@@ -490,17 +491,27 @@ static id rewrite_path(id path) {
     if (!path) return path;
     const char *utf8 = ((const char *(*)(id, SEL))objc_msgSend)(
         path, sel_registerName("UTF8String"));
+    if (starts_with(utf8, NWLegacyHelperDirectory)) {
+        path = ((id (*)(id, SEL, id))objc_msgSend)(string_from_utf8(NWInstalledHelperDirectory),
+            sel_registerName("stringByAppendingString:"), string_from_utf8(utf8 + strlen(NWLegacyHelperDirectory)));
+        utf8 = ((const char *(*)(id, SEL))objc_msgSend)(path, sel_registerName("UTF8String"));
+    }
     if (!is_jailbreak_file(utf8)) return path;
     return ((id (*)(id, SEL, id))objc_msgSend)(
         jailbreak_prefix(), sel_registerName("stringByAppendingString:"), path);
 }
 
 static id rewrite_argument(id argument) {
+    // The pinned Swift binary still constructs the old helper paths. Translate
+    // those before adding the bootstrap prefix, including on rootful systems.
+    if (argument) argument = ((id (*)(id, SEL, id, id))objc_msgSend)(argument,
+        sel_registerName("stringByReplacingOccurrencesOfString:withString:"),
+        string_from_utf8(NWLegacyHelperDirectory), string_from_utf8(NWInstalledHelperDirectory));
     const char *value = utf8(argument);
     const char *root = utf8(jailbreak_prefix());
     if (!value || !root || !root[0]) return argument;
     static const char *paths[] = {
-        NWLegacyHelperDirectory, "/usr/bin/arpoison", "/sbin/pfctl"
+        NWInstalledHelperDirectory, "/usr/bin/arpoison", "/sbin/pfctl"
     };
     size_t length = strlen(value), prefix = strlen(root);
     if (length > 65536 || prefix > 4096) return argument;
@@ -1592,7 +1603,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
     if (capture_root_task) {
         id task_path = ((id (*)(id, SEL))objc_msgSend)(self,
             sel_registerName("launchPath"));
-        if (contains(utf8(task_path), NWLegacyHelperSuffix))
+        if (contains(utf8(task_path), NWInstalledHelperSuffix))
             captured_root_task = self;
     }
     if (!is_arpoison) {
@@ -1684,7 +1695,7 @@ __attribute__((constructor)) static void install_paths(void) {
     if (image_header && image_name && image_count) {
         for (unsigned i = 0; i < image_count(); ++i) {
             const char *name = image_name(i);
-            if (contains(name, "/" NWLegacyAppDirectory "/" NWLegacyExecutable)) {
+            if (contains(name, NWInstalledAppSuffix)) {
                 app_header = image_header(i);
                 break;
             }

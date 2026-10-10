@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic7+bundle1: renombrado de las rutas instaladas.**
+La app se instala en `Applications/NukeWireless.app`, con ejecutable
+`NukeWireless`, y los ayudantes en `usr/libexec/nukewireless`.
+Actualiza las comprobaciones de ruta de Wi-Fi, punto de acceso y Bluetooth;
+el componente Bluetooth pasa a `2.0.0~diagnostic2`. Conserva la identidad de
+firma y los datos existentes. Compilación y entrega en preparación;
+validación física pendiente. Véase [migración de nombres](docs/INSTALL-LAYOUT-DIAGNOSTIC7.md).
+
 **2.0.0~diagnostic6+bundle3: corrección de rutas del instalador rootless.**
 Elimina las entradas de directorio con componentes `.` que registraban
 `/var/jb/.` y bloqueaban la desinstalación en Dopamine. No distribuir los DEB
@@ -274,7 +282,7 @@ Consulta [el informe de auditoría](docs/AUDIT-rh25.5.md) para conocer las causa
 
 Este proyecto contiene una extensión y herramientas de adaptación; **no contiene el código Swift original completo**. Se conservan las dos bibliotecas de rutas y los auxiliares del paquete base. En el ejecutable original solo se sustituyen dos textos visibles manteniendo exactamente su longitud; dev18 también sustituye la llamada de color y el nombre de imagen de SplashView con guardas del binario fijado.
 
-Las rutas `HarpyReloaded.app`, las clases Swift `_TtC13HarpyReloaded…`, el bundle ID `me.midnightchips.harpy-reloaded` y las preferencias existentes son identificadores de compatibilidad. No deben renombrarse. `src/NWBootstrapPathsHistorical.c`, `scripts/build_deb.py` y el parche de Aegis son material histórico: no se recompilan ni aplican al generar esta versión.
+Las clases Swift `_TtC13HarpyReloaded…`, el bundle ID `me.midnightchips.harpy-reloaded` y las preferencias existentes son identificadores de compatibilidad. Las rutas instaladas sí se renombran desde diagnostic7 mediante el adaptador y el empaquetador actuales. `src/NWBootstrapPathsHistorical.c`, `scripts/build_deb.py` y el parche ensamblador original de Aegis son material histórico; el empaquetador actual adapta de forma verificada la whitelist de Aegis al nuevo nombre.
 
 Versión instalada comprobada: iOS 16.3.1 con Dopamine RootHide. Las variantes nuevas apuntan a iOS 15–18 y siguen pendientes de validación funcional. SSID/BSSID se consultan mediante MobileWiFi sin solicitar ubicación; el acceso efectivo depende del dispositivo.
 

@@ -2,6 +2,7 @@
 #import "NWScanBridge.h"
 #import "NWPolicy.h"
 #import "NWLegacyABI.h"
+#import "NWInstallLayout.h"
 #import "NWAppearance.h"
 #import "NWLanguage.h"
 #import "NWResources.h"
@@ -102,7 +103,8 @@ static id current(NSDictionary *row) {
 }
 static NSDictionary *invoke(NSArray<NSString *> *arguments) {
     NSString *root = [NSBundle.mainBundle.bundlePath stringByDeletingLastPathComponent].stringByDeletingLastPathComponent;
-    NSString *path = [root stringByAppendingPathComponent:@"usr/libexec/harpy-reloaded/nw-hotspot"];
+    NSString *relative = [@NWInstalledHelperDirectory substringFromIndex:1];
+    NSString *path = [root stringByAppendingPathComponent:[relative stringByAppendingString:@"nw-hotspot"]];
     if (![NSFileManager.defaultManager isExecutableFileAtPath:path]) return @{@"ok":@NO,@"error_code":@"missing"};
     int descriptors[2]; if (pipe(descriptors)) return @{@"ok":@NO,@"error_code":@"transport"};
     char *argv[5] = {(char *)path.UTF8String,NULL,NULL,NULL,NULL};
@@ -206,7 +208,7 @@ static BOOL refresh(void) {
     const uint8_t *base=NULL;
     for (uint32_t i=0;i<_dyld_image_count();++i) {
         const char *name=_dyld_get_image_name(i), *last=name ? strrchr(name,'/') : NULL;
-        if (last && !strcmp(last+1,NWLegacyExecutable)) base=(const uint8_t *)_dyld_get_image_header(i);
+        if (last && !strcmp(last+1,NWInstalledExecutable)) base=(const uint8_t *)_dyld_get_image_header(i);
     }
     static const uint8_t prologue[]={0xff,0xc3,0x01,0xd1,0xfa,0x67,0x02,0xa9,0xf8,0x5f,0x03,0xa9,0xf6,0x57,0x04,0xa9};
     if (!base || memcmp(base+0xc5a8,prologue,sizeof(prologue))) return NO;

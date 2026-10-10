@@ -1,4 +1,6 @@
-"""Build the private development package from the pinned current baseline.
+"""Build a staging-only core in the pinned baseline layout.
+
+Use build_compat_debs.py for installable packages with the current product paths.
 
 Archive scripts are data, never executed. The two stable path libraries and
 network helpers remain byte-identical. SplashView loads the current logo and uses the already imported black color
@@ -18,8 +20,8 @@ from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, 
 from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.0.0~diagnostic6"
-WORKER_VERSION = "2.0.0~diagnostic1"
+VERSION = "2.0.0~diagnostic7"
+WORKER_VERSION = "2.0.0~diagnostic2"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
 APP = "Applications/HarpyReloaded.app/"
@@ -63,11 +65,11 @@ def patch_hotspot_signing(script):
     if script.count(original) != 1: raise ValueError("unexpected hotspot signing script")
     return script.replace(original, original + b'ldid -Hsha256 -S/usr/share/nukewireless-roothide/hotspot.entitlements "$BASE/nw-hotspot"\nchown root:wheel "$BASE/nw-hotspot"\nchmod 4755 "$BASE/nw-hotspot"\n')
 
-def hotspot_prerm(prefix=""):
+def hotspot_prerm(prefix="", helpers="usr/libexec/harpy-reloaded/"):
     root = "/" + prefix.rstrip("/") if prefix else ""
     return f'''#!/bin/sh
 case "$1" in
-  remove|deconfigure) {root}/usr/libexec/harpy-reloaded/nw-hotspot clear >/dev/null 2>&1 || true ;;
+  remove|deconfigure) {root}/{helpers}nw-hotspot clear >/dev/null 2>&1 || true ;;
 esac
 exit 0
 '''.encode()
@@ -80,7 +82,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text(encoding="utf-8"))
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-diagnostic6" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-diagnostic7" not in library:
         raise ValueError("wrong development library version")
     helper = (artifact / "nw-hotspot").read_bytes()
     if manifest.get("hotspot_helper_sha256") != sha(helper):
@@ -102,7 +104,7 @@ def build(source, artifact, output):
         raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless Dev", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="20006",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="20007",
                     NukeWirelessPackageScheme="roothide", NukeWirelessWorkerVersion=WORKER_VERSION,
                     NukeWirelessSourceCommit=manifest.get("source_commit", "unknown"),
                     UIFileSharingEnabled=True, LSSupportsOpeningDocumentsInPlace=True,

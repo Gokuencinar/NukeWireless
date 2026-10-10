@@ -10,6 +10,7 @@ on:
       - 'scripts/startup_resources.py'
       - 'scripts/build_compat*'
       - 'scripts/compat_*'
+      - 'scripts/install_layout.py'
       - 'scripts/build_bluetooth_inspector.sh'
       - 'scripts/bluetooth_manifest.py'
       - 'scripts/build_bluetooth_deb.py'

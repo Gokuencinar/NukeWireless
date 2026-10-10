@@ -24,10 +24,13 @@ BASH = shutil.which("bash") if os.name != "nt" else next(
     (str(p) for p in [Path("C:/Program Files/Git/bin/bash.exe")] if p.exists()), None)
 
 
-def fixture(folder, scheme, worker):
+def fixture(folder, scheme, worker, legacy=False):
     prefix, inject, architecture, _ = unified.SCHEMES[scheme]
     package = unified.WORKER_PACKAGE if worker else unified.PACKAGE
-    version = unified.WORKER_VERSION if worker else unified.APP_VERSION
+    version = ("2.0.0~diagnostic1" if worker else "2.0.0~diagnostic6") if legacy else (unified.WORKER_VERSION if worker else unified.APP_VERSION)
+    app_dir = "Applications/HarpyReloaded.app/" if legacy else unified.APP
+    executable = "HarpyReloaded" if legacy else unified.EXECUTABLE
+    helpers = "usr/libexec/harpy-reloaded/" if legacy else unified.HELPERS
     path = folder / f"{package}_{version}_{architecture}.deb"
     control = (f"Package: {package}\nName: Fixture\nVersion: {version}\nArchitecture: {architecture}\n"
                "Maintainer: Test <test@example.invalid>\nDepends: firmware (>= 15.0), firmware (<< 19.0), ldid\nDescription: Fixture\n").encode()
@@ -45,9 +48,11 @@ def fixture(folder, scheme, worker):
                  prefix + "usr/share/nukewireless-roothide/compatibility.json":
                      json.dumps({"minimum_ios":"15.0", "maximum_ios_exclusive":"19.0", "runtime_verified":False}).encode(),
                  prefix + inject + "/NukeWirelessPaths.dylib": b"adapter",
-                 prefix + "usr/libexec/harpy-reloaded/nw-hotspot": b"hotspot",
-                 prefix + unified.APP + "Info.plist": plistlib.dumps({
-                     "CFBundleIdentifier": "me.midnightchips.harpy-reloaded", "CFBundleShortVersionString": version, "MinimumOSVersion":"15.0",
+                 prefix + helpers + "nw-hotspot": b"hotspot",
+                 prefix + helpers + "aegis": b"aegis",
+                 prefix + app_dir + executable: b"app-executable",
+                 prefix + app_dir + "Info.plist": plistlib.dumps({
+                     "CFBundleExecutable": executable, "CFBundleIdentifier": "me.midnightchips.harpy-reloaded", "CFBundleShortVersionString": version, "MinimumOSVersion":"15.0",
                      "NukeWirelessPackageScheme": scheme, "NukeWirelessWorkerVersion": unified.WORKER_VERSION})}
         controls.append(regular("prerm", b"#!/bin/sh\nexit 0\n", 0o755))
         report = {"core": {"sources": unified.source_hashes(), "binary_sha256": unified.sha(b"extension"),
@@ -56,7 +61,7 @@ def fixture(folder, scheme, worker):
     entries = unified.ordered_entries([regular(n, b, 0o755) for n, b in files.items()])
     # Reproduce the old app archive's root directory after bootstrap prefixing.
     # Bypass ordered_entries here intentionally: the unified builder must fix it.
-    if not worker:
+    if not worker and not legacy:
         entries.append(directory(prefix + "."))
     path.write_bytes(pack_ar([("debian-binary", b"2.0\n"), ("control.tar.gz", tar_bytes(controls)),
                              ("data.tar.gz", tar_bytes(entries))]))
@@ -165,13 +170,16 @@ class FixtureTests(unittest.TestCase):
           app, worker = fixture(self.folder, scheme, False), fixture(self.folder, scheme, True)
           combined = self.folder / (scheme + ".deb")
           unified.build(app, worker, combined, scheme)
-          for upgrade in (False, True):
-            root = self.folder / (scheme + ("-upgrade" if upgrade else "-fresh"))
+          for upgrade in ("fresh", "split-legacy", "unified-legacy"):
+            root = self.folder / (scheme + "-" + upgrade)
             (root / "var/lib/dpkg").mkdir(parents=True)
             (root / "var/lib/dpkg/status").touch()
             bootstrap = root / "var/jb/keep-bootstrap"
             bootstrap.parent.mkdir(parents=True, exist_ok=True)
             bootstrap.write_text("untouched", encoding="utf-8")
+            user_data = root / "var/mobile/Library/Preferences/me.midnightchips.harpy-reloaded.plist"
+            user_data.parent.mkdir(parents=True)
+            user_data.write_bytes(b"existing-user-data")
             log = root / "script-log"
             env = dict(os.environ, NW_TEST_LOG=str(log))
             def dpkg(*args):
@@ -179,10 +187,31 @@ class FixtureTests(unittest.TestCase):
                                          "--force-architecture", "--force-depends", *args],
                                         env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            if upgrade:
-                dpkg("--install", str(worker), str(app))
+            if upgrade != "fresh":
+                old_app = fixture(self.folder, scheme, False, legacy=True)
+                old_worker = fixture(self.folder, scheme, True, legacy=True)
+                if upgrade == "split-legacy":
+                    dpkg("--install", str(old_worker), str(old_app))
+                else:
+                    controls = unified.members(old_app.read_bytes(), "control.tar")
+                    fields = unified.fields(controls["control"][1])
+                    fields["Version"] += "+bundle3"
+                    controls["control"] = regular("control", ("\n".join(f"{k}: {v}" for k,v in fields.items())+"\n").encode())
+                    old_data = list(unified.members(old_app.read_bytes(), "data.tar").values())
+                    old_data += list(unified.members(old_worker.read_bytes(), "data.tar").values())
+                    old_combined = self.folder / (scheme+"-old-unified.deb")
+                    old_combined.write_bytes(pack_ar([("debian-binary", b"2.0\n"),
+                        ("control.tar.gz", tar_bytes(list(controls.values()))),
+                        ("data.tar.gz", tar_bytes(unified.ordered_entries(old_data)))]))
+                    dpkg("--install", str(old_combined))
+                self.assertTrue((root/prefix/"Applications/HarpyReloaded.app/HarpyReloaded").exists())
             log.write_text("", encoding="utf-8")
             dpkg("--install", str(combined))
+            self.assertTrue((root/prefix/unified.APP/unified.EXECUTABLE).exists())
+            self.assertTrue((root/prefix/unified.HELPERS/"aegis").exists())
+            self.assertFalse((root/prefix/"Applications/HarpyReloaded.app").exists())
+            self.assertFalse((root/prefix/"usr/libexec/harpy-reloaded").exists())
+            self.assertEqual(user_data.read_bytes(), b"existing-user-data")
             self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["worker", "app"])
             query = subprocess.check_output(["dpkg-query", "--admindir=" + str(root / "var/lib/dpkg"),
                                              "--show", "--showformat=${Version} ${Status}", unified.PACKAGE], text=True)
@@ -196,6 +225,7 @@ class FixtureTests(unittest.TestCase):
             self.assertFalse((root / prefix / "usr/bin/nwbt-run").exists())
             self.assertFalse((root / prefix / unified.APP / "Info.plist").exists())
             self.assertEqual(bootstrap.read_text(encoding="utf-8"), "untouched")
+            self.assertEqual(user_data.read_bytes(), b"existing-user-data")
 
     @unittest.skipUnless(sys.platform.startswith("linux") and shutil.which("dpkg") and os.geteuid() == 0,
                          "dpkg recovery requires isolated Linux CI as root")
@@ -295,6 +325,8 @@ class DeliveryTests(unittest.TestCase):
                 self.assertEqual(control["Version"], unified.VERSION)
                 self.assertNotIn("firmware",control["Depends"])
                 metadata = plistlib.loads(files[prefix+unified.APP+"Info.plist"][1])
+                self.assertFalse(any("harpy" in name.lower() for name in files))
+                self.assertEqual(metadata["CFBundleExecutable"], unified.EXECUTABLE)
                 self.assertNotIn("MinimumOSVersion",metadata)
                 original_metadata = plistlib.loads(app[2][prefix+unified.APP+"Info.plist"][1])
                 original_metadata.pop("MinimumOSVersion")

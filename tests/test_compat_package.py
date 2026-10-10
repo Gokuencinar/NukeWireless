@@ -76,8 +76,11 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual('rootless-compat' in control, scheme == 'roothide')
                 self.assertIn('firmware (>= 15.0), firmware (<< 19.0)', control)
                 info = plistlib.loads(files[prefix + app.APP + 'Info.plist'][1])
+                self.assertFalse(any('harpy' in name.lower() for name in files))
+                self.assertEqual(info['CFBundleExecutable'], app.EXECUTABLE)
+                self.assertIn(prefix + app.APP + app.EXECUTABLE, files)
                 self.assertEqual(info['CFBundleIdentifier'], 'me.midnightchips.harpy-reloaded')
-                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20006'))
+                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20007'))
                 self.assertEqual(info['CFBundleShortVersionString'], app.VERSION)
                 self.assertEqual(info['NukeWirelessPackageScheme'], scheme)
                 self.assertEqual(info['CFBundleDisplayName'], 'NukeWireless Dev')
@@ -87,9 +90,9 @@ class CandidateTests(unittest.TestCase):
                 self.assertIn('-Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"', script)
                 self.assertIn('ldid -S /' + prefix + inject + '/NukeWirelessInfo.dylib', script)
                 self.assertIn('chmod 4755 "$BASE/nw-hotspot"', script)
-                helper = files[prefix + 'usr/libexec/harpy-reloaded/nw-hotspot'][1]
+                helper = files[prefix + app.HELPERS + 'nw-hotspot'][1]
                 self.assertEqual(sha(helper), json.loads(self.apps[scheme].with_suffix('.manifest.json').read_text(encoding='utf-8'))['core']['hotspot_helper_sha256'])
-                self.assertIn((prefix + 'usr/libexec/harpy-reloaded/nw-hotspot clear').encode(), controls['prerm'][1])
+                self.assertIn((prefix + app.HELPERS + 'nw-hotspot clear').encode(), controls['prerm'][1])
                 self.assertEqual(any(name.endswith('.roothidepatch') for name in files), scheme == 'roothide')
                 self.assertFalse(any('HarpyRootHidePaths' in name for name in files))
                 self.assertIn(prefix + inject + '/NukeWirelessPaths.dylib', files)
@@ -108,7 +111,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-diagnostic6', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-diagnostic7', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],

@@ -10,21 +10,22 @@ import plistlib
 import tempfile
 from pathlib import Path
 from build_manifest import ROOT, sha
-from build_nuke_info_deb import build, read_tar, APP, EXPECTED_SOURCE_SHA256, hotspot_prerm
+from build_nuke_info_deb import build, read_tar, APP as BASE_APP, EXPECTED_SOURCE_SHA256, hotspot_prerm
 from compat_manifest import compat_sources
+from install_layout import APP, EXECUTABLE, HELPERS, rename_path
 from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 
-VERSION = "2.0.0~diagnostic6"
+VERSION = "2.0.0~diagnostic7"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
     return f'''#!/bin/sh
 set -e
 ENT={root}/usr/share/nukewireless-roothide/roothide.entitlements
-APP={root}/Applications/HarpyReloaded.app/HarpyReloaded
-BASE={root}/usr/libexec/harpy-reloaded
+APP={root}/{APP}{EXECUTABLE}
+BASE={root}/{HELPERS.rstrip("/")}
 ldid -Hsha256 -M -Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"
 for executable in "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
     ldid -Hsha256 -M "-S$ENT" "$executable"
@@ -37,7 +38,7 @@ chmod 4755 "$BASE/nw-hotspot"
 chown root:wheel "$BASE/aegis"
 chmod 6755 "$BASE/aegis"
 if command -v uicache >/dev/null 2>&1; then
-    uicache -p {root}/Applications/HarpyReloaded.app || true
+    uicache -p {root}/{APP.rstrip("/")} || true
 fi
 exit 0
 '''.encode()
@@ -53,10 +54,10 @@ def package(scheme, core, artifact, output):
     if (manifest["sources"] != compat_sources() or manifest["path_library_sha256"] != sha(paths)
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
-    metadata = plistlib.loads(original[APP + "Info.plist"])
-    metadata.update(CFBundleShortVersionString=VERSION, CFBundleVersion="20006", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
+    metadata = plistlib.loads(original[BASE_APP + "Info.plist"])
+    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20007", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
     replacement = {
-        APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
+        BASE_APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
         "usr/libexec/harpy-reloaded/aegis": compatible_aegis(original["usr/libexec/harpy-reloaded/aegis"]),
     }
@@ -72,6 +73,7 @@ def package(scheme, core, artifact, output):
             continue
         if name in replacement:
             data = replacement[name]
+        name = rename_path(name)
         if member.isfile() and data[:4] in (b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"):
             checks[name] = inspect(data)
         if name == "usr/lib/TweakInject" or name.startswith("usr/lib/TweakInject/"):
@@ -109,7 +111,7 @@ Description: NukeWireless iOS 15-18 development diagnostic edition ({label})
     output.mkdir(parents=True, exist_ok=True)
     destination = output / f"com.gokuencinar.nukewireless_{VERSION}_{architecture}.deb"
     destination.write_bytes(pack_ar([("debian-binary", b"2.0\n"),
-        ("control.tar.gz", tar_bytes([regular("control", control), regular("postinst", maintainer_script(prefix, inject), 0o755), regular("prerm", hotspot_prerm(prefix), 0o755)])),
+        ("control.tar.gz", tar_bytes([regular("control", control), regular("postinst", maintainer_script(prefix, inject), 0o755), regular("prerm", hotspot_prerm(prefix, HELPERS), 0o755)])),
         ("data.tar.gz", tar_bytes(ordered_entries(final)))]))
     report["package_sha256"] = sha(destination.read_bytes())
     destination.with_suffix(".manifest.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic6")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic7")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.

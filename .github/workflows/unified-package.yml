@@ -6,6 +6,8 @@ on:
     paths:
       - 'scripts/build_unified_deb.py'
       - 'scripts/compat_layout.py'
+      - 'scripts/install_layout.py'
+      - 'src/NWInstallLayout.h'
       - 'scripts/build_compat_debs.py'
       - 'scripts/repair_rootless_package_list.sh'
       - 'tests/test_unified_package.py'

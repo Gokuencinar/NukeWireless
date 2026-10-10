@@ -1,6 +1,7 @@
 // Bounded PF frontend. Does not load pf.conf, replace a ruleset, or flush states.
 // Only NukeWireless-labelled rules and the selected hotspot client's states change.
 #define PRIVATE 1
+#include "../NWInstallLayout.h"
 #include "vendor/pfvar.h"
 #undef PRIVATE
 #include <sys/ioctl.h>
@@ -35,11 +36,11 @@ static int authorized(const char *executable) {
     // Same libproc signature already verified by the Bluetooth runner.
     int (*pidpath)(int, void *, uint32_t) = dlsym(RTLD_DEFAULT, "proc_pidpath");
     if (!pidpath || !realpath(executable, self) || pidpath(getppid(), parent, sizeof(parent)) <= 0) return 0;
-    const char *suffix = "/usr/libexec/harpy-reloaded/nw-hotspot";
+    const char *suffix = NWInstalledHelperDirectory "nw-hotspot";
     size_t root = strlen(self), tail = strlen(suffix);
     if (root < tail || strcmp(self + root - tail, suffix)) return 0;
     root -= tail;
-    if (snprintf(expected, sizeof(expected), "%.*s/Applications/HarpyReloaded.app/HarpyReloaded", (int)root, self) >= (int)sizeof(expected)) return 0;
+    if (snprintf(expected, sizeof(expected), "%.*s" NWInstalledAppSuffix, (int)root, self) >= (int)sizeof(expected)) return 0;
     char resolved[PATH_MAX]; return realpath(expected, resolved) && !strcmp(parent, resolved);
 }
 static int parse_mac(const char *text, unsigned char bytes[6], char canonical[18]) {

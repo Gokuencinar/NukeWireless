@@ -2,6 +2,7 @@
 #import "NWDiagnosticReport.h"
 #import "NWBuild.h"
 #import "NWLegacyABI.h"
+#import "NWInstallLayout.h"
 #import "NWResources.h"
 #import "NWAppearance.h"
 #import "NWScanBridge.h"
@@ -39,7 +40,7 @@ static NSDictionary *environment(void) {
     NSMutableArray *images = [NSMutableArray new];
     for (uint32_t i = 0; i < _dyld_image_count() && images.count < 16; ++i) {
         NSString *path = [NSString stringWithUTF8String:_dyld_get_image_name(i) ?: ""];
-        if (![path.lastPathComponent hasPrefix:@"NukeWireless"] && ![path.lastPathComponent isEqual:@NWLegacyExecutable]) continue;
+        if (![path.lastPathComponent hasPrefix:@"NukeWireless"] && ![path.lastPathComponent isEqual:@NWInstalledExecutable]) continue;
         const struct mach_header_64 *header = (const void *)_dyld_get_image_header(i);
         if (!header || header->magic != MH_MAGIC_64 || header->sizeofcmds > 1024 * 1024) continue;
         const uint8_t *cursor = (const void *)(header + 1), *end = cursor + header->sizeofcmds;
