@@ -21,7 +21,7 @@ from package_utils import get_tar_member, pack_ar, regular, read_ar, tar_bytes
 PACKAGE = "com.gokuencinar.nukewireless"
 WORKER_PACKAGE = PACKAGE + ".bluetooth"
 VERSION = APP_VERSION + "+bundle2"
-INSTALLATION_POLICY = {"minimum_ios": "15.0", "maximum_ios_exclusive": None,
+INSTALLATION_POLICY = {"minimum_ios": None, "maximum_ios_exclusive": None, "binary_minimum_ios": "15.0",
                        "scope": "installer-only", "runtime_checks_unchanged": True}
 PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py"]
 
@@ -85,7 +85,7 @@ def build(app_path, worker_path, output, scheme):
     if (info["NukeWirelessPackageScheme"] != scheme
             or info["CFBundleShortVersionString"] != APP_VERSION
             or info["NukeWirelessWorkerVersion"] != WORKER_VERSION
-            or info.get("MinimumOSVersion") != INSTALLATION_POLICY["minimum_ios"]
+            or info.get("MinimumOSVersion") != INSTALLATION_POLICY["binary_minimum_ios"]
             or info["CFBundleIdentifier"] != "me.midnightchips.harpy-reloaded"):
         raise ValueError("app metadata mismatch")
     if (sha(app_data[prefix + inject + "/NukeWirelessInfo.dylib"][1]) != app_report["core"]["binary_sha256"]
@@ -101,17 +101,17 @@ def build(app_path, worker_path, output, scheme):
     for field in ("Conflicts", "Replaces"):
         control[field] = ", ".join(filter(None, [control.get(field), WORKER_PACKAGE]))
     control["Provides"] = f"{WORKER_PACKAGE} (= {WORKER_VERSION})"
-    # Retain both dependency sets, except the old installer-only upper iOS cap.
+    # Retain both dependency sets, except the old installer-only iOS bounds.
     # Private Bluetooth transport admission remains in the unchanged binaries.
     for field in ("Depends", "Pre-Depends"):
         dependencies = list(dict.fromkeys(
             item.strip() for value in (control.get(field, ""), worker_info.get(field, ""))
-            for item in value.split(",") if item.strip() and item.strip() != "firmware (<< 19.0)"))
+            for item in value.split(",") if item.strip() and item.strip() not in {"firmware (>= 15.0)", "firmware (<< 19.0)"}))
         if dependencies:
             control[field] = ", ".join(dependencies)
     firmware = [item for item in control["Depends"].split(", ") if item.startswith("firmware")]
-    if firmware != ["firmware (>= 15.0)"]:
-        raise ValueError("unexpected firmware policy; preserve the real binary minimum")
+    if firmware:
+        raise ValueError("unexpected firmware policy")
     control["Description"] = f"NukeWireless development diagnostic edition ({SCHEMES[scheme][3]}); includes Bluetooth worker"
     merged = list(app_data.values()) + list(worker_data.values())
     # Correct the standalone worker removal instruction now that it is bundled.
@@ -122,6 +122,10 @@ def build(app_path, worker_path, output, scheme):
         raise ValueError("unexpected worker removal instruction")
     merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != readme]
     merged.append(regular(readme, previous.replace(old, f"dpkg -r {PACKAGE}".encode())))
+    info_path = prefix + APP + "Info.plist"
+    info.pop("MinimumOSVersion")
+    merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != info_path]
+    merged.append(regular(info_path, plistlib.dumps(info, fmt=plistlib.FMT_BINARY)))
     status_path = prefix + "usr/share/nukewireless-roothide/compatibility.json"
     status = json.loads(app_data[status_path][1].decode("utf-8"))
     if status.get("minimum_ios") != "15.0" or status.get("maximum_ios_exclusive") != "19.0":
@@ -148,7 +152,7 @@ def build(app_path, worker_path, output, scheme):
                                ("data.tar.gz", tar_bytes(ordered_entries(merged)))]))
     report = dict(provenance, package_sha256=sha(output.read_bytes()), architecture=architecture,
                   components={"app": app_report, "bluetooth": worker_report},
-                  changed_payload_files=[readme, status_path], runtime_verified=False)
+                  changed_payload_files=[readme, info_path, status_path], runtime_verified=False)
     output.with_suffix(".manifest.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return report
 

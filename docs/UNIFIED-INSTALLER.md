@@ -11,16 +11,19 @@ El empaquetador conserva los binarios y permisos de sus dos DEB de entrada;
 no equivale a conservar los binarios de diagnostic5. Las fuentes nativas de
 esta entrega son `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
 
-## Revisión bundle2: instalación sin tope máximo
+## Revisión bundle2: instalación sin límites de versión
 
-Elimina únicamente `firmware (<< 19.0)` de las dependencias combinadas del
-instalador. Conserva `firmware (>= 15.0)`, `MinimumOSVersion=15.0`, todas las
-otras dependencias y los controles del transporte Bluetooth. No altera los
-Mach-O, los permisos, las firmas ni el código del catálogo. Instalar en una
-versión posterior no demuestra que las funciones privadas sean compatibles.
+Elimina `firmware (>= 15.0)` y `firmware (<< 19.0)` de las dependencias combinadas
+del instalador, y retira `MinimumOSVersion` del Info.plist de la app. Conserva
+todas las otras dependencias y los controles del transporte Bluetooth. No altera
+los Mach-O, los permisos ni el código del catálogo; el postinst conserva la misma
+firma con el identificador original. El mínimo compilado de los binarios sigue
+siendo iOS 15.0. Instalar fuera del rango probado no demuestra que se pueda abrir
+la app ni que sus funciones sean compatibles.
 
 Se actualiza `compatibility.json` con `maximum_ios_exclusive: null` y una
-`installation_policy` que identifica el alcance del cambio. El manifiesto del
+`installation_policy` que identifica el alcance del cambio. La política
+distingue `minimum_ios: null` de `binary_minimum_ios: "15.0"`. El manifiesto del
 DEB distingue el commit/hash del empaquetador de los del código nativo y conserva
 la procedencia íntegra de ambos paquetes de entrada. Sus fuentes se vuelven a
 comprobar; no se modifican sus manifiestos para aceptar artefactos obsoletos.
@@ -31,7 +34,7 @@ corresponde a bundle1 en el iPhone XS con iOS 16.3.1, no a sistemas posteriores.
 ## Instalación y actualización
 
 Cerrar la app antes de instalar. Elegir un único paquete del bootstrap correcto.
-Se mantienen las dependencias de los dos paquetes; el DEB no incluye el jailbreak,
+Se mantienen las otras dependencias de los dos paquetes; el DEB no incluye el jailbreak,
 ldid, el motor de inyección ni otras dependencias del sistema.
 
 El paquete conserva `com.gokuencinar.nukewireless` y declara `Conflicts`, `Replaces`
@@ -48,7 +51,7 @@ propagado; el `exit 0` de uno no puede omitir el otro. Se conservan las firmas y
 permisos existentes, incluido `nwbt-run` con 4755. El prerm original de la app
 conserva la limpieza PF. Bundle1 cambiaba la instrucción de desinstalación del
 README del trabajador; bundle2 actualiza también el estado JSON de la política
-de instalación.
+de instalación y retira el mínimo declarado del Info.plist.
 
 Desinstalar `com.gokuencinar.nukewireless` retira también el componente Bluetooth.
 Para recuperar la distribución anterior: cerrar la app, retirar el paquete único

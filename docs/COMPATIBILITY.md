@@ -12,8 +12,9 @@ dispositivos adicionales. Las entregas anteriores conservan sus informes;
 no reutilizar artefactos antiguos para estas fuentes.
 
 En compat4, el mínimo de build 15.0 y la dependencia `< 19.0` delimitaban el rango experimental.
-El instalador actual bundle2 elimina ese tope máximo, conservando el mínimo
-técnico iOS 15.0 y las comprobaciones en ejecución; no amplía la evidencia física.
+El instalador actual bundle2 elimina los límites de firmware y del Info.plist,
+conservando el mínimo compilado iOS 15.0 y las comprobaciones en ejecución;
+no amplía la evidencia física ni acredita apertura en sistemas anteriores.
 La emisión ya admite sistemas que cumplan el contrato Skywalk observado, sin
 whitelist XS/16.3.1. Esto no acredita funcionamiento en cada chip o versión menor.
 Véase [port y fuentes primarias de ABI](BLUETOOTH-SKYWALK-PORT.md).

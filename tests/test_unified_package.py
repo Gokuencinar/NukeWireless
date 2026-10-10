@@ -68,29 +68,34 @@ class FixtureTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_installer_removes_only_upper_firmware_limit(self):
+    def test_installer_removes_only_firmware_limits(self):
         for scheme in unified.SCHEMES:
             with self.subTest(scheme=scheme):
                 app, worker = fixture(self.folder, scheme, False), fixture(self.folder, scheme, True)
                 output = self.folder/(scheme+".deb")
                 unified.build(app, worker, output, scheme)
                 control = unified.fields(unified.members(output.read_bytes(), "control.tar")["control"][1])
-                self.assertEqual(control["Depends"], "firmware (>= 15.0), ldid")
+                self.assertEqual(control["Depends"], "ldid")
+                prefix = unified.SCHEMES[scheme][0]
+                files = unified.members(output.read_bytes(), "data.tar")
+                self.assertNotIn("MinimumOSVersion", plistlib.loads(files[prefix+unified.APP+"Info.plist"][1]))
                 report = json.loads(output.with_suffix('.manifest.json').read_text(encoding='utf-8'))
                 self.assertIsNone(report["installation_policy"]["maximum_ios_exclusive"])
+                self.assertIsNone(report["installation_policy"]["minimum_ios"])
+                self.assertEqual(report["installation_policy"]["binary_minimum_ios"],"15.0")
                 self.assertFalse(report["native_payload_changed"])
 
     @unittest.skipUnless(shutil.which("dpkg") and os.geteuid() == 0 if os.name != "nt" else False,
                          "requires Linux dpkg as root")
-    def test_install_with_newer_firmware_without_ignoring_dependencies(self):
+    def test_install_without_firmware_provider_or_ignoring_dependencies(self):
         app, worker = fixture(self.folder, "rootful", False), fixture(self.folder, "rootful", True)
         combined = self.folder/"unified.deb"
         unified.build(app, worker, combined, "rootful")
-        root = self.folder/"newer-ios"
+        root = self.folder/"no-firmware-provider"
         (root/"var/lib/dpkg").mkdir(parents=True)
         (root/"var/lib/dpkg/status").touch()
         dependencies = []
-        for name, version in [("firmware","19.0"), ("ldid","1.0")]:
+        for name, version in [("ldid","1.0")]:
             path = self.folder/(name+".deb")
             control = f"Package: {name}\nVersion: {version}\nArchitecture: all\nMaintainer: Test <test@example.invalid>\nDescription: Fixture\n".encode()
             path.write_bytes(pack_ar([("debian-binary",b"2.0\n"),
@@ -186,6 +191,10 @@ class DeliveryTests(unittest.TestCase):
                 self.assertFalse(report["native_payload_changed"])
                 self.assertFalse(report["unified_installation_verified"])
                 self.assertEqual(report["components"], {"app": app[1], "bluetooth": worker[1]})
+                self.assertEqual(set(report["changed_payload_files"]), {
+                    prefix+"usr/share/nukewireless-bluetooth/README.txt",
+                    prefix+unified.APP+"Info.plist",
+                    prefix+"usr/share/nukewireless-roothide/compatibility.json"})
                 for original in (app[2], worker[2]):
                     for name, (member, data) in original.items():
                         actual, content = files[name]
@@ -199,10 +208,12 @@ class DeliveryTests(unittest.TestCase):
                 self.assertEqual(postinst.count(worker[3]["postinst"][1]), 1)
                 control = unified.fields(scripts["control"][1])
                 self.assertEqual(control["Version"], unified.VERSION)
-                self.assertIn("firmware (>= 15.0)",control["Depends"])
-                self.assertNotIn("firmware (<<",control["Depends"])
+                self.assertNotIn("firmware",control["Depends"])
                 metadata = plistlib.loads(files[prefix+unified.APP+"Info.plist"][1])
-                self.assertEqual(metadata["MinimumOSVersion"], "15.0")
+                self.assertNotIn("MinimumOSVersion",metadata)
+                original_metadata = plistlib.loads(app[2][prefix+unified.APP+"Info.plist"][1])
+                original_metadata.pop("MinimumOSVersion")
+                self.assertEqual(metadata,original_metadata)
                 status_path = prefix+"usr/share/nukewireless-roothide/compatibility.json"
                 status = json.loads(files[status_path][1])
                 original_status = json.loads(app[2][status_path][1])
@@ -215,7 +226,7 @@ class DeliveryTests(unittest.TestCase):
                 for old in (app[4], worker[4]):
                     for field in ("Depends", "Pre-Depends"):
                         for dependency in old.get(field, "").split(", "):
-                            if dependency and dependency != "firmware (<< 19.0)":
+                            if dependency and dependency not in {"firmware (>= 15.0)","firmware (<< 19.0)"}:
                                 self.assertIn(dependency, control[field].split(", "))
                 seen = set()
                 for member, _ in unified.read_tar(unified.get_tar_member(unified.read_ar(raw), "data.tar")):

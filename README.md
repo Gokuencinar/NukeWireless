@@ -4,9 +4,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**2.0.0~diagnostic6+bundle2: revisión del instalador sin límite máximo de iOS.**
-Retira `firmware (<< 19.0)` del DEB unificado de las tres variantes y conserva
-el mínimo real iOS 15.0, los binarios de diagnostic6/Bluetooth diagnostic1 y
+**2.0.0~diagnostic6+bundle2: revisión del instalador sin límites de iOS.**
+Retira las dependencias `firmware` y `MinimumOSVersion` del DEB unificado de
+las tres variantes. Conserva el mínimo compilado real iOS 15.0, los binarios de diagnostic6/Bluetooth diagnostic1 y
 las comprobaciones de compatibilidad en ejecución. No acredita funcionamiento
 en sistemas nuevos ni corrige el crash externo del catálogo aún sin informe.
 Validación del paquete y de la migración dpkg pendiente de esta entrega.
