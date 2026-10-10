@@ -13,8 +13,18 @@ hashes, permisos y dependencias se mantienen.
 
 Cerrar Sileo/Zebra y NukeWireless. Copiar al iPhone el archivo
 [`repair_rootless_package_list.sh`](../scripts/repair_rootless_package_list.sh).
-En una terminal del iPhone, entrar como root y ejecutarlo mediante `sh`, indicando
-la ruta real donde se haya guardado. No usar una contraseña de otro dispositivo.
+En una terminal del iPhone, ejecutarlo con `sudo sh`, indicando la ruta real
+donde se haya guardado. Si está en Documents:
+
+```sh
+sudo sh /var/mobile/Documents/repair_rootless_package_list.sh
+```
+
+Introducir la contraseña de `mobile`, configurada en Dopamine. No hace falta
+entrar mediante `su`: ese comando pide la contraseña independiente de `root`.
+La propia [interfaz de Dopamine 2.4.4](https://github.com/opa334/Dopamine/blob/2.4.4/Application/Dopamine/en.lproj/Localizable.strings#L75)
+explica que su opción cambia `mobile` y que esa contraseña se usa con `sudo`.
+Al escribirla no se muestran caracteres; es normal.
 
 El script comprueba el paquete y su versión, hace una copia de seguridad y
 elimina **solo la línea exacta `/var/jb/.`** de su registro `.list`. Conserva las
