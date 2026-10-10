@@ -5,10 +5,10 @@
 #include <string.h>
 
 /* Darwin routing socket wire layout, from hotspot/vendor/net/route.h (Apple
- * XNU): rt_msghdr is 96 bytes on arm64; sockaddr records use 4-byte rounding.
+ * XNU): rt_msghdr is 92 bytes on arm64; sockaddr records use 4-byte rounding.
  * Neither size follows sizeof(long). No socket operations or packet emission.
  */
-#define NW_ROUTE_HEADER_SIZE 96u
+#define NW_ROUTE_HEADER_SIZE 92u
 static inline int NWRouteFindIPv4MAC(const void *buffer, size_t size,
                                      const uint8_t ip[4], unsigned interface_index,
                                      uint8_t result[6]) {

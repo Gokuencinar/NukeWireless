@@ -16,6 +16,8 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 _Static_assert(sizeof(struct rt_msghdr) == NW_ROUTE_HEADER_SIZE, "Darwin route ABI mismatch");
+_Static_assert(offsetof(struct rt_msghdr, rtm_index) == 4, "Darwin route index mismatch");
+_Static_assert(offsetof(struct rt_msghdr, rtm_addrs) == 12, "Darwin route addresses mismatch");
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

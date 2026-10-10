@@ -15,7 +15,7 @@ cuando la cabecera Apple fijada emplea campos de 32 bits. El parser saltaba una
 cabecera incorrecta y redondeaba sockaddr a ocho bytes en lugar de cuatro.
 El adaptador usa ahora la cabecera Apple ya incluida con el helper de punto de
 acceso y comprueba su tamaño al compilar. `NWRouteNeighbors.h` procesa el formato
-de 96 bytes, exige coincidencia de IP e interfaz y rechaza registros truncados,
+de 92 bytes, exige coincidencia de IP e interfaz y rechaza registros truncados,
 MAC inválida o identidades ambiguas. No amplía el barrido ni emite paquetes.
 
 La prueba C cubre alineación de cuatro bytes, otra IP/interfaz, tabla truncada,
