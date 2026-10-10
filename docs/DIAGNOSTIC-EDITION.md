@@ -1,4 +1,4 @@
-# NukeWireless Dev · 2.0.0~diagnostic7
+# NukeWireless Dev · 2.0.0~diagnostic8
 
 Edición de desarrollo para recoger evidencia de compatibilidad en iOS 15–18.
 Se generan paquetes separados para RootHide, rootless y rootful. Compartir una
@@ -6,9 +6,10 @@ compilación no constituye una verificación en todos esos entornos.
 
 ## Uso por los testers
 
-1. Cerrar NukeWireless e instalar **un único DEB** `2.0.0~diagnostic7+bundle1`
+1. Cerrar NukeWireless e instalar **un único DEB** `2.0.0~diagnostic8+bundle1`
    de la variante correcta: RootHide, Dopamine/rootless o rootful. Incluye la app
-   diagnostic7 y el trabajador Bluetooth diagnostic2. Diagnostic7 renombra las
+   diagnostic8 y el trabajador Bluetooth diagnostic2. Diagnostic8 integra la
+   [interfaz obligatoria](EMBEDDED-UI-DIAGNOSTIC8.md) dentro de la app. Diagnostic7 renombra las
    [rutas instaladas](INSTALL-LAYOUT-DIAGNOSTIC7.md); su validación física está
    pendiente. Conserva el arreglo de diagnostic6, que corrige la
    lectura de identidad del router; el usuario confirmó bloqueo y desbloqueo

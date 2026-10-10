@@ -15,6 +15,7 @@
 #import "NWMainTabs.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <mach-o/dyld.h>
 #import <arpa/inet.h>
 #import <ifaddrs.h>
 #import <net/if.h>
@@ -695,12 +696,15 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic7 extension loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic8 embedded UI loaded");
+    // Both are mandatory app dependencies. Initialize our adapter exactly once
+    // before wrapping its methods, regardless of dyld constructor order.
+    void (*initializeAdapter)(void) = dlsym(RTLD_DEFAULT, "NWBootstrapInitialize");
+    if (initializeAdapter) initializeAdapter();
     NWInstallLanguageHooks();
     NWInstallDeviceActionPresentation();
     NWDiagnosticsInstall();
     NWInstallScanHooks();
-    // Install UI and task wrappers after both legacy dylib constructors.
     dispatch_async(dispatch_get_main_queue(), ^{
         actions = [NWActions new];
         [NSNotificationCenter.defaultCenter addObserver:actions selector:@selector(tabReselected:) name:NWMainTabReselected object:nil];
@@ -791,6 +795,14 @@ int NWUIRegressionCheck(int phase) {
     UITabBarController *tab = activeTab;
     if (!tab || tab.viewControllers.count != 3) return 1;
     if (phase == 0) {
+        extern int NWEmbeddedStartupUIRegression(void);
+        if (NWEmbeddedStartupUIRegression() || ![NSBundle.mainBundle.infoDictionary[@"NukeWirelessUIIntegration"] isEqual:@"embedded-required-v1"]) return 19;
+        unsigned copies = 0;
+        for (uint32_t i = 0; i < _dyld_image_count(); ++i) {
+            NSString *path = [NSString stringWithUTF8String:_dyld_get_image_name(i) ?: ""];
+            if ([path.lastPathComponent isEqual:@"NukeWirelessInfo.dylib"]) ++copies;
+        }
+        if (copies != 1) return 20;
         hosts = [tab.viewControllers copy];
         UINavigationItem *item = [UINavigationItem new];
         item.title = @NWLegacyTitleShort;

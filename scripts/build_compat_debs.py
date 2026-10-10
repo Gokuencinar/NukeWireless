@@ -16,8 +16,9 @@ from install_layout import APP, EXECUTABLE, HELPERS, rename_path
 from compat_macho import compatible_aegis, inspect, thin_arm64
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
+from embedded_ui import embed_ui, LIBRARIES, LOADS
 
-VERSION = "2.0.0~diagnostic7"
+VERSION = "2.0.0~diagnostic8"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -26,12 +27,13 @@ set -e
 ENT={root}/usr/share/nukewireless-roothide/roothide.entitlements
 APP={root}/{APP}{EXECUTABLE}
 BASE={root}/{HELPERS.rstrip("/")}
+for library in "${{APP%/*}}"/Frameworks/NukeWirelessPaths.dylib "${{APP%/*}}"/Frameworks/NukeWirelessInfo.dylib; do
+    ldid -S "$library"
+done
 ldid -Hsha256 -M -Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"
 for executable in "$BASE/aegis" "$BASE/arp-scan" "$BASE/arpspoof"; do
     ldid -Hsha256 -M "-S$ENT" "$executable"
 done
-ldid -S {root}/{inject}/NukeWirelessPaths.dylib
-ldid -S {root}/{inject}/NukeWirelessInfo.dylib
 ldid -Hsha256 -S{root}/usr/share/nukewireless-roothide/hotspot.entitlements "$BASE/nw-hotspot"
 chown root:wheel "$BASE/nw-hotspot"
 chmod 4755 "$BASE/nw-hotspot"
@@ -55,10 +57,10 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[BASE_APP + "Info.plist"])
-    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20007", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0")
+    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20008", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0", NukeWirelessUIIntegration="embedded-required-v1")
     replacement = {
         BASE_APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
-        "usr/lib/TweakInject/NukeWirelessPaths.dylib": paths,
+        BASE_APP + "HarpyReloaded": embed_ui(original[BASE_APP + "HarpyReloaded"]),
         "usr/libexec/harpy-reloaded/aegis": compatible_aegis(original["usr/libexec/harpy-reloaded/aegis"]),
     }
     for name in ["arp-scan", "arpspoof"]:
@@ -69,18 +71,26 @@ def package(scheme, core, artifact, output):
         name = member.name.removeprefix("./").strip("/")
         if name in ("", ".") or name.startswith(("usr/lib/TweakInject/HarpyRootHidePaths", "usr/share/harpy-reloaded-roothide")):
             continue
+        # The app loads these itself. Never leave an injected second copy that
+        # could install the same hooks twice or restore the injection dependency.
+        if name == "usr/lib/TweakInject" or name.startswith(("usr/lib/TweakInject/NukeWirelessPaths", "usr/lib/TweakInject/NukeWirelessInfo")):
+            continue
         if scheme != "roothide" and name.endswith(".roothidepatch"):
             continue
         if name in replacement:
             data = replacement[name]
         name = rename_path(name)
         if member.isfile() and data[:4] in (b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"):
-            checks[name] = inspect(data)
+            checks[name] = inspect(data, embedded=(name == APP + EXECUTABLE))
         if name == "usr/lib/TweakInject" or name.startswith("usr/lib/TweakInject/"):
             name = inject + name[len("usr/lib/TweakInject"):]
         member = copy.copy(member); member.name = "./" + prefix + name
         if member.isfile(): member.size = len(data)
         final.append((member, data))
+    for library, data in zip(LIBRARIES, (paths, original["usr/lib/TweakInject/NukeWirelessInfo.dylib"])):
+        name = APP + "Frameworks/" + library
+        checks[name] = inspect(data)
+        final.append(regular(prefix + name, data, 0o755))
     # Explicit status included with every candidate; no unsupported validation claim.
     report = {"version": VERSION, "scheme": scheme, "bootstrap": label,
               "architecture": architecture, "minimum_ios": "15.0", "maximum_ios_exclusive": "19.0",
@@ -90,6 +100,8 @@ def package(scheme, core, artifact, output):
               "bluetooth_native_admission_policy": "skywalk-runtime-contract-v1",
               "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
+              "ui_integration": {"mode": "embedded-required-v1", "mandatory_loads": list(LOADS),
+                                 "executable_sha256": sha(replacement[BASE_APP + "HarpyReloaded"])},
               "core": core_manifest, "baseline_sha256": EXPECTED_SOURCE_SHA256,
               "development_core_sha256": sha(core)}
     status_path = prefix + "usr/share/nukewireless-roothide/compatibility.json"
@@ -121,7 +133,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic7")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic8")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.

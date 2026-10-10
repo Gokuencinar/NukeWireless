@@ -44,7 +44,8 @@ static NSDictionary *environment(void) {
         const struct mach_header_64 *header = (const void *)_dyld_get_image_header(i);
         if (!header || header->magic != MH_MAGIC_64 || header->sizeofcmds > 1024 * 1024) continue;
         const uint8_t *cursor = (const void *)(header + 1), *end = cursor + header->sizeofcmds;
-        NSMutableDictionary *image = [@{@"name": path.lastPathComponent, @"cpu_type": @(header->cputype), @"cpu_subtype": @(header->cpusubtype)} mutableCopy];
+        NSMutableDictionary *image = [@{@"name": path.lastPathComponent, @"cpu_type": @(header->cputype), @"cpu_subtype": @(header->cpusubtype),
+            @"embedded_in_app": @([path hasPrefix:[NSBundle.mainBundle.bundlePath stringByAppendingString:@"/Frameworks/"]])} mutableCopy];
         for (uint32_t c = 0; c < header->ncmds && cursor + sizeof(struct load_command) <= end; ++c) {
             const struct load_command *command = (const void *)cursor;
             if (command->cmdsize < sizeof *command || command->cmdsize > (uintptr_t)(end - cursor)) break;
@@ -63,6 +64,7 @@ static NSDictionary *environment(void) {
         @"bundle_id": NSBundle.mainBundle.bundleIdentifier ?: @"unknown", @"package_version": info[@"CFBundleShortVersionString"] ?: NW_BUILD_VERSION,
         @"bundle_version": info[@"CFBundleVersion"] ?: @"unknown", @"package_scheme": info[@"NukeWirelessPackageScheme"] ?: @"unknown",
         @"source_commit": info[@"NukeWirelessSourceCommit"] ?: @"unknown", @"expected_worker": info[@"NukeWirelessWorkerVersion"] ?: @"unknown",
+        @"ui_integration": info[@"NukeWirelessUIIntegration"] ?: @"external-injection",
         @"rootless_prefix_present": @([NSFileManager.defaultManager fileExistsAtPath:@"/var/jb"]),
         @"interfaces_without_addresses": interfaces, @"loaded_product_images": images,
         @"symbol_presence": @{@"MSHookFunction": @(dlsym(RTLD_DEFAULT, "MSHookFunction") != NULL)},

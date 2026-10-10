@@ -24,10 +24,12 @@ BASH = shutil.which("bash") if os.name != "nt" else next(
     (str(p) for p in [Path("C:/Program Files/Git/bin/bash.exe")] if p.exists()), None)
 
 
-def fixture(folder, scheme, worker, legacy=False):
+def fixture(folder, scheme, worker, legacy=False, injected=False):
     prefix, inject, architecture, _ = unified.SCHEMES[scheme]
     package = unified.WORKER_PACKAGE if worker else unified.PACKAGE
     version = ("2.0.0~diagnostic1" if worker else "2.0.0~diagnostic6") if legacy else (unified.WORKER_VERSION if worker else unified.APP_VERSION)
+    if injected:
+        version = "2.0.0~diagnostic2" if worker else "2.0.0~diagnostic7"
     app_dir = "Applications/HarpyReloaded.app/" if legacy else unified.APP
     executable = "HarpyReloaded" if legacy else unified.EXECUTABLE
     helpers = "usr/libexec/harpy-reloaded/" if legacy else unified.HELPERS
@@ -44,20 +46,28 @@ def fixture(folder, scheme, worker, legacy=False):
         report = {"sources": unified.bluetooth_sources(),
                   "files": {PurePosixPath(n).name: unified.sha(b) for n, b in files.items() if not n.endswith(".txt")}}
     else:
-        files = {prefix + inject + "/NukeWirelessInfo.dylib": b"extension",
+        from test_embedded_ui import fixture_executable
+        executable_data = fixture_executable()
+        libraries = prefix + inject + "/" if legacy or injected else prefix + app_dir + "Frameworks/"
+        files = {libraries + "NukeWirelessInfo.dylib": b"extension",
                  prefix + "usr/share/nukewireless-roothide/compatibility.json":
                      json.dumps({"minimum_ios":"15.0", "maximum_ios_exclusive":"19.0", "runtime_verified":False}).encode(),
-                 prefix + inject + "/NukeWirelessPaths.dylib": b"adapter",
+                 libraries + "NukeWirelessPaths.dylib": b"adapter",
                  prefix + helpers + "nw-hotspot": b"hotspot",
                  prefix + helpers + "aegis": b"aegis",
-                 prefix + app_dir + executable: b"app-executable",
+                 prefix + app_dir + executable: executable_data,
                  prefix + app_dir + "Info.plist": plistlib.dumps({
                      "CFBundleExecutable": executable, "CFBundleIdentifier": "me.midnightchips.harpy-reloaded", "CFBundleShortVersionString": version, "MinimumOSVersion":"15.0",
-                     "NukeWirelessPackageScheme": scheme, "NukeWirelessWorkerVersion": unified.WORKER_VERSION})}
+                     "NukeWirelessPackageScheme": scheme, "NukeWirelessWorkerVersion": unified.WORKER_VERSION,
+                     "NukeWirelessUIIntegration": "embedded-required-v1"})}
+        if legacy or injected:
+            for name in ("NukeWirelessInfo", "NukeWirelessPaths"):
+                files[libraries + name + ".plist"] = plistlib.dumps({"Filter": {"Bundles": ["me.midnightchips.harpy-reloaded"]}})
         controls.append(regular("prerm", b"#!/bin/sh\nexit 0\n", 0o755))
         report = {"core": {"sources": unified.source_hashes(), "binary_sha256": unified.sha(b"extension"),
                            "hotspot_helper_sha256": unified.sha(b"hotspot"), "source_commit": "fixture"},
-                  "adapter": {"sources": unified.compat_sources(), "path_library_sha256": unified.sha(b"adapter")}}
+                  "adapter": {"sources": unified.compat_sources(), "path_library_sha256": unified.sha(b"adapter")},
+                  "ui_integration": {"executable_sha256": unified.sha(executable_data)}}
     entries = unified.ordered_entries([regular(n, b, 0o755) for n, b in files.items()])
     # Reproduce the old app archive's root directory after bootstrap prefixing.
     # Bypass ordered_entries here intentionally: the unified builder must fix it.
@@ -170,7 +180,7 @@ class FixtureTests(unittest.TestCase):
           app, worker = fixture(self.folder, scheme, False), fixture(self.folder, scheme, True)
           combined = self.folder / (scheme + ".deb")
           unified.build(app, worker, combined, scheme)
-          for upgrade in ("fresh", "split-legacy", "unified-legacy"):
+          for upgrade in ("fresh", "split-legacy", "unified-legacy", "unified-injected"):
             root = self.folder / (scheme + "-" + upgrade)
             (root / "var/lib/dpkg").mkdir(parents=True)
             (root / "var/lib/dpkg/status").touch()
@@ -188,8 +198,8 @@ class FixtureTests(unittest.TestCase):
                                         env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             if upgrade != "fresh":
-                old_app = fixture(self.folder, scheme, False, legacy=True)
-                old_worker = fixture(self.folder, scheme, True, legacy=True)
+                old_app = fixture(self.folder, scheme, False, legacy=upgrade != "unified-injected", injected=upgrade == "unified-injected")
+                old_worker = fixture(self.folder, scheme, True, legacy=upgrade != "unified-injected", injected=upgrade == "unified-injected")
                 if upgrade == "split-legacy":
                     dpkg("--install", str(old_worker), str(old_app))
                 else:
@@ -204,13 +214,20 @@ class FixtureTests(unittest.TestCase):
                         ("control.tar.gz", tar_bytes(list(controls.values()))),
                         ("data.tar.gz", tar_bytes(unified.ordered_entries(old_data)))]))
                     dpkg("--install", str(old_combined))
-                self.assertTrue((root/prefix/"Applications/HarpyReloaded.app/HarpyReloaded").exists())
+                previous_app = unified.APP + unified.EXECUTABLE if upgrade == "unified-injected" else "Applications/HarpyReloaded.app/HarpyReloaded"
+                self.assertTrue((root/prefix/previous_app).exists())
             log.write_text("", encoding="utf-8")
             dpkg("--install", str(combined))
             self.assertTrue((root/prefix/unified.APP/unified.EXECUTABLE).exists())
             self.assertTrue((root/prefix/unified.HELPERS/"aegis").exists())
             self.assertFalse((root/prefix/"Applications/HarpyReloaded.app").exists())
             self.assertFalse((root/prefix/"usr/libexec/harpy-reloaded").exists())
+            injection_dir = root/prefix/unified.SCHEMES[scheme][1]
+            self.assertFalse((injection_dir/"NukeWirelessInfo.dylib").exists())
+            self.assertFalse((injection_dir/"NukeWirelessPaths.dylib").exists())
+            self.assertFalse((injection_dir/"NukeWirelessInfo.plist").exists())
+            self.assertFalse((injection_dir/"NukeWirelessPaths.plist").exists())
+            self.assertTrue((root/prefix/unified.APP/"Frameworks/NukeWirelessInfo.dylib").exists())
             self.assertEqual(user_data.read_bytes(), b"existing-user-data")
             self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["worker", "app"])
             query = subprocess.check_output(["dpkg-query", "--admindir=" + str(root / "var/lib/dpkg"),

@@ -1625,7 +1625,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
     }
 }
 
-__attribute__((constructor)) static void install_paths(void) {
+static void install_paths(void) {
     id bundle = ((id (*)(id, SEL))objc_msgSend)(objc_getClass("NSBundle"), sel_registerName("mainBundle"));
     id identifier = ((id (*)(id, SEL))objc_msgSend)(bundle, sel_registerName("bundleIdentifier"));
     if (!equals(utf8(identifier), NWLegacyBundleID)) return;
@@ -1720,6 +1720,12 @@ __attribute__((constructor)) static void install_paths(void) {
     }
 }
 
-
-
-
+// Called by the embedded UI before it wraps scanner/task methods. Dependency
+// constructor order must not decide which implementation is captured as orig.
+void NWBootstrapInitialize(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ install_paths(); });
+}
+__attribute__((constructor)) static void initialize_paths(void) {
+    NWBootstrapInitialize();
+}

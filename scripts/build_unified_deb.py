@@ -18,13 +18,14 @@ from install_layout import APP, EXECUTABLE, HELPERS
 from compat_layout import SCHEMES, ordered_entries
 from compat_manifest import compat_sources
 from package_utils import get_tar_member, pack_ar, regular, read_ar, tar_bytes
+from embedded_ui import require_embedded_ui
 
 PACKAGE = "com.gokuencinar.nukewireless"
 WORKER_PACKAGE = PACKAGE + ".bluetooth"
 VERSION = APP_VERSION + "+bundle1"
 INSTALLATION_POLICY = {"minimum_ios": None, "maximum_ios_exclusive": None, "binary_minimum_ios": "15.0",
                        "scope": "installer-only", "runtime_checks_unchanged": True}
-PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py", "scripts/install_layout.py", "src/NWInstallLayout.h"]
+PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py", "scripts/install_layout.py", "scripts/embedded_ui.py", "src/NWInstallLayout.h"]
 
 
 def members(raw, archive):
@@ -90,8 +91,14 @@ def build(app_path, worker_path, output, scheme):
             or info.get("CFBundleExecutable") != EXECUTABLE
             or info["CFBundleIdentifier"] != "me.midnightchips.harpy-reloaded"):
         raise ValueError("app metadata mismatch")
-    if (sha(app_data[prefix + inject + "/NukeWirelessInfo.dylib"][1]) != app_report["core"]["binary_sha256"]
-            or sha(app_data[prefix + inject + "/NukeWirelessPaths.dylib"][1]) != app_report["adapter"]["path_library_sha256"]
+    if info.get("NukeWirelessUIIntegration") != "embedded-required-v1":
+        raise ValueError("app UI still depends on external tweak injection")
+    executable = app_data[prefix + APP + EXECUTABLE][1]
+    require_embedded_ui(executable)
+    if sha(executable) != app_report["ui_integration"]["executable_sha256"]:
+        raise ValueError("embedded app executable hash mismatch")
+    if (sha(app_data[prefix + APP + "Frameworks/NukeWirelessInfo.dylib"][1]) != app_report["core"]["binary_sha256"]
+            or sha(app_data[prefix + APP + "Frameworks/NukeWirelessPaths.dylib"][1]) != app_report["adapter"]["path_library_sha256"]
             or sha(app_data[prefix + HELPERS + "nw-hotspot"][1]) != app_report["core"]["hotspot_helper_sha256"]):
         raise ValueError("app payload mismatch")
     for name, folder in [("nwbt-run", "usr/bin/"), ("nwbt-inspect", "usr/bin/"),
@@ -162,7 +169,7 @@ def build(app_path, worker_path, output, scheme):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inputs", type=Path, required=True, help="directory with both DEBs and manifests per scheme")
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic7-unified")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic8-unified")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     for scheme in SCHEMES if args.scheme == "all" else [args.scheme]:

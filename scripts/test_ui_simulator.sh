@@ -36,6 +36,7 @@ with open(sys.argv[1], 'wb') as f:
     plistlib.dump(dict(CFBundleIdentifier='app.nukewireless.ui-regression', CFBundleName='UIRegression',
         CFBundleExecutable='UIRegression', CFBundlePackageType='APPL', CFBundleVersion='1',
         CFBundleShortVersionString='1', MinimumOSVersion=sys.argv[2], UILaunchScreen={},
+        NukeWirelessUIIntegration='embedded-required-v1',
         NSBluetoothAlwaysUsageDescription='Scan nearby BLE devices',
         UIApplicationSceneManifest={'UIApplicationSupportsMultipleScenes': False}), f)
 PY

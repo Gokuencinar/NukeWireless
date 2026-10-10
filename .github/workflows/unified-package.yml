@@ -7,6 +7,7 @@ on:
       - 'scripts/build_unified_deb.py'
       - 'scripts/compat_layout.py'
       - 'scripts/install_layout.py'
+      - 'scripts/embedded_ui.py'
       - 'src/NWInstallLayout.h'
       - 'scripts/build_compat_debs.py'
       - 'scripts/repair_rootless_package_list.sh'

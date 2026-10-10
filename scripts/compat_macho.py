@@ -7,6 +7,7 @@ Its equivalent is installed in the arm64 slice; all other native code stays.
 import hashlib
 import struct
 from install_layout import AEGIS_SUFFIX, APP_SUFFIX
+from embedded_ui import LOADS, require_embedded_ui
 
 ARM64 = 0x100000C
 HELPER_SHA = "878dab6af6d1b2a45d10c1e0e7fa5ca46eac2873eb7d723871a510bec55a00fb"
@@ -32,7 +33,7 @@ def thin_arm64(data):
         raise ValueError("missing regular arm64 slice for the preserved arm64 app")
     return data
 
-def inspect(data):
+def inspect(data, embedded=False):
     data = thin_arm64(data)
     count, size = struct.unpack_from("<II", data, 16)
     if 32 + size > len(data) or count > 1024:
@@ -53,12 +54,14 @@ def inspect(data):
         elif command in (0xC, 0x80000018, 0x8000001F, 0x80000023):
             name_offset = struct.unpack_from("<I", data, offset + 8)[0]
             name = data[offset + name_offset:offset + length].split(b"\0")[0].decode()
-            if not name.startswith(("/System/Library/", "/usr/lib/")):
+            if not name.startswith(("/System/Library/", "/usr/lib/")) and not (embedded and command == 0xC and name in LOADS):
                 raise ValueError("bootstrap-specific linked dependency: " + name)
             result["loads"].append(name)
         offset += length
     if not result["minimum_ios"] or max(result["minimum_ios"]) > (15 << 16):
         raise ValueError("native binary requires a newer iOS than the candidate minimum")
+    if embedded:
+        require_embedded_ui(data)
     return result
 
 def branch(at, target, instruction):

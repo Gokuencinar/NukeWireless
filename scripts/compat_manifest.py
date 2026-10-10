@@ -4,7 +4,7 @@ from build_manifest import ROOT, sha
 
 SOURCES = ["src/NWLegacyABI.h", "src/NWInstallLayout.h", "scripts/install_layout.py", "src/NWRouteNeighbors.h", "tests/test_route_neighbors.c", "src/hotspot/vendor/net/route.h", "src/compat/NWBootstrapPaths.c", "scripts/build_compat.sh",
            "scripts/compat_manifest.py", "scripts/build_compat_debs.py", "scripts/compat_macho.py",
-           "scripts/compat_layout.py", "scripts/build_bluetooth_deb.py",
+           "scripts/compat_layout.py", "scripts/embedded_ui.py", "scripts/build_bluetooth_deb.py",
            "scripts/test_ui_simulator.sh", ".github/workflows/compat-build.yml"]
 
 def compat_sources():

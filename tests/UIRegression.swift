@@ -76,7 +76,11 @@ struct RegressionTabs: View {
             }.tabItem { Label("WiFi", systemImage: "wifi") }.tag(0)
             Text("Hotspot fixture")
                 .tabItem { Label("Hotspot", systemImage: "link") }.tag(1)
-            Text("Legacy banner fixture")
+            VStack {
+                Text("Don't pirate!")
+                Text("MidnightChips")
+                Text("PINPAL")
+            }
                 .tabItem { Label("Info", systemImage: "info.circle") }.tag(2)
         }.onAppear {
             guard !started else { return }

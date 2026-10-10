@@ -11,6 +11,7 @@ on:
       - 'scripts/build_compat*'
       - 'scripts/compat_*'
       - 'scripts/install_layout.py'
+      - 'scripts/embedded_ui.py'
       - 'scripts/build_bluetooth_inspector.sh'
       - 'scripts/bluetooth_manifest.py'
       - 'scripts/build_bluetooth_deb.py'
@@ -27,6 +28,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile current app, adapter and guarded Bluetooth worker for iOS 15
         run: bash scripts/build_compat.sh
+      - name: Validate mandatory embedded UI load commands
+        run: python3 tests/test_embedded_ui.py
       - name: Navigation and background regression with iOS 15 deployment target
         run: NW_MIN_IOS=15.0 bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4

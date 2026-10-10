@@ -80,7 +80,8 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual(info['CFBundleExecutable'], app.EXECUTABLE)
                 self.assertIn(prefix + app.APP + app.EXECUTABLE, files)
                 self.assertEqual(info['CFBundleIdentifier'], 'me.midnightchips.harpy-reloaded')
-                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20007'))
+                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20008'))
+                self.assertEqual(info['NukeWirelessUIIntegration'], 'embedded-required-v1')
                 self.assertEqual(info['CFBundleShortVersionString'], app.VERSION)
                 self.assertEqual(info['NukeWirelessPackageScheme'], scheme)
                 self.assertEqual(info['CFBundleDisplayName'], 'NukeWireless Dev')
@@ -88,14 +89,18 @@ class CandidateTests(unittest.TestCase):
                 self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
                 self.assertEqual(info['NukeWirelessWorkerVersion'], bluetooth.VERSION)
                 self.assertIn('-Ime.midnightchips.harpy-reloaded "-S$ENT" "$APP"', script)
-                self.assertIn('ldid -S /' + prefix + inject + '/NukeWirelessInfo.dylib', script)
+                self.assertIn('ldid -S "$library"', script)
+                self.assertNotIn('/' + inject + '/', script)
                 self.assertIn('chmod 4755 "$BASE/nw-hotspot"', script)
                 helper = files[prefix + app.HELPERS + 'nw-hotspot'][1]
                 self.assertEqual(sha(helper), json.loads(self.apps[scheme].with_suffix('.manifest.json').read_text(encoding='utf-8'))['core']['hotspot_helper_sha256'])
                 self.assertIn((prefix + app.HELPERS + 'nw-hotspot clear').encode(), controls['prerm'][1])
                 self.assertEqual(any(name.endswith('.roothidepatch') for name in files), scheme == 'roothide')
                 self.assertFalse(any('HarpyRootHidePaths' in name for name in files))
-                self.assertIn(prefix + inject + '/NukeWirelessPaths.dylib', files)
+                self.assertIn(prefix + app.APP + 'Frameworks/NukeWirelessPaths.dylib', files)
+                self.assertFalse(any(name.startswith(prefix + inject + '/') for name in files))
+                from embedded_ui import require_embedded_ui
+                require_embedded_ui(files[prefix + app.APP + app.EXECUTABLE][1])
                 self.assertFalse(any(name.startswith('var/jb/') for name in files) if not prefix else
                                  any(name.startswith(('Applications/', 'usr/')) for name in files))
 
@@ -107,11 +112,12 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual(report['package_sha256'], sha(self.apps[scheme].read_bytes()))
                 self.assertEqual(report['core']['sources'], source_hashes())
                 self.assertEqual(report['adapter']['sources'], compat_sources())
-                self.assertEqual(report['core']['binary_sha256'], sha(files[prefix + inject + '/NukeWirelessInfo.dylib'][1]))
+                self.assertEqual(report['core']['binary_sha256'], sha(files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1]))
+                self.assertEqual(report['ui_integration']['executable_sha256'], sha(files[prefix + app.APP + app.EXECUTABLE][1]))
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-diagnostic7', files[prefix + inject + '/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-diagnostic8', files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],
@@ -123,7 +129,7 @@ class CandidateTests(unittest.TestCase):
             for name, (member, data) in files.items():
                 if member.isfile() and data[:4] in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe'):
                     with self.subTest(package=path.name, binary=name):
-                        report = bluetooth.inspect_tool(data) if name.endswith(('nwbt-run', 'nwbt-inspect')) else inspect(data)
+                        report = bluetooth.inspect_tool(data) if name.endswith(('nwbt-run', 'nwbt-inspect')) else inspect(data, embedded=name.endswith(app.APP + app.EXECUTABLE))
                         self.assertLessEqual(max(report['minimum_ios']), 15 << 16)
 
     def test_worker_same_payload_guard_and_scheme_signing(self):

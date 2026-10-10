@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic8+bundle1: interfaz integrada en la app.**
+La interfaz actual y el adaptador de red pasan a ser bibliotecas obligatorias
+del bundle. La app deja de arrancar con la pantalla Info antigua cuando no hay
+inyección de tweaks. Se retiran las copias y filtros externos para evitar una
+doble carga. Conserva los hosts SwiftUI, la identidad de firma y los datos.
+Comprobaciones locales aprobadas; compilación, paquetes y aceptación física
+pendientes. Véase [interfaz integrada](docs/EMBEDDED-UI-DIAGNOSTIC8.md).
+
 **2.0.0~diagnostic7+bundle1: renombrado de las rutas instaladas.**
 La app se instala en `Applications/NukeWireless.app`, con ejecutable
 `NukeWireless`, y los ayudantes en `usr/libexec/nukewireless`.
