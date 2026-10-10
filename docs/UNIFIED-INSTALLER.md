@@ -66,8 +66,9 @@ El DEB unificado diagnostic6+bundle1 se instaló en iPhone XS / iOS 16.3.1 /
 RootHide. dpkg sustituyó el paquete Bluetooth separado y el paquete principal
 pasó a ser propietario de `nwbt-run`. Versiones, firma, código y permisos
 verificados; diagnóstico de solo lectura sin alterar el servicio Bluetooth.
-La prueba del corte/restauración del tráfico Wi-Fi está pendiente de aceptación
-manual. iOS 15, 17, 18, rootless y rootful requieren pruebas físicas.
+El usuario confirmó bloqueo y desbloqueo Wi-Fi en esa referencia. Es aceptación
+manual, sin captura independiente del tráfico. iOS 15, 17, 18, rootless y rootful
+requieren pruebas físicas.
 
 ## Dependencias del bootstrap
 

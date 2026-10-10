@@ -52,8 +52,13 @@ SHA-256 RootHide: `e9599a0197091567ea6415cbbf386591cf60218c52d22dba37ffd541d9fa5
 Recuperación: cerrar la app, retirar el paquete unificado sin purgar datos e
 instalar `/var/mobile/Documents/NukeWireless-diagnostic5-backup.deb` junto a
 `/var/mobile/Documents/NukeWireless-diagnostic1-bluetooth-backup.deb`.
-No se requiere un reinicio general por rutina. Pendientes: aceptación del corte
-y restauración de tráfico Wi-Fi y verificación física en los otros entornos.
+No se requiere un reinicio general por rutina.
+
+El 10 de octubre el usuario respondió «Bloquea y desbloquea correctamente» a la
+prueba de mano roja persistente, páginas nuevas sin cargar con datos móviles
+apagados y recuperación al desbloquear. Se registra como `passed_user_report`
+en la referencia XS / iOS 16.3.1 / RootHide, sin captura independiente del tráfico.
+La verificación física de los otros entornos sigue pendiente.
 
 ## Reporte externo recibido
 
