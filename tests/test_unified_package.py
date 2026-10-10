@@ -97,7 +97,7 @@ class FixtureTests(unittest.TestCase):
         dependencies = []
         for name, version in [("ldid","1.0")]:
             path = self.folder/(name+".deb")
-            control = f"Package: {name}\nVersion: {version}\nArchitecture: all\nMaintainer: Test <test@example.invalid>\nDescription: Fixture\n".encode()
+            control = f"Package: {name}\nVersion: {version}\nArchitecture: iphoneos-arm\nMaintainer: Test <test@example.invalid>\nDescription: Fixture\n".encode()
             path.write_bytes(pack_ar([("debian-binary",b"2.0\n"),
                                       ("control.tar.gz",tar_bytes([regular("control",control)])),
                                       ("data.tar.gz",tar_bytes([]))]))
