@@ -9,7 +9,9 @@ Retira las dependencias `firmware` y `MinimumOSVersion` del DEB unificado de
 las tres variantes. Conserva el mínimo compilado real iOS 15.0, los binarios de diagnostic6/Bluetooth diagnostic1 y
 las comprobaciones de compatibilidad en ejecución. No acredita funcionamiento
 en sistemas nuevos ni corrige el crash externo del catálogo aún sin informe.
-Validación del paquete y de la migración dpkg pendiente de esta entrega.
+Los tres DEB pasaron la inspección local. En Linux pasaron instalación nueva,
+migración, propiedad, retirada e instalación sin proveedor `firmware` sin ignorar
+dependencias. Instalación física de bundle2 pendiente.
 Véase [empaquetado unificado](docs/UNIFIED-INSTALLER.md).
 
 **2.0.0~diagnostic6+bundle1: compilada, validada e instalada en RootHide.**

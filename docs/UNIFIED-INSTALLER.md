@@ -28,8 +28,20 @@ DEB distingue el commit/hash del empaquetador de los del código nativo y conser
 la procedencia íntegra de ambos paquetes de entrada. Sus fuentes se vuelven a
 comprobar; no se modifican sus manifiestos para aceptar artefactos obsoletos.
 
-Validación de bundle2 pendiente. La evidencia física que aparece más abajo
-corresponde a bundle1 en el iPhone XS con iOS 16.3.1, no a sistemas posteriores.
+Bundle2 validado el 10 de octubre de 2026: los tres DEB pasaron la comparación de
+payload, scripts, permisos, dependencias, metadatos y procedencia en Windows
+(cinco pruebas aprobadas; dos pruebas dpkg reservadas a Linux). Las fixtures de
+[CI 38016603665](https://github.com/Gokuencinar/NukeWireless/actions/runs/38016603665)
+pasaron seis pruebas: instalación nueva, migración desde paquetes separados,
+propiedad y retirada, entre otras. La instalación sin proveedor `firmware` usa
+una dependencia ficticia `ldid` de la misma arquitectura y no usa `--force-depends`.
+La comparación del payload real se ejecutó localmente; CI usa solo fixtures.
+
+Empaquetador de los DEB entregados: `4d30aad9167291bf032ced4f47bf5723dfd812ed`;
+la corrección de arquitectura de la fixture se registra en `b152630` y no altera
+el empaquetador ni los binarios. Instalación física de bundle2 pendiente. La
+evidencia física que aparece más abajo corresponde a bundle1 en el iPhone XS
+con iOS 16.3.1, no a sistemas posteriores ni anteriores a iOS 15.
 
 ## Instalación y actualización
 
