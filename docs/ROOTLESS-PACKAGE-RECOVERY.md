@@ -36,4 +36,6 @@ variantes, con un archivo testigo del bootstrap que debe conservarse. Otra prueb
 reproduce el fallo antiguo, comprueba la copia y el cambio de una sola línea,
 repite la reparación y exige que la retirada posterior funcione. Se ejecutan en
 raíces temporales Linux, con scripts ficticios que no ejecutan código iOS.
-La prueba física del tester se registra por separado.
+La prueba física del tester se registra por separado y sigue pendiente.
+La [ejecución Linux 38059066627](https://github.com/Gokuencinar/NukeWireless/actions/runs/38059066627)
+aprobó las ocho pruebas de fixtures, incluida la reproducción y recuperación.

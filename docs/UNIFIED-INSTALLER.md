@@ -1,15 +1,41 @@
-# Instalador único · diagnostic6+bundle2
+# Instalador único · diagnostic6+bundle3
 
 Cada variante RootHide, Dopamine/rootless y rootful se distribuye ahora en un DEB
-`com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle2_<arquitectura>.deb`.
+`com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle3_<arquitectura>.deb`.
 Contiene la aplicación diagnostic6 y el componente Bluetooth diagnostic1.
 Las etiquetas Debian identifican el bootstrap, no las arquitecturas del código.
 
-El sufijo `+bundle2` identifica la revisión del instalador. La app indica
+El sufijo `+bundle3` identifica la revisión del instalador. La app indica
 diagnostic6 y CFBundleVersion 20006; el trabajador mantiene diagnostic1.
 El empaquetador conserva los binarios y permisos de sus dos DEB de entrada;
 no equivale a conservar los binarios de diagnostic5. Las fuentes nativas de
-esta entrega son `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
+esta entrega son `b0e74944c4e9063450045716df636a766a46aa40`.
+
+## Revisión bundle3: retirada rootless y recuperación
+
+Corrige la entrada `/var/jb/.` procedente de prefijar el directorio raíz del
+archivo tar. El empaquetador omite esa raíz y normaliza los componentes `.`;
+la ordenación sigue rechazando colisiones y recorridos `..`. No distribuir los
+DEB rootless diagnostic5+bundle1 ni diagnostic6+bundle1/bundle2.
+
+La nueva compilación de compatibilidad conserva la lógica y versiones de la
+app y Bluetooth. Se ha recompilado para que el manifiesto incluya los hashes
+del empaquetador corregido, sin adaptar manifiestos históricos.
+
+Validación del 10 de octubre de 2026:
+
+- [CI de compatibilidad](https://github.com/Gokuencinar/NukeWireless/actions/runs/38059066712):
+  compilación y 46 comprobaciones UI más cuatro ciclos de segundo plano por idioma.
+- [CI del instalador](https://github.com/Gokuencinar/NukeWireless/actions/runs/38059066627):
+  ocho pruebas aprobadas, con instalación/migración/retirada de las tres variantes,
+  reproducción del error antiguo, reparación de una sola línea y conservación
+  del testigo del bootstrap. Son fixtures Linux, no ejecución de binarios iOS.
+- Inspección local: ocho pruebas de compatibilidad y seis del unificado aprobadas;
+  las tres pruebas que requieren dpkg se ejecutaron en CI. Se comparan los DEB
+  reales con sus entradas, incluyendo permisos, recursos, dependencias y hashes.
+
+La instalación física de bundle3 y la retirada del paquete afectado del tester
+siguen pendientes. Véase [reparación rootless](ROOTLESS-PACKAGE-RECOVERY.md).
 
 ## Revisión bundle2: instalación sin límites de versión
 
@@ -32,7 +58,7 @@ Bundle2 validado el 10 de octubre de 2026: los tres DEB pasaron la comparación 
 payload, scripts, permisos, dependencias, metadatos y procedencia en Windows
 (cinco pruebas aprobadas; dos pruebas dpkg reservadas a Linux). Las fixtures de
 [CI 38016603665](https://github.com/Gokuencinar/NukeWireless/actions/runs/38016603665)
-pasaron seis pruebas: instalación nueva, migración desde paquetes separados,
+pasaron seis pruebas con dpkg rootful: instalación nueva, migración desde paquetes separados,
 propiedad y retirada, entre otras. La instalación sin proveedor `firmware` usa
 una dependencia ficticia `ldid` de la misma arquitectura y no usa `--force-depends`.
 La comparación del payload real se ejecutó localmente; CI usa solo fixtures.

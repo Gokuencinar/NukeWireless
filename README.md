@@ -8,8 +8,10 @@ Nuke Wireless is in development. This repository is public; development builds a
 Elimina las entradas de directorio con componentes `.` que registraban
 `/var/jb/.` y bloqueaban la desinstalación en Dopamine. No distribuir los DEB
 rootless anteriores bundle1/bundle2. Se conserva la política sin límites de iOS
-del instalador. Compilación y validación de esta revisión en curso; la reparación
-del registro antiguo se describe en [recuperación rootless](docs/ROOTLESS-PACKAGE-RECOVERY.md).
+del instalador. Compilación de compatibilidad, 46 comprobaciones UI por idioma,
+inspección de las tres variantes y pruebas Linux de retirada/recuperación aprobadas.
+La confirmación física del tester sigue pendiente. La reparación del registro
+antiguo se describe en [recuperación rootless](docs/ROOTLESS-PACKAGE-RECOVERY.md).
 
 **2.0.0~diagnostic6+bundle2: revisión del instalador sin límites de iOS.**
 Retira las dependencias `firmware` y `MinimumOSVersion` del DEB unificado de
