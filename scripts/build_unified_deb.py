@@ -6,6 +6,7 @@ each original postinst runs in its own subshell so its exit cannot skip the othe
 import argparse
 import json
 import plistlib
+import subprocess
 from pathlib import Path
 
 from build_manifest import ROOT, sha, source_hashes
@@ -19,7 +20,10 @@ from package_utils import get_tar_member, pack_ar, regular, read_ar, tar_bytes
 
 PACKAGE = "com.gokuencinar.nukewireless"
 WORKER_PACKAGE = PACKAGE + ".bluetooth"
-VERSION = APP_VERSION + "+bundle1"
+VERSION = APP_VERSION + "+bundle2"
+INSTALLATION_POLICY = {"minimum_ios": "15.0", "maximum_ios_exclusive": None,
+                       "scope": "installer-only", "runtime_checks_unchanged": True}
+PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py"]
 
 
 def members(raw, archive):
@@ -81,6 +85,7 @@ def build(app_path, worker_path, output, scheme):
     if (info["NukeWirelessPackageScheme"] != scheme
             or info["CFBundleShortVersionString"] != APP_VERSION
             or info["NukeWirelessWorkerVersion"] != WORKER_VERSION
+            or info.get("MinimumOSVersion") != INSTALLATION_POLICY["minimum_ios"]
             or info["CFBundleIdentifier"] != "me.midnightchips.harpy-reloaded"):
         raise ValueError("app metadata mismatch")
     if (sha(app_data[prefix + inject + "/NukeWirelessInfo.dylib"][1]) != app_report["core"]["binary_sha256"]
@@ -96,14 +101,18 @@ def build(app_path, worker_path, output, scheme):
     for field in ("Conflicts", "Replaces"):
         control[field] = ", ".join(filter(None, [control.get(field), WORKER_PACKAGE]))
     control["Provides"] = f"{WORKER_PACKAGE} (= {WORKER_VERSION})"
-    # Keep every dependency from both packages (including future additions).
+    # Retain both dependency sets, except the old installer-only upper iOS cap.
+    # Private Bluetooth transport admission remains in the unchanged binaries.
     for field in ("Depends", "Pre-Depends"):
         dependencies = list(dict.fromkeys(
             item.strip() for value in (control.get(field, ""), worker_info.get(field, ""))
-            for item in value.split(",") if item.strip()))
+            for item in value.split(",") if item.strip() and item.strip() != "firmware (<< 19.0)"))
         if dependencies:
             control[field] = ", ".join(dependencies)
-    control["Description"] += "; includes Bluetooth worker"
+    firmware = [item for item in control["Depends"].split(", ") if item.startswith("firmware")]
+    if firmware != ["firmware (>= 15.0)"]:
+        raise ValueError("unexpected firmware policy; preserve the real binary minimum")
+    control["Description"] = f"NukeWireless development diagnostic edition ({SCHEMES[scheme][3]}); includes Bluetooth worker"
     merged = list(app_data.values()) + list(worker_data.values())
     # Correct the standalone worker removal instruction now that it is bundled.
     readme = prefix + "usr/share/nukewireless-bluetooth/README.txt"
@@ -113,11 +122,21 @@ def build(app_path, worker_path, output, scheme):
         raise ValueError("unexpected worker removal instruction")
     merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != readme]
     merged.append(regular(readme, previous.replace(old, f"dpkg -r {PACKAGE}".encode())))
+    status_path = prefix + "usr/share/nukewireless-roothide/compatibility.json"
+    status = json.loads(app_data[status_path][1].decode("utf-8"))
+    if status.get("minimum_ios") != "15.0" or status.get("maximum_ios_exclusive") != "19.0":
+        raise ValueError("unexpected input compatibility policy")
+    status.update(maximum_ios_exclusive=None, installation_policy=INSTALLATION_POLICY)
+    merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != status_path]
+    merged.append(regular(status_path, (json.dumps(status, indent=2) + "\n").encode("utf-8")))
     provenance = {"package_version": VERSION, "app_version": APP_VERSION,
                   "worker_version": WORKER_VERSION, "scheme": scheme,
                   "source_commit": app_report["core"]["source_commit"],
                   "inputs": {"app": sha(app_raw), "bluetooth": sha(worker_raw)},
-                  "native_payload_changed": False, "unified_installation_verified": False}
+                  "native_payload_changed": False, "unified_installation_verified": False,
+                  "installation_policy": INSTALLATION_POLICY,
+                  "packaging_source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+                  "packaging_sources": {name: sha((ROOT/name).read_bytes().replace(b"\r\n", b"\n")) for name in PACKAGING_SOURCES}}
     merged.append(regular(prefix + "usr/share/nukewireless-roothide/unified-package.json",
                           (json.dumps(provenance, indent=2) + "\n").encode("utf-8")))
     scripts = [regular("control", ("\n".join(f"{key}: {value}" for key, value in control.items()) + "\n").encode("utf-8")),
@@ -129,7 +148,7 @@ def build(app_path, worker_path, output, scheme):
                                ("data.tar.gz", tar_bytes(ordered_entries(merged)))]))
     report = dict(provenance, package_sha256=sha(output.read_bytes()), architecture=architecture,
                   components={"app": app_report, "bluetooth": worker_report},
-                  changed_payload_files=[readme], runtime_verified=False)
+                  changed_payload_files=[readme, status_path], runtime_verified=False)
     output.with_suffix(".manifest.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     return report
 

@@ -1,15 +1,32 @@
-# Instalador único · diagnostic6+bundle1
+# Instalador único · diagnostic6+bundle2
 
 Cada variante RootHide, Dopamine/rootless y rootful se distribuye ahora en un DEB
-`com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle1_<arquitectura>.deb`.
+`com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle2_<arquitectura>.deb`.
 Contiene la aplicación diagnostic6 y el componente Bluetooth diagnostic1.
 Las etiquetas Debian identifican el bootstrap, no las arquitecturas del código.
 
-El sufijo `+bundle1` identifica la revisión del instalador. La app indica
+El sufijo `+bundle2` identifica la revisión del instalador. La app indica
 diagnostic6 y CFBundleVersion 20006; el trabajador mantiene diagnostic1.
 El empaquetador conserva los binarios y permisos de sus dos DEB de entrada;
 no equivale a conservar los binarios de diagnostic5. Las fuentes nativas de
 esta entrega son `6f30ff2beb9d4109905b44c662de989e88ab2bf0`.
+
+## Revisión bundle2: instalación sin tope máximo
+
+Elimina únicamente `firmware (<< 19.0)` de las dependencias combinadas del
+instalador. Conserva `firmware (>= 15.0)`, `MinimumOSVersion=15.0`, todas las
+otras dependencias y los controles del transporte Bluetooth. No altera los
+Mach-O, los permisos, las firmas ni el código del catálogo. Instalar en una
+versión posterior no demuestra que las funciones privadas sean compatibles.
+
+Se actualiza `compatibility.json` con `maximum_ios_exclusive: null` y una
+`installation_policy` que identifica el alcance del cambio. El manifiesto del
+DEB distingue el commit/hash del empaquetador de los del código nativo y conserva
+la procedencia íntegra de ambos paquetes de entrada. Sus fuentes se vuelven a
+comprobar; no se modifican sus manifiestos para aceptar artefactos obsoletos.
+
+Validación de bundle2 pendiente. La evidencia física que aparece más abajo
+corresponde a bundle1 en el iPhone XS con iOS 16.3.1, no a sistemas posteriores.
 
 ## Instalación y actualización
 
@@ -29,8 +46,9 @@ Las relaciones siguen las reglas de
 Los dos scripts postinst originales se ejecutan en subprocesos de shell con fallo
 propagado; el `exit 0` de uno no puede omitir el otro. Se conservan las firmas y
 permisos existentes, incluido `nwbt-run` con 4755. El prerm original de la app
-conserva la limpieza PF. La única modificación de un archivo de datos existente
-es la instrucción de desinstalación del README del trabajador.
+conserva la limpieza PF. Bundle1 cambiaba la instrucción de desinstalación del
+README del trabajador; bundle2 actualiza también el estado JSON de la política
+de instalación.
 
 Desinstalar `com.gokuencinar.nukewireless` retira también el componente Bluetooth.
 Para recuperar la distribución anterior: cerrar la app, retirar el paquete único

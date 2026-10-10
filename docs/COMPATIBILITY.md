@@ -1,6 +1,6 @@
 # Candidatas de compatibilidad iOS 15–18: compat4
 
-Edición actual para testers: [NukeWireless Dev 2.0.0~diagnostic1](DIAGNOSTIC-EDITION.md).
+Edición actual para testers: [NukeWireless Dev 2.0.0~diagnostic6+bundle2](DIAGNOSTIC-EDITION.md).
 Las validaciones históricas de dev53/compat4 no equivalen a aceptación de esta edición.
 
 Preparadas desde las fuentes de **dev53**, con el trabajador **app32**.
@@ -11,7 +11,9 @@ otros bootstraps requieren validación física propia. El usuario no dispone de
 dispositivos adicionales. Las entregas anteriores conservan sus informes;
 no reutilizar artefactos antiguos para estas fuentes.
 
-El mínimo de build 15.0 y la dependencia `< 19.0` delimitan el rango experimental.
+En compat4, el mínimo de build 15.0 y la dependencia `< 19.0` delimitaban el rango experimental.
+El instalador actual bundle2 elimina ese tope máximo, conservando el mínimo
+técnico iOS 15.0 y las comprobaciones en ejecución; no amplía la evidencia física.
 La emisión ya admite sistemas que cumplan el contrato Skywalk observado, sin
 whitelist XS/16.3.1. Esto no acredita funcionamiento en cada chip o versión menor.
 Véase [port y fuentes primarias de ABI](BLUETOOTH-SKYWALK-PORT.md).

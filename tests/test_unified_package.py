@@ -30,7 +30,7 @@ def fixture(folder, scheme, worker):
     version = unified.WORKER_VERSION if worker else unified.APP_VERSION
     path = folder / f"{package}_{version}_{architecture}.deb"
     control = (f"Package: {package}\nName: Fixture\nVersion: {version}\nArchitecture: {architecture}\n"
-               "Maintainer: Test <test@example.invalid>\nDepends: firmware (>= 15.0), ldid\nDescription: Fixture\n").encode()
+               "Maintainer: Test <test@example.invalid>\nDepends: firmware (>= 15.0), firmware (<< 19.0), ldid\nDescription: Fixture\n").encode()
     script = b"#!/bin/sh\nset -e\nprintf '" + (b"worker" if worker else b"app") + b"\\n' >> \"$NW_TEST_LOG\"\nexit 0\n"
     controls = [regular("control", control), regular("postinst", script, 0o755)]
     if worker:
@@ -42,10 +42,12 @@ def fixture(folder, scheme, worker):
                   "files": {PurePosixPath(n).name: unified.sha(b) for n, b in files.items() if not n.endswith(".txt")}}
     else:
         files = {prefix + inject + "/NukeWirelessInfo.dylib": b"extension",
+                 prefix + "usr/share/nukewireless-roothide/compatibility.json":
+                     json.dumps({"minimum_ios":"15.0", "maximum_ios_exclusive":"19.0", "runtime_verified":False}).encode(),
                  prefix + inject + "/NukeWirelessPaths.dylib": b"adapter",
                  prefix + "usr/libexec/harpy-reloaded/nw-hotspot": b"hotspot",
                  prefix + unified.APP + "Info.plist": plistlib.dumps({
-                     "CFBundleIdentifier": "me.midnightchips.harpy-reloaded", "CFBundleShortVersionString": version,
+                     "CFBundleIdentifier": "me.midnightchips.harpy-reloaded", "CFBundleShortVersionString": version, "MinimumOSVersion":"15.0",
                      "NukeWirelessPackageScheme": scheme, "NukeWirelessWorkerVersion": unified.WORKER_VERSION})}
         controls.append(regular("prerm", b"#!/bin/sh\nexit 0\n", 0o755))
         report = {"core": {"sources": unified.source_hashes(), "binary_sha256": unified.sha(b"extension"),
@@ -65,6 +67,40 @@ class FixtureTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_installer_removes_only_upper_firmware_limit(self):
+        for scheme in unified.SCHEMES:
+            with self.subTest(scheme=scheme):
+                app, worker = fixture(self.folder, scheme, False), fixture(self.folder, scheme, True)
+                output = self.folder/(scheme+".deb")
+                unified.build(app, worker, output, scheme)
+                control = unified.fields(unified.members(output.read_bytes(), "control.tar")["control"][1])
+                self.assertEqual(control["Depends"], "firmware (>= 15.0), ldid")
+                report = json.loads(output.with_suffix('.manifest.json').read_text(encoding='utf-8'))
+                self.assertIsNone(report["installation_policy"]["maximum_ios_exclusive"])
+                self.assertFalse(report["native_payload_changed"])
+
+    @unittest.skipUnless(shutil.which("dpkg") and os.geteuid() == 0 if os.name != "nt" else False,
+                         "requires Linux dpkg as root")
+    def test_install_with_newer_firmware_without_ignoring_dependencies(self):
+        app, worker = fixture(self.folder, "rootful", False), fixture(self.folder, "rootful", True)
+        combined = self.folder/"unified.deb"
+        unified.build(app, worker, combined, "rootful")
+        root = self.folder/"newer-ios"
+        (root/"var/lib/dpkg").mkdir(parents=True)
+        (root/"var/lib/dpkg/status").touch()
+        dependencies = []
+        for name, version in [("firmware","19.0"), ("ldid","1.0")]:
+            path = self.folder/(name+".deb")
+            control = f"Package: {name}\nVersion: {version}\nArchitecture: all\nMaintainer: Test <test@example.invalid>\nDescription: Fixture\n".encode()
+            path.write_bytes(pack_ar([("debian-binary",b"2.0\n"),
+                                      ("control.tar.gz",tar_bytes([regular("control",control)])),
+                                      ("data.tar.gz",tar_bytes([]))]))
+            dependencies.append(str(path))
+        command = ["dpkg","--root="+str(root),"--force-script-chrootless","--force-architecture","--install"]
+        env = dict(os.environ,NW_TEST_LOG=str(root/"script-log"))
+        result = subprocess.run(command+dependencies+[str(combined)],env=env,capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
 
     def test_reject_wrong_bootstrap_and_stale_source(self):
         app, worker = fixture(self.folder, "rootful", False), fixture(self.folder, "rootless", True)
@@ -155,7 +191,7 @@ class DeliveryTests(unittest.TestCase):
                         actual, content = files[name]
                         self.assertEqual((actual.mode, actual.uid, actual.gid, actual.type, actual.linkname),
                                          (member.mode, member.uid, member.gid, member.type, member.linkname), name)
-                        if name != prefix + "usr/share/nukewireless-bluetooth/README.txt":
+                        if name not in report["changed_payload_files"]:
                             self.assertEqual(content, data, name)
                 self.assertEqual(scripts["prerm"][1], app[3]["prerm"][1])
                 postinst = scripts["postinst"][1]
@@ -163,13 +199,23 @@ class DeliveryTests(unittest.TestCase):
                 self.assertEqual(postinst.count(worker[3]["postinst"][1]), 1)
                 control = unified.fields(scripts["control"][1])
                 self.assertEqual(control["Version"], unified.VERSION)
+                self.assertIn("firmware (>= 15.0)",control["Depends"])
+                self.assertNotIn("firmware (<<",control["Depends"])
+                metadata = plistlib.loads(files[prefix+unified.APP+"Info.plist"][1])
+                self.assertEqual(metadata["MinimumOSVersion"], "15.0")
+                status_path = prefix+"usr/share/nukewireless-roothide/compatibility.json"
+                status = json.loads(files[status_path][1])
+                original_status = json.loads(app[2][status_path][1])
+                original_status.update(maximum_ios_exclusive=None, installation_policy=unified.INSTALLATION_POLICY)
+                self.assertEqual(status, original_status)
+                self.assertEqual(report["installation_policy"],unified.INSTALLATION_POLICY)
                 self.assertIn(unified.WORKER_PACKAGE, control["Conflicts"].split(", "))
                 self.assertIn(unified.WORKER_PACKAGE, control["Replaces"].split(", "))
                 self.assertEqual(control["Provides"], f"{unified.WORKER_PACKAGE} (= {unified.WORKER_VERSION})")
                 for old in (app[4], worker[4]):
                     for field in ("Depends", "Pre-Depends"):
                         for dependency in old.get(field, "").split(", "):
-                            if dependency:
+                            if dependency and dependency != "firmware (<< 19.0)":
                                 self.assertIn(dependency, control[field].split(", "))
                 seen = set()
                 for member, _ in unified.read_tar(unified.get_tar_member(unified.read_ar(raw), "data.tar")):

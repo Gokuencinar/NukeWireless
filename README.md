@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic6+bundle2: revisión del instalador sin límite máximo de iOS.**
+Retira `firmware (<< 19.0)` del DEB unificado de las tres variantes y conserva
+el mínimo real iOS 15.0, los binarios de diagnostic6/Bluetooth diagnostic1 y
+las comprobaciones de compatibilidad en ejecución. No acredita funcionamiento
+en sistemas nuevos ni corrige el crash externo del catálogo aún sin informe.
+Validación del paquete y de la migración dpkg pendiente de esta entrega.
+Véase [empaquetado unificado](docs/UNIFIED-INSTALLER.md).
+
 **2.0.0~diagnostic6+bundle1: compilada, validada e instalada en RootHide.**
 Corrige la lectura de identidad del router usada por el bloqueo Wi-Fi: cabecera
 Darwin de 92 bytes, alineación de cuatro bytes y coincidencia de IP/interfaz.
