@@ -80,7 +80,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertEqual(info['CFBundleExecutable'], app.EXECUTABLE)
                 self.assertIn(prefix + app.APP + app.EXECUTABLE, files)
                 self.assertEqual(info['CFBundleIdentifier'], 'me.midnightchips.harpy-reloaded')
-                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20008'))
+                self.assertEqual((info['MinimumOSVersion'], info['CFBundleVersion']), ('15.0', '20009'))
                 self.assertEqual(info['NukeWirelessUIIntegration'], 'embedded-required-v1')
                 self.assertEqual(info['CFBundleShortVersionString'], app.VERSION)
                 self.assertEqual(info['NukeWirelessPackageScheme'], scheme)
@@ -117,7 +117,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-diagnostic8', files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-diagnostic9', files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],

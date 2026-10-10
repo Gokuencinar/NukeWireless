@@ -4,12 +4,21 @@
 #import "NWBluetooth.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
+#import "NWDiagnosticReport.h"
+#import <QuartzCore/QuartzCore.h>
+#include <math.h>
 #include <stdlib.h>
 
-static UIImage *brandImage(NSString *name) {
-    static NSMutableDictionary<NSString *, UIImage *> *images;
+// The reported iOS 16.7.4 crash passes through CoreUI's styling of a CGImage
+// template and then CI::GLContext. Rasterize/tint logos ourselves and present
+// original pixels, without asking configured buttons to style their images.
+static UIImage *brandImage(NSString *name, UIColor *color, UITraitCollection *traits, BOOL padded) {
+    static NSMutableDictionary<NSArray *, UIImage *> *images;
     if (!images) images = [NSMutableDictionary new];
-    if (images[name]) return images[name];
+    UIColor *resolved = [color resolvedColorWithTraitCollection:traits];
+    CGFloat scale = traits.displayScale > 0 ? traits.displayScale : UIScreen.mainScreen.scale;
+    NSArray *key = @[name, resolved, @(scale), @(padded)];
+    if (images[key]) return images[key];
     NSURL *url = [NWResourceBundle() URLForResource:name withExtension:@"pdf" subdirectory:@"brands"];
     if (!url) return nil;
     CGPDFDocumentRef document = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
@@ -17,44 +26,57 @@ static UIImage *brandImage(NSString *name) {
     CGPDFPageRef page = CGPDFDocumentGetPage(document, 1);
     UIImage *image = nil;
     if (page) {
-        CGSize size = CGSizeMake([name isEqual:@"samsung"] ? 64 : 24, 24);
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
-        image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
-            CGContextTranslateCTM(context.CGContext, 0, 24); CGContextScaleCTM(context.CGContext, 1, -1);
-            if ([name isEqual:@"samsung"]) {
-                // The wordmark's PDF is smaller than its target. Explicitly
-                // magnify its cropped vector bounds as well as scaling down.
-                CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
-                CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
-                CGContextTranslateCTM(context.CGContext, (size.width - box.size.width * scale) / 2,
-                    (size.height - box.size.height * scale) / 2);
-                CGContextScaleCTM(context.CGContext, scale, scale);
-                CGContextTranslateCTM(context.CGContext, -box.origin.x, -box.origin.y);
+        CGSize mark = CGSizeMake([name isEqual:@"samsung"] ? 64 : 24, 24);
+        CGSize size = CGSizeMake(padded ? 64 : mark.width, 24);
+        size_t width = (size_t)ceil(size.width * scale), height = (size_t)ceil(size.height * scale);
+        CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+        CGContextRef context = CGBitmapContextCreate(NULL, width, height, 8, width * 4, space,
+            kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+        CGColorSpaceRelease(space);
+        if (context) {
+            CGContextScaleCTM(context, scale, scale);
+            CGContextSaveGState(context);
+            CGContextTranslateCTM(context, (size.width - mark.width) / 2, 0);
+            CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+            if ([name isEqual:@"samsung"] && box.size.width > 0 && box.size.height > 0) {
+                CGFloat fit = MIN(mark.width / box.size.width, mark.height / box.size.height);
+                CGContextTranslateCTM(context, (mark.width - box.size.width * fit) / 2,
+                    (mark.height - box.size.height * fit) / 2);
+                CGContextScaleCTM(context, fit, fit);
+                CGContextTranslateCTM(context, -box.origin.x, -box.origin.y);
             } else {
-                CGContextConcatCTM(context.CGContext, CGPDFPageGetDrawingTransform(page, kCGPDFCropBox,
-                    CGRectMake(0, 0, size.width, size.height), 0, YES));
+                CGContextConcatCTM(context, CGPDFPageGetDrawingTransform(page, kCGPDFCropBox,
+                    CGRectMake(0, 0, mark.width, mark.height), 0, YES));
             }
-            CGContextDrawPDFPage(context.CGContext, page);
-        }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            CGContextDrawPDFPage(context, page);
+            CGContextRestoreGState(context);
+            CGContextSetBlendMode(context, kCGBlendModeSourceIn);
+            CGContextSetFillColorWithColor(context, resolved.CGColor);
+            CGContextFillRect(context, CGRectMake(0, 0, size.width, size.height));
+            CGImageRef bitmap = CGBitmapContextCreateImage(context);
+            if (bitmap) {
+                image = [[UIImage imageWithCGImage:bitmap scale:scale orientation:UIImageOrientationUp]
+                    imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+                CGImageRelease(bitmap);
+            }
+            CGContextRelease(context);
+        }
     }
     CGPDFDocumentRelease(document);
-    if (image) images[name] = image;
+    if (image) images[key] = image;
     return image;
 }
 static NSArray<NSString *> *brandNames(void) { return @[@"Apple", @"Google", @"Microsoft", @"Samsung"]; }
 static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"microsoft", @"samsung"]; }
-static UIImage *brandButtonImage(NSString *name) {
-    static NSMutableDictionary<NSString *, UIImage *> *images;
-    if (!images) images = [NSMutableDictionary new];
-    if (images[name]) return images[name];
-    UIImage *mark = brandImage(name); if (!mark) return nil;
-    // A shared image column aligns the marks' centers and the text starts.
-    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(64, 24)];
-    UIImage *image = [[renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
-        (void)context; [mark drawAtPoint:CGPointMake((64 - mark.size.width) / 2, 0)];
-    }] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    images[name] = image; return image;
+
+@interface NWCatalogBrandButton : UIButton
+@end
+@implementation NWCatalogBrandButton
+- (void)setHighlighted:(BOOL)highlighted {
+    [super setHighlighted:highlighted];
+    self.alpha = highlighted ? 0.65 : 1.0;
 }
+@end
 
 @interface NWBluetoothCatalogViewController : UITableViewController
 @property(nonatomic) NSUInteger platform;
@@ -86,6 +108,11 @@ static UIImage *brandButtonImage(NSString *name) {
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh:)
         name:NWBluetoothChanged object:nil];
     [self refresh:nil];
+    NWDiagnosticRecord(@"catalog_ui", @"view_loaded", @{@"renderer": @"cg-bitmap-original-v1"});
+}
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    NWDiagnosticRecord(@"catalog_ui", @"appeared", @{@"renderer": @"cg-bitmap-original-v1"});
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)viewWillAppear:(BOOL)animated {
@@ -173,7 +200,8 @@ static UIImage *brandButtonImage(NSString *name) {
     UITableViewHeaderFooterView *header = [[UITableViewHeaderFooterView alloc] initWithReuseIdentifier:nil];
     UIListContentConfiguration *content = [UIListContentConfiguration groupedHeaderConfiguration];
     content.text = NWText(@"bt.catalog.selection");
-    content.image = brandImage(self.platform == 1 ? @"android" : brandAssets()[self.platform]);
+    content.image = brandImage(self.platform == 1 ? @"android" : brandAssets()[self.platform],
+        UIColor.secondaryLabelColor, self.traitCollection, NO);
     content.imageProperties.tintColor = UIColor.secondaryLabelColor;
     content.imageProperties.maximumSize = CGSizeMake(self.platform == 3 ? 48 : 18, 18);
     header.contentConfiguration = content; return header;
@@ -197,29 +225,41 @@ static UIImage *brandButtonImage(NSString *name) {
             for (NSUInteger column = 0; column < columns; ++column) {
                 NSUInteger platform = row * columns + column;
                 BOOL selected = platform == self.platform;
-                UIButtonConfiguration *configuration = selected ? [UIButtonConfiguration tintedButtonConfiguration] : [UIButtonConfiguration plainButtonConfiguration];
-                configuration.title = brandNames()[platform];
-                configuration.subtitle = platform == 1 ? @"Android · Fast Pair" : platform == 2 ? @"Windows · Swift Pair" : platform == 3 ? @"Galaxy · EasySetup" : @"iPhone / iPad";
-                configuration.image = brandButtonImage(brandAssets()[platform]); configuration.imagePadding = 4;
-                configuration.titleAlignment = UIButtonConfigurationTitleAlignmentLeading;
-                configuration.contentInsets = NSDirectionalEdgeInsetsMake(10, 2, 10, 2);
-                configuration.titleLineBreakMode = NSLineBreakByWordWrapping;
-                configuration.subtitleLineBreakMode = NSLineBreakByWordWrapping;
-                configuration.baseForegroundColor = selected ? NWAccentColor() : UIColor.labelColor;
-                configuration.titleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey, id> *(NSDictionary<NSAttributedStringKey, id> *attributes) {
-                    NSMutableDictionary *result = [attributes mutableCopy];
-                    result[NSFontAttributeName] = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline]; return result;
-                };
-                configuration.subtitleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey, id> *(NSDictionary<NSAttributedStringKey, id> *attributes) {
-                    NSMutableDictionary *result = [attributes mutableCopy];
-                    result[NSFontAttributeName] = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2]; return result;
-                };
-                UIButton *button = [UIButton buttonWithConfiguration:configuration primaryAction:nil];
-                button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
-                button.tag = platform; button.enabled = !NWBluetoothBusy();
-                button.titleLabel.numberOfLines = 0;
-                button.titleLabel.adjustsFontForContentSizeCategory = YES;
-                button.accessibilityLabel = [NSString stringWithFormat:@"%@, %@", configuration.title, configuration.subtitle];
+                BOOL enabled = !NWBluetoothBusy();
+                UIColor *foreground = enabled ? (selected ? NWAccentColor() : UIColor.labelColor) : UIColor.tertiaryLabelColor;
+                UIButton *button = [NWCatalogBrandButton buttonWithType:UIButtonTypeCustom];
+                button.tag = platform; button.enabled = enabled;
+                button.backgroundColor = selected ? [NWAccentColor() colorWithAlphaComponent:0.12] : UIColor.clearColor;
+                button.layer.cornerRadius = 12;
+                UIImageView *logo = [[UIImageView alloc] initWithImage:
+                    brandImage(brandAssets()[platform], foreground, self.traitCollection, YES)];
+                logo.contentMode = UIViewContentModeCenter;
+                [logo.widthAnchor constraintEqualToConstant:64].active = YES;
+                [logo.heightAnchor constraintEqualToConstant:24].active = YES;
+                UILabel *title = [UILabel new], *subtitle = [UILabel new];
+                title.text = brandNames()[platform];
+                subtitle.text = platform == 1 ? @"Android · Fast Pair" : platform == 2 ? @"Windows · Swift Pair" : platform == 3 ? @"Galaxy · EasySetup" : @"iPhone / iPad";
+                title.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
+                subtitle.font = [UIFont preferredFontForTextStyle:UIFontTextStyleCaption2];
+                title.textColor = subtitle.textColor = foreground;
+                title.numberOfLines = subtitle.numberOfLines = 0;
+                title.adjustsFontForContentSizeCategory = subtitle.adjustsFontForContentSizeCategory = YES;
+                UIStackView *labels = [[UIStackView alloc] initWithArrangedSubviews:@[title, subtitle]];
+                labels.axis = UILayoutConstraintAxisVertical; labels.spacing = 2;
+                UIStackView *content = [[UIStackView alloc] initWithArrangedSubviews:@[logo, labels]];
+                content.alignment = UIStackViewAlignmentCenter; content.spacing = 4;
+                content.userInteractionEnabled = NO;
+                content.translatesAutoresizingMaskIntoConstraints = NO;
+                [button addSubview:content];
+                [NSLayoutConstraint activateConstraints:@[
+                    [content.leadingAnchor constraintEqualToAnchor:button.leadingAnchor constant:2],
+                    [content.trailingAnchor constraintEqualToAnchor:button.trailingAnchor constant:-2],
+                    [content.topAnchor constraintEqualToAnchor:button.topAnchor constant:10],
+                    [content.bottomAnchor constraintEqualToAnchor:button.bottomAnchor constant:-10]]];
+                button.isAccessibilityElement = YES;
+                logo.isAccessibilityElement = title.isAccessibilityElement = subtitle.isAccessibilityElement = NO;
+                button.accessibilityLabel = [NSString stringWithFormat:@"%@, %@", title.text, subtitle.text];
+                if (!enabled) button.accessibilityTraits |= UIAccessibilityTraitNotEnabled;
                 if (selected) button.accessibilityTraits |= UIAccessibilityTraitSelected;
                 button.accessibilityIdentifier = [NSString stringWithFormat:@"nw.catalog.platform.%lu", (unsigned long)platform];
                 [button.heightAnchor constraintGreaterThanOrEqualToConstant:56].active = YES;
@@ -374,13 +414,40 @@ int NWBluetoothCatalogUIRegressionSinglePresent(void) {
 int NWBluetoothCatalogUIRegressionCheck(void) {
     NWBluetoothCatalogViewController *controller = [NWBluetoothCatalogViewController new];
     [controller loadViewIfNeeded];
-    for (NSString *asset in @[@"apple", @"google", @"microsoft", @"samsung", @"android"])
-        if (!brandImage(asset)) return 13;
+    for (NSString *asset in @[@"apple", @"google", @"microsoft", @"samsung", @"android"]) {
+        for (NSNumber *density in @[@1, @2, @3]) for (NSNumber *dark in @[@NO, @YES]) {
+            UITraitCollection *traits = [UITraitCollection traitCollectionWithTraitsFromCollections:@[
+                [UITraitCollection traitCollectionWithDisplayScale:density.doubleValue],
+                [UITraitCollection traitCollectionWithUserInterfaceStyle:dark.boolValue ? UIUserInterfaceStyleDark : UIUserInterfaceStyleLight]]];
+            UIImage *image = brandImage(asset, UIColor.labelColor, traits, YES);
+            if (!image.CGImage || image.renderingMode != UIImageRenderingModeAlwaysOriginal ||
+                !CGSizeEqualToSize(image.size, CGSizeMake(64, 24)) || image.scale != density.doubleValue ||
+                CGImageGetWidth(image.CGImage) != 64 * density.unsignedIntegerValue ||
+                CGImageGetHeight(image.CGImage) != 24 * density.unsignedIntegerValue) return 13;
+            NSData *pixels = CFBridgingRelease(CGDataProviderCopyData(CGImageGetDataProvider(image.CGImage)));
+            const unsigned char *bytes = pixels.bytes;
+            NSUInteger opaque = 0, transparent = 0;
+            // The cached result must contain alpha and the already resolved
+            // black/white pixels; UIKit should never have to tint this logo.
+            for (NSUInteger i = 0; i + 3 < pixels.length; i += 4) {
+                if (bytes[i + 3] == 0) ++transparent;
+                if (bytes[i + 3] < 250) continue;
+                ++opaque;
+                unsigned expected = dark.boolValue ? bytes[i + 3] : 0;
+                for (unsigned c = 0; c < 3; ++c)
+                    if (abs((int)bytes[i + c] - (int)expected) > 2) return 17;
+            }
+            if (!opaque || !transparent || image != brandImage(asset, UIColor.labelColor, traits, YES)) return 18;
+        }
+    }
     UITableViewCell *brands = [controller tableView:controller.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
     UIStackView *selectorView = (UIStackView *)brands.contentView.subviews.firstObject;
     NSUInteger buttons = 0;
     for (UIStackView *pair in selectorView.arrangedSubviews) for (UIButton *button in pair.arrangedSubviews) {
-        if (!button.configuration.image || !button.accessibilityLabel.length ||
+        UIStackView *content = (UIStackView *)button.subviews.firstObject;
+        UIImageView *logo = (UIImageView *)content.arrangedSubviews.firstObject;
+        if (button.configuration || !logo.image.CGImage || logo.image.renderingMode != UIImageRenderingModeAlwaysOriginal ||
+            content.userInteractionEnabled || !button.accessibilityLabel.length ||
             button.tag != (NSInteger)buttons) return 14;
         if (((button.accessibilityTraits & UIAccessibilityTraitSelected) != 0) != (buttons == controller.platform)) return 15;
         ++buttons;

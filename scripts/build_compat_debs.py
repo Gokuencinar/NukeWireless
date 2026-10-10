@@ -18,7 +18,7 @@ from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 from embedded_ui import embed_ui, LIBRARIES, LOADS
 
-VERSION = "2.0.0~diagnostic8"
+VERSION = "2.0.0~diagnostic9"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -57,7 +57,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[BASE_APP + "Info.plist"])
-    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20008", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0", NukeWirelessUIIntegration="embedded-required-v1")
+    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20009", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0", NukeWirelessUIIntegration="embedded-required-v1")
     replacement = {
         BASE_APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         BASE_APP + "HarpyReloaded": embed_ui(original[BASE_APP + "HarpyReloaded"]),
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline", type=Path)
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic8")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic9")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     # The guarded startup resource/Swift patches remain guarded in the original builder.

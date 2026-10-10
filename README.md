@@ -4,6 +4,15 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic9+bundle1: candidata para el cierre gráfico del catálogo.**
+Sustituye los logos template y su estilizado en botones configurados por bitmaps
+coloreados con CoreGraphics y botones custom. Conserva alineación, marcas,
+accesibilidad, apariencia y controles de emisión. La traza del iPhone 8 Plus
+apunta a CoreUI/CoreImage al dibujar una imagen; no demuestra todavía la causa
+raíz ni una reparación física. Compilación y aceptación pendientes.
+El error independiente de transporte Bluetooth no está corregido por este cambio.
+Véase [investigación del cierre](docs/CATALOG-GRAPHICS-DIAGNOSTIC9.md).
+
 **2.0.0~diagnostic8+bundle1: interfaz integrada en la app.**
 La interfaz actual y el adaptador de red pasan a ser bibliotecas obligatorias
 del bundle. La app deja de arrancar con la pantalla Info antigua cuando no hay

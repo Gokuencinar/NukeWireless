@@ -20,7 +20,7 @@ from package_utils import directory, get_tar_member, pack_ar, read_ar, regular, 
 from startup_resources import patch_splash_resources
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2.0.0~diagnostic8"
+VERSION = "2.0.0~diagnostic9"
 WORKER_VERSION = "2.0.0~diagnostic2"
 EXPECTED_SOURCE_SHA256 = "83b8f4364194ecabda0e516659568e7e92af656c0cfa82222ccb596239bfc128"
 EXPECTED_APP_SHA256 = "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11"
@@ -82,7 +82,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text(encoding="utf-8"))
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-diagnostic8" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-diagnostic9" not in library:
         raise ValueError("wrong development library version")
     helper = (artifact / "nw-hotspot").read_bytes()
     if manifest.get("hotspot_helper_sha256") != sha(helper):
@@ -104,7 +104,7 @@ def build(source, artifact, output):
         raise ValueError("missing or mismatched inspected startup resources")
     metadata = plistlib.loads(original[APP + "Info.plist"])
     metadata.update(CFBundleDisplayName="NukeWireless Dev", CFBundleName="NukeWireless",
-                    CFBundleShortVersionString=VERSION, CFBundleVersion="20008",
+                    CFBundleShortVersionString=VERSION, CFBundleVersion="20009",
                     NukeWirelessPackageScheme="roothide", NukeWirelessWorkerVersion=WORKER_VERSION,
                     NukeWirelessSourceCommit=manifest.get("source_commit", "unknown"),
                     UIFileSharingEnabled=True, LSSupportsOpeningDocumentsInPlace=True,
