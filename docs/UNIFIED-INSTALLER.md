@@ -1,4 +1,13 @@
-# Instalador único · diagnostic6+bundle3
+# Instalador único · diagnostic7+bundle1
+
+La entrega actual contiene app diagnostic7 (CFBundleVersion 20007) y Bluetooth
+diagnostic2, con rutas `Applications/NukeWireless.app/NukeWireless` y
+`usr/libexec/nukewireless`. Conserva el paquete único, los permisos, la corrección
+de rutas canónicas de bundle3 y la ausencia de límites de instalación de iOS.
+Véase [renombrado y validación de diagnostic7](INSTALL-LAYOUT-DIAGNOSTIC7.md).
+La validación física de esta entrega está pendiente.
+
+## Entrega anterior: diagnostic6+bundle3
 
 Cada variante RootHide, Dopamine/rootless y rootful se distribuye ahora en un DEB
 `com.gokuencinar.nukewireless_2.0.0~diagnostic6+bundle3_<arquitectura>.deb`.

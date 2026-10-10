@@ -1,6 +1,8 @@
 # Candidatas de compatibilidad iOS 15–18: compat4
 
-Edición actual para testers: [NukeWireless Dev 2.0.0~diagnostic6+bundle2](DIAGNOSTIC-EDITION.md).
+Edición actual para testers: [NukeWireless Dev 2.0.0~diagnostic7+bundle1](DIAGNOSTIC-EDITION.md).
+Desde diagnostic7 la app se instala como `NukeWireless.app` y el ejecutable
+como `NukeWireless`; véase [migración de nombres](INSTALL-LAYOUT-DIAGNOSTIC7.md).
 Las validaciones históricas de dev53/compat4 no equivalen a aceptación de esta edición.
 
 Preparadas desde las fuentes de **dev53**, con el trabajador **app32**.
@@ -23,9 +25,9 @@ Véase [port y fuentes primarias de ABI](BLUETOOTH-SKYWALK-PORT.md).
 
 | Variante | Arquitectura Debian | App | Inyección | Entorno previsto |
 | --- | --- | --- | --- | --- |
-| RootHide | iphoneos-arm64e | /Applications/HarpyReloaded.app | /usr/lib/TweakInject | Bootstrap RootHide |
-| Dopamine rootless | iphoneos-arm64 | /var/jb/Applications/HarpyReloaded.app | /var/jb/Library/MobileSubstrate/DynamicLibraries | Dopamine convencional |
-| Rootful | iphoneos-arm | /Applications/HarpyReloaded.app | /Library/MobileSubstrate/DynamicLibraries | Jailbreak rootful compatible con el equipo/iOS |
+| RootHide | iphoneos-arm64e | /Applications/NukeWireless.app | /usr/lib/TweakInject | Bootstrap RootHide |
+| Dopamine rootless | iphoneos-arm64 | /var/jb/Applications/NukeWireless.app | /var/jb/Library/MobileSubstrate/DynamicLibraries | Dopamine convencional |
+| Rootful | iphoneos-arm | /Applications/NukeWireless.app | /Library/MobileSubstrate/DynamicLibraries | Jailbreak rootful compatible con el equipo/iOS |
 
 Solo instalar la variante del bootstrap real. Todas contienen Mach-O **arm64**;
 la etiqueta Debian RootHide no convierte la app en arm64e. Conservan los IDs

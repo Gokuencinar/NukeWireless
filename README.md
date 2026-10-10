@@ -9,8 +9,10 @@ La app se instala en `Applications/NukeWireless.app`, con ejecutable
 `NukeWireless`, y los ayudantes en `usr/libexec/nukewireless`.
 Actualiza las comprobaciones de ruta de Wi-Fi, punto de acceso y Bluetooth;
 el componente Bluetooth pasa a `2.0.0~diagnostic2`. Conserva la identidad de
-firma y los datos existentes. Compilación y entrega en preparación;
-validación física pendiente. Véase [migración de nombres](docs/INSTALL-LAYOUT-DIAGNOSTIC7.md).
+firma y los datos existentes. Compilación, 46 comprobaciones UI y cuatro ciclos
+de segundo plano por idioma aprobados. Los tres DEB pasaron la inspección y
+la actualización/retirada en dpkg aislado. Validación física pendiente.
+Véase [migración de nombres](docs/INSTALL-LAYOUT-DIAGNOSTIC7.md).
 
 **2.0.0~diagnostic6+bundle3: corrección de rutas del instalador rootless.**
 Elimina las entradas de directorio con componentes `.` que registraban

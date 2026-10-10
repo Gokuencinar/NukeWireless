@@ -44,8 +44,28 @@ deliver the output of `build_compat_debs.py` / `build_unified_deb.py` only.
 ## Validation status
 
 - Local layout and ARM64 parent-validation tests: passed.
-- Fresh compilation, simulator regression and final DEB inspection: pending.
+- Fresh compilation: passed for source commit
+  `3378895f46b60b6e5bde34f41bc09472c426211e`.
+- Simulator regression: 46 checks and four background/foreground cycles per
+  language (English and Spanish), passed.
+- Final DEB inspection: eight compatibility tests, six locally runnable unified
+  tests and three layout/ARM64 whitelist tests, passed. The three Linux-only
+  tests skipped on Windows ran successfully in Linux CI.
 - Isolated Linux dpkg tests cover fresh install, upgrade from old split/unified
-  layouts, ownership and removal for RootHide/rootless/rootful: pending CI.
+  layouts, ownership and removal for RootHide/rootless/rootful: passed in CI.
 - Physical upgrade, opening, scanning, block/unblock and Bluetooth repetition:
   pending; previous-version acceptance is not evidence for this renamed build.
+
+CI on 10 October 2026:
+
+- [Compatibility compile and UI](https://github.com/Gokuencinar/NukeWireless/actions/runs/38064128551)
+- [Development compile and UI](https://github.com/Gokuencinar/NukeWireless/actions/runs/38064128546)
+- [Isolated dpkg migration](https://github.com/Gokuencinar/NukeWireless/actions/runs/38064128561)
+
+Unified `2.0.0~diagnostic7+bundle1` delivery SHA-256:
+
+| Bootstrap | SHA-256 |
+| --- | --- |
+| RootHide (`iphoneos-arm64e`) | `4104c319f83e37722bba1df720727aa459c623474de55f71cd5df8bdf4bb6c96` |
+| Dopamine/rootless (`iphoneos-arm64`) | `55bc50d415bacef8078dcc02d1d9bca454b9b9040ebc8ec0a76c4570ca4af40b` |
+| Rootful (`iphoneos-arm`) | `fbe6e474f00d0eb0c240e679efe4ec10b426a9c5e0ac60b1db2ebe7f0694a296` |
