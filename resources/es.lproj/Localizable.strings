@@ -216,7 +216,7 @@
 "bt.catalog.emit" = "Emitir todos (%lu) · 10 s";
 "bt.catalog.emit_hint" = "O toca ▶ junto a un modelo";
 "bt.catalog.partial" = "Se emiten solo los modelos con perfil disponible";
-"bt.catalog.worker_required" = "Emisión no disponible. Requiere el módulo Bluetooth app32.";
+"bt.catalog.worker_required" = "Emisión no disponible. Instala el paquete completo de NukeWireless para tu jailbreak, incluido su componente Bluetooth.";
 "bt.catalog.profile_available" = "Perfil de anuncio disponible";
 "bt.catalog.profile_unavailable" = "Emisión no disponible";
 "bt.catalog.emission_note" = "El anuncio incluye el modelo del perfil. Emisión manual de 10 s, sin emparejamiento ni aviso garantizado.";

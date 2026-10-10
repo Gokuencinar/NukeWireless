@@ -216,7 +216,7 @@
 "bt.catalog.emit" = "Advertise all (%lu) · 10 s";
 "bt.catalog.emit_hint" = "Or tap ▶ beside a model";
 "bt.catalog.partial" = "Only models with an available profile are advertised";
-"bt.catalog.worker_required" = "Advertising unavailable. Requires Bluetooth module app32.";
+"bt.catalog.worker_required" = "Advertising unavailable. Install the complete NukeWireless package for your jailbreak, including its Bluetooth component.";
 "bt.catalog.profile_available" = "Advertising profile available";
 "bt.catalog.profile_unavailable" = "Advertising unavailable";
 "bt.catalog.emission_note" = "The advertisement includes the profile model. Manual 10 s advertising, without pairing or guaranteed notifications.";

@@ -1,4 +1,5 @@
 #include "../NWLegacyABI.h"
+#include "../NWRouteNeighbors.h"
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
  * Recompiled for iOS 15; bootstrap paths and native-entry guards adapted here.
@@ -9,34 +10,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
-#if __has_include(<net/route.h>)
-#include <net/route.h>
-#else
-/* iPhoneOS SDKs omit the BSD routing-table declarations. Keep the Darwin
- * rt_msghdr layout needed by the ARP cache parser local to this tweak. */
-#define NET_RT_FLAGS 2
-#define RTF_LLINFO 0x400
-#define RTAX_DST 0
-#define RTAX_GATEWAY 1
-#define RTAX_MAX 8
-struct rt_metrics {
-    unsigned long rmx_locks, rmx_mtu, rmx_hopcount, rmx_expire;
-    unsigned long rmx_recvpipe, rmx_sendpipe, rmx_ssthresh, rmx_rtt;
-    unsigned long rmx_rttvar, rmx_weight;
-    uint32_t rmx_filler[3];
-};
-struct rt_msghdr {
-    unsigned short rtm_msglen;
-    unsigned char rtm_version, rtm_type;
-    unsigned short rtm_index;
-    int rtm_flags, rtm_addrs;
-    pid_t rtm_pid;
-    int rtm_seq, rtm_errno, rtm_use;
-    uint32_t rtm_inits;
-    struct rt_metrics rtm_rmx;
-};
-#endif
+/* Same pinned Apple header used by the hotspot helper. The previous fallback
+ * used 64-bit unsigned long metrics and therefore skipped real ARP entries. */
+#include "../hotspot/vendor/net/route.h"
+#include <net/if.h>
 #include <net/if_dl.h>
+_Static_assert(sizeof(struct rt_msghdr) == NW_ROUTE_HEADER_SIZE, "Darwin route ABI mismatch");
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -319,7 +298,7 @@ static int get_mac_from_arp_table(const char *ip, char *mac, unsigned long mac_s
     if (inet_pton(AF_INET, ip, &wanted) != 1) return 0;
     int mib[6] = {CTL_NET, PF_ROUTE, 0, AF_INET, NET_RT_FLAGS, RTF_LLINFO};
     size_t length = 0;
-    if (sysctl(mib, 6, 0, &length, 0, 0) != 0 || !length) {
+    if (sysctl(mib, 6, 0, &length, 0, 0) != 0 || !length || length > 2 * 1024 * 1024) {
         debug_line("arp-sysctl", "size query failed");
         return 0;
     }
@@ -334,44 +313,11 @@ static int get_mac_from_arp_table(const char *ip, char *mac, unsigned long mac_s
         free(buffer);
         return 0;
     }
-    char *cursor = buffer;
-    char *end = cursor + length;
-    int found = 0;
-    while (cursor + sizeof(struct rt_msghdr) <= end) {
-        struct rt_msghdr *message = (struct rt_msghdr *)cursor;
-        if (message->rtm_msglen < sizeof(struct rt_msghdr) ||
-            cursor + message->rtm_msglen > end) break;
-        char *next = cursor + message->rtm_msglen;
-        char *address_cursor = cursor + sizeof(struct rt_msghdr);
-        struct sockaddr *destination = 0;
-        struct sockaddr *gateway = 0;
-        for (int index = 0; index < RTAX_MAX && address_cursor + 2 <= next; ++index) {
-            if (!(message->rtm_addrs & (1 << index))) continue;
-            struct sockaddr *address = (struct sockaddr *)address_cursor;
-            unsigned long step = address->sa_len ? ((address->sa_len + 7) & ~7UL) : 8;
-            if (address_cursor + step > next) break;
-            if (index == RTAX_DST) destination = address;
-            if (index == RTAX_GATEWAY) gateway = address;
-            address_cursor += step;
-        }
-        if (destination && gateway && destination->sa_family == AF_INET &&
-            gateway->sa_family == AF_LINK &&
-            destination->sa_len >= sizeof(struct sockaddr_in) &&
-            gateway->sa_len >= sizeof(struct sockaddr_dl)) {
-            struct sockaddr_in *d = (struct sockaddr_in *)destination;
-            struct sockaddr_dl *g = (struct sockaddr_dl *)gateway;
-            if (d->sin_addr.s_addr == wanted.s_addr && g->sdl_alen == 6 &&
-                mac_size >= 18 &&
-                (char *)LLADDR(g) + 6 <= (char *)gateway + gateway->sa_len) {
-                const unsigned char *bytes = (const unsigned char *)LLADDR(g);
-                snprintf(mac, mac_size, "%02x:%02x:%02x:%02x:%02x:%02x",
-                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
-                found = 1;
-                break;
-            }
-        }
-        cursor = next;
-    }
+    uint8_t bytes[6];
+    int found = mac_size >= 18 && NWRouteFindIPv4MAC(buffer, length,
+        (const uint8_t *)&wanted.s_addr, if_nametoindex("en0"), bytes);
+    if (found) snprintf(mac, mac_size, "%02x:%02x:%02x:%02x:%02x:%02x",
+        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
     free(buffer);
     debug_line("arp-sysctl-mac", found ? mac : "not found");
     return found;
@@ -1598,6 +1544,19 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
     int has_gateway = is_arpoison && get_gateway(gateway_ip, sizeof(gateway_ip),
                                                 gateway_mac, sizeof(gateway_mac));
     if (is_arpoison) debug_line("gateway-found", has_gateway ? "yes" : "no");
+    if (is_arpoison && !repair_in_progress) {
+        // Source-defined reporting API, optional until the UI extension loads.
+        // Capture preflight only; a gateway identity is not proof of blocking.
+        void (*record)(id, id, id) = (void *)dlsym((void *)-2, "NWDiagnosticRecord");
+        if (record) {
+            id details = ((id (*)(id, SEL, id, id))objc_msgSend)(objc_getClass("NSDictionary"),
+                sel_registerName("dictionaryWithObject:forKey:"),
+                string_from_utf8(has_gateway ? "ready" : "gateway_identity_unavailable"),
+                string_from_utf8("preflight"));
+            record(string_from_utf8("wifi_block_launch"),
+                string_from_utf8(has_gateway ? "captured" : "failed"), details);
+        }
+    }
     char phone_mac[32] = {0};
     int has_phone_mac = is_arpoison && get_interface_mac("en0", phone_mac, sizeof(phone_mac));
     if (is_arpoison) debug_line("phone-mac", has_phone_mac ? phone_mac : "missing");
