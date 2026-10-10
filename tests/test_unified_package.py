@@ -231,15 +231,24 @@ class FixtureTests(unittest.TestCase):
         record, = list((admin / "info").glob(unified.PACKAGE+"*.list"))
         before = record.read_bytes()
         self.assertIn(b"/var/jb/.\n", before)
-        repair = ["sh", str(ROOT / "scripts/repair_rootless_package_list.sh"), str(admin)]
-        result = subprocess.run(repair, capture_output=True, text=True)
+        # Match the reported bootstrap: only the already available tools, no awk.
+        minimal_bin = self.folder / "recovery-tools"
+        minimal_bin.mkdir()
+        for tool in ["id", "dpkg-query", "grep", "mktemp", "cp", "mv", "rm"]:
+            executable = shutil.which(tool)
+            self.assertIsNotNone(executable, tool)
+            (minimal_bin / tool).symlink_to(executable)
+        recovery_env = dict(os.environ, PATH=str(minimal_bin))
+        self.assertIsNone(shutil.which("awk", path=recovery_env["PATH"]))
+        repair = [shutil.which("sh"), str(ROOT / "scripts/repair_rootless_package_list.sh"), str(admin)]
+        result = subprocess.run(repair, env=recovery_env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
         self.assertEqual(record.read_bytes(), b"".join(line for line in before.splitlines(keepends=True)
                                                      if line != b"/var/jb/.\n"))
         backup, = list((admin / "info").glob(record.name+".nw-backup.*"))
         self.assertEqual(backup.read_bytes(), before)
         # A second invocation must leave the already repaired database alone.
-        result = subprocess.run(repair, capture_output=True, text=True)
+        result = subprocess.run(repair, env=recovery_env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
         result = subprocess.run(command+["--remove", unified.PACKAGE], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout+result.stderr)

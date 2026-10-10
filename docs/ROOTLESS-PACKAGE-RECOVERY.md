@@ -26,6 +26,11 @@ La propia [interfaz de Dopamine 2.4.4](https://github.com/opa334/Dopamine/blob/2
 explica que su opción cambia `mobile` y que esa contraseña se usa con `sudo`.
 Al escribirla no se muestran caracteres; es normal.
 
+Si una copia antigua del script muestra `awk: not found`, sustituirla por la
+actual y repetir el mismo comando. Esa copia se detenía antes de reemplazar
+el registro original. La revisión actual filtra la línea con funciones internas
+de `sh`; la prueba de recuperación utiliza un PATH sin `awk`.
+
 El script comprueba el paquete y su versión, hace una copia de seguridad y
 elimina **solo la línea exacta `/var/jb/.`** de su registro `.list`. Conserva las
 demás líneas, propietario y permisos. Imprime la ruta de la copia. No borra

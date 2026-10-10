@@ -45,7 +45,17 @@ cp -p "$record" "$backup"
 temporary=$(mktemp "$record.nw-repair.XXXXXX")
 trap 'rm -f "$temporary"' EXIT HUP INT TERM
 cp -p "$record" "$temporary"
-awk '$0 != "/var/jb/." { print }' "$backup" > "$temporary"
+# Use shell builtins: awk is not necessarily installed in a Dopamine bootstrap.
+# Preserve every other byte, including a final line without a newline.
+while :; do
+    last_line=false
+    IFS= read -r entry || last_line=true
+    if [ "$entry" != '/var/jb/.' ]; then
+        printf '%s' "$entry"
+        if [ "$last_line" = false ]; then printf '\n'; fi
+    fi
+    if [ "$last_line" = true ]; then break; fi
+done < "$backup" > "$temporary"
 # Preserve permissions/ownership via cp -p, then replace on the same filesystem.
 mv -f "$temporary" "$record"
 trap - EXIT HUP INT TERM
