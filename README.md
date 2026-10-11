@@ -9,8 +9,10 @@ Conserva el método Objective-C y cubre la entrada Swift del ejecutable fijado,
 con comprobación de bytes y carga explícita de la API del backend si hace falta.
 Las llamadas anidadas limpian una vez el proceso propio de la misma IP.
 El JSON indica si el hook nativo está instalado. Bluetooth sigue en diagnostic6.
-Pruebas, instalación y aceptación pendientes; la caída del resto de la red
-comunicada por el usuario sigue sin causa confirmada.
+Instalada en el XS de referencia: carga del backend y del hook nativo observadas.
+Aceptación del desbloqueo pendiente; la caída del resto de la red comunicada por
+el usuario sigue sin causa confirmada.
+Compilación y regresiones aprobadas; DEB unificados validados en los tres esquemas.
 Véase [implementación y límites](docs/WIFI-UNBLOCK-DIAGNOSTIC16.md).
 
 **2.0.0~diagnostic15: corrección incompleta en dispositivo.**

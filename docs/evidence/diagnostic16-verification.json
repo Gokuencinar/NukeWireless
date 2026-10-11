@@ -1,0 +1,366 @@
+{
+  "package_version": "2.0.0~diagnostic16+bundle1",
+  "worker_version": "2.0.0~diagnostic6",
+  "source_commit": "254e353f32062ce7df2dd1003aced56b489c9d43",
+  "ci": [
+    {
+      "id": 38183157950,
+      "name": "Unified installer packaging",
+      "head_sha": "254e353f32062ce7df2dd1003aced56b489c9d43",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157950",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38183157898,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "254e353f32062ce7df2dd1003aced56b489c9d43",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157898",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38183157900,
+      "name": "Development build",
+      "head_sha": "254e353f32062ce7df2dd1003aced56b489c9d43",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157900",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38183166607,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "254e353f32062ce7df2dd1003aced56b489c9d43",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38183166607",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic16+bundle1_iphoneos-arm64e.deb",
+      "sha256": "5c3ad8357a1574a906b56b58616b2cea8fb165c1b474f5023b7a5fa640fbc06f"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic16+bundle1_iphoneos-arm64.deb",
+      "sha256": "929c2a38e9f39c624ea6e7d18235baea604599afd62a072cea01a88e5e260121"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic16+bundle1_iphoneos-arm.deb",
+      "sha256": "7ac82c2f7bd9cab3ab00db99ef924a70ba6221491d9abbf46fbf6d9d92171018"
+    }
+  ],
+  "checks": [
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "passed_reference_iphone11_2_ios16_3_1_roothide",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "catalog_rendering": "cg-bitmap-original-v1",
+  "physical_crash_fix_confirmed": false,
+  "diagnostics": {
+    "important_events_limit": 32,
+    "recent_events_limit": 64,
+    "per_peer_process_results": true,
+    "stderr_raw_output_exported": false,
+    "external_connectivity_verified": false,
+    "xr_wifi_block_fix_confirmed": false
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "configuration_policy": "h4-stream-effective-v2",
+    "prior_failure_stage": "le_capabilities_hci_completion_timeout",
+    "wake_ownership": "btwake_fd_session_v1",
+    "physical_uart_advertising_confirmed": false
+  },
+  "input_evidence": {
+    "report_sha256": "02e77daadc78ace7be697fbd20ccbb508f81809db2427b89f9d5838983d3795f",
+    "app_version": "2.0.0~diagnostic13",
+    "worker_version": "2.0.0~diagnostic5",
+    "machine": "iPhone10,2",
+    "ios_version": "16.7.4",
+    "os_build": "20H240",
+    "package_scheme": "rootless",
+    "source_commit": "5c265c96f326b84911342ccb07768cb4998372c4",
+    "current_worker_emission_events": 0,
+    "failure": {
+      "error": "Controller read completion deadline expired.",
+      "error_code": "transport",
+      "stage": "le_capabilities",
+      "queries": [
+        {
+          "name": "read_local_version",
+          "opcode": 4097,
+          "timed_out": true
+        }
+      ],
+      "local_hci_commands_submitted": 1,
+      "advertising_commands_submitted": 0,
+      "connection_commands_submitted": 0,
+      "capabilities_verified": false,
+      "service_restored": true,
+      "controller_interface_ready": true,
+      "transport_details": {
+        "channel_closed": true,
+        "channel_opened": true,
+        "commands_written": 1,
+        "configuration_comparison": {
+          "matches": 1,
+          "mismatches": [],
+          "policy": "h4-stream-effective-v2",
+          "reported_differences": [
+            "20H240_kernel_control_tty_flags",
+            "input_flags",
+            "control_flags"
+          ]
+        },
+        "configuration_contract": "iphone10_2-20H240-uart-stream-v1",
+        "configuration_readback": {
+          "errno": 0,
+          "result": 0,
+          "size": 72
+        },
+        "configuration_restored": true,
+        "configuration_verified": true,
+        "experimental": true,
+        "ignored_data_packets": 0,
+        "link_speed": 3000000,
+        "observed_configuration": {
+          "control_characters": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "control_flags": 197376,
+          "input_flags": 0,
+          "input_speed": 3000000,
+          "local_flags": 0,
+          "output_flags": 0,
+          "output_speed": 3000000
+        },
+        "original_configuration": {
+          "control_characters": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "control_flags": 768,
+          "input_flags": 0,
+          "input_speed": 9600,
+          "local_flags": 0,
+          "output_flags": 0,
+          "output_speed": 9600
+        },
+        "original_read": {
+          "errno": 0,
+          "result": 0,
+          "size": 72
+        },
+        "partial_rx_bytes": 0,
+        "requested_configuration": {
+          "control_characters": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "control_flags": 232192,
+          "input_flags": 5,
+          "input_speed": 3000000,
+          "local_flags": 0,
+          "output_flags": 0,
+          "output_speed": 3000000
+        },
+        "restoration_io": {
+          "read_attempted": 1,
+          "read_errno": 0,
+          "read_result": 0,
+          "size": 72,
+          "write_errno": 0,
+          "write_result": 0
+        },
+        "restored_configuration": {
+          "control_characters": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "control_flags": 768,
+          "input_flags": 0,
+          "input_speed": 9600,
+          "local_flags": 0,
+          "output_flags": 0,
+          "output_speed": 9600
+        },
+        "rx_bytes": 0,
+        "rx_events": 0,
+        "transport": "uart-h4"
+      }
+    },
+    "note": "One current capability failure; important_events duplicates it. Historical diagnostic11/12 emissions are not diagnostic13 tests.",
+    "own_phone_unblock": {
+      "app_version": "2.0.0~diagnostic10",
+      "source_commit": "9210fb073c03a7c69a1c610d206708d236403545",
+      "machine": "iPhone11,2",
+      "ios_version": "16.3.1",
+      "scheme": "roothide",
+      "swift_unblock_hook": "unavailable",
+      "owned_block_launch_recorded": true,
+      "root_stop_recorded_for_test_peer": false,
+      "user_observation": "Blocking stopped only after restarting the app",
+      "physical_fix_acceptance": "pending"
+    }
+  },
+  "uart_tests": {
+    "wake_descriptor_ownership_failure_and_close": "passed_macos_ci",
+    "captured_20H240_readback_and_unchanged_request": "passed_macos_ci",
+    "effective_configuration_and_hardware_rejection": "passed_macos_ci",
+    "h4_socketpair_cancellation_eof_ownership": "passed_macos_ci",
+    "diagnostic_retention": "passed_macos_ci",
+    "physical_hci_response": "pending_tester",
+    "physical_advertising": "pending_tester"
+  },
+  "wifi_unblock_tests": {
+    "objective_c_direct_native_nesting_guard_exception_cleanup": "passed_macos_ci",
+    "native_entry_and_bridge_fingerprints": "passed_baseline_local",
+    "own_phone_functional_acceptance": "pending"
+  },
+  "local_package_tests": {
+    "executed_passed": 20,
+    "linux_only_skipped": 3
+  },
+  "linux_ci_package_tests": {
+    "executed_passed": 8,
+    "real_payload_test_skipped": 1,
+    "real_payload_verified_locally": true
+  },
+  "prior_wifi_unblock_acceptance": {
+    "diagnostic15": "failed_user_report_hand_stays_red",
+    "objc_hook_loaded": true,
+    "native_hook_call_not_observed": true
+  },
+  "network_wide_incident": {
+    "user_action": "block_one_device",
+    "cause": "unconfirmed",
+    "reproduction_attempted": false
+  },
+  "reference_phone_installation": {
+    "version": "2.0.0~diagnostic16+bundle1",
+    "worker_version": "2.0.0~diagnostic6",
+    "installed_bundle_version": "20016",
+    "source_commit": "254e353f32062ce7df2dd1003aced56b489c9d43",
+    "code_directory": [
+      {
+        "slot": 0,
+        "identifier": "me.midnightchips.harpy-reloaded"
+      }
+    ],
+    "readonly_service_pid_unchanged": true,
+    "new_relevant_crashes": [],
+    "installed_binary_fingerprints_match_ci": true,
+    "package_transfer_sha256_verified": true,
+    "manual_app_load": "passed_user_report_and_journal",
+    "native_unblock_hook": "installed_observed",
+    "native_unblock_diagnostic": true,
+    "backend": "/usr/lib/libsubstrate.dylib",
+    "active_block_processes": false,
+    "recovery_package": "NukeWireless-diagnostic15-backup.deb",
+    "functional_acceptance": "pending_identified_client_test"
+  }
+}

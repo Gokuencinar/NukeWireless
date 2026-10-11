@@ -51,3 +51,50 @@ IP inválida y nil. Se mantienen UI, paquetes y pruebas UART anteriores.
 No se realizará un bloqueo remoto automático. Antes de una prueba manual,
 comprobar carga y `native_unblock`, identidad del cliente y puerta de enlace.
 La pérdida general de conectividad y la aceptación de desbloqueo siguen pendientes.
+
+## Validación de entrega (12 de octubre de 2026, Europe/Madrid)
+Fuentes compiladas: `254e353f32062ce7df2dd1003aced56b489c9d43`.
+Los cuatro workflows aprobaron:
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157950)
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157898)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38183157900)
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38183166607)
+
+Las regresiones de ownership y fallo de wake, y UART con los valores del
+tester, pasaron en macOS, junto con H4,
+cancelación, EOF y propiedad del descriptor. También pasó la regresión de desbloqueo Objective-C
+con entrada directa, anidamiento, recuperación de guarda, ABI y excepción. El simulador pasó 46 comprobaciones
+y cuatro ciclos reales de segundo plano por idioma (español e inglés).
+
+Se generaron los tres DEB unificados con Bluetooth diagnostic6 incluido:
+RootHide, Dopamine/rootless y rootful.
+Pasaron 20 pruebas locales; las tres
+pruebas exclusivas de dpkg/Linux se cubrieron en CI. CI pasó ocho pruebas
+de empaquetado y omitió una de payload real, cubierta localmente.
+
+Hashes, versiones y procedencia están en
+[el registro de entrega](evidence/diagnostic16-verification.json).
+Aceptación física del desbloqueo, causa de la caída general y UART del tester: pendientes.
+
+## Instalación y carga observadas
+
+Se instaló el DEB unificado RootHide en el XS de referencia, iOS 16.3.1.
+Se verificaron transferencias SHA-256, dpkg, versión 20016, commit compilado,
+identidad CodeDirectory y fingerprints de los componentes frente a CI.
+Se conserva `NukeWireless-diagnostic15-backup.deb`, además de la copia anterior.
+No había arpoison, trabajador Bluetooth ni dpkg activos al instalar.
+No se realizaron bloqueos, ni reinicios generales; solo se cerró NukeWireless.
+
+El diagnóstico Bluetooth de solo lectura no abrió HCI ni cambió el servicio;
+bluetoothd conservó su PID y no se observaron nuevos crashes relevantes durante
+la instalación. El usuario abrió la app y confirmó diagnostic16. El diario
+confirma las fuentes instaladas y `hooks.native_unblock: true` tras el escaneo.
+El registro muestra carga de `/usr/lib/libsubstrate.dylib` y hook Swift instalado.
+La lectura posterior muestra NukeWireless abierta y ningún arpoison activo.
+
+La comprobación de los fingerprints nativos se ejecutó localmente sobre el
+baseline fijado. Las regresiones de limpieza se ejecutaron en macOS CI.
+No se confunden esos resultados con restauración real de Internet: falta
+identificar el cliente de prueba antes de repetir el bloqueo. La causa de la
+caída general continúa sin confirmar y no se publica una release.
