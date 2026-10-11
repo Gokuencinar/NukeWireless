@@ -80,34 +80,42 @@ static NSDictionary *configurationSnapshot(const struct termios *value) {
         @"control_characters": characters};
 }
 static void configureStream(struct termios *value) {
-    // This is a kernel-control SOCK_STREAM, not a tty. VMIN/VTIME and line
-    // editing characters are not socket receive controls; leave them intact.
-    cc_t characters[NCCS]; memcpy(characters, value->c_cc, sizeof(characters));
-    cfmakeraw(value); memcpy(value->c_cc, characters, sizeof(characters));
-    value->c_iflag |= IGNPAR;
+    // Preserve the request accepted by iPhone10,2 / 20H240 and the historical
+    // UART client. Keep c_cc intact: socket reads do not use tty VMIN/VTIME.
+    value->c_iflag = IGNBRK | IGNPAR; value->c_oflag = 0; value->c_lflag = 0;
     value->c_cflag = CS8 | CREAD | CLOCAL | CRTSCTS;
 }
 static NSDictionary *configurationComparison(const struct termios *wanted, const struct termios *observed) {
     NSMutableArray *mismatches = [NSMutableArray new], *normalizations = [NSMutableArray new];
+    // Observed in the exact admitted firmware's diagnostic4 readback. Accept
+    // this complete representation only, not arbitrary missing control bits.
+    // The request is unchanged; no inference that CREAD can safely be omitted.
+    BOOL kernelStreamRepresentation = wanted->c_cflag == (CS8 | CREAD | CLOCAL | CRTSCTS) &&
+        observed->c_cflag == (CS8 | CRTSCTS) && wanted->c_iflag == (IGNBRK | IGNPAR) &&
+        observed->c_iflag == 0;
+    tcflag_t expectedInput = kernelStreamRepresentation ? 0 : wanted->c_iflag;
+    tcflag_t expectedControl = kernelStreamRepresentation ? (CS8 | CRTSCTS) : wanted->c_cflag;
+    if (kernelStreamRepresentation) [normalizations addObject:@"20H240_kernel_control_tty_flags"];
     // Compare effective byte processing, not inactive tty bookkeeping. With
     // 8N1, parity-error handling flags cannot change ordinary H4 octets.
     tcflag_t inputMask = IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY;
     if ((wanted->c_cflag | observed->c_cflag) & PARENB) inputMask |= INPCK | IGNPAR;
     tcflag_t localMask = ICANON | ISIG | IEXTEN | ECHO | ECHONL | FLUSHO;
-    if ((wanted->c_iflag & inputMask) != (observed->c_iflag & inputMask)) [mismatches addObject:@"input_flags"];
+    if ((expectedInput & inputMask) != (observed->c_iflag & inputMask)) [mismatches addObject:@"input_flags"];
     if ((wanted->c_oflag & OPOST) != (observed->c_oflag & OPOST)) [mismatches addObject:@"output_processing"];
-    // All hardware control bits must match, including framing and RTS/CTS.
-    if (wanted->c_cflag != observed->c_cflag) [mismatches addObject:@"control_flags"];
+    // Framing and both RTS/CTS directions still have to match exactly.
+    if (expectedControl != observed->c_cflag) [mismatches addObject:@"control_flags"];
     if ((wanted->c_lflag & localMask) != (observed->c_lflag & localMask)) [mismatches addObject:@"local_processing"];
     speed_t inputSpeed = cfgetispeed(observed) ?: cfgetospeed(observed);
     if (cfgetispeed(wanted) != inputSpeed) [mismatches addObject:@"input_speed"];
     if (cfgetospeed(wanted) != cfgetospeed(observed)) [mismatches addObject:@"output_speed"];
     if (wanted->c_iflag != observed->c_iflag) [normalizations addObject:@"input_flags"];
+    if (wanted->c_cflag != observed->c_cflag) [normalizations addObject:@"control_flags"];
     if (wanted->c_oflag != observed->c_oflag) [normalizations addObject:@"output_flags"];
     if (wanted->c_lflag != observed->c_lflag) [normalizations addObject:@"local_flags"];
     if (memcmp(wanted->c_cc, observed->c_cc, sizeof(wanted->c_cc))) [normalizations addObject:@"tty_control_characters"];
     if (!cfgetispeed(observed)) [normalizations addObject:@"input_speed_follows_output"];
-    return @{@"policy": @"h4-stream-effective-v1", @"matches": @(mismatches.count == 0),
+    return @{@"policy": @"h4-stream-effective-v2", @"matches": @(mismatches.count == 0),
         @"mismatches": mismatches, @"reported_differences": normalizations};
 }
 @interface NWBTUART () {
@@ -130,6 +138,7 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     if ((self = [super init])) {
         _descriptor = -1;
         _details = [@{@"transport": @"uart-h4", @"experimental": @YES,
+            @"configuration_contract": @"iphone10_2-20H240-uart-stream-v1", @"commands_written": @0,
             @"channel_opened": @NO, @"configuration_verified": @NO} mutableCopy];
     }
     return self;

@@ -13,6 +13,29 @@ static NWBTUART *pair(int descriptors[2]) {
     return [[NWBTUART alloc] initWithTestDescriptor:descriptors[0]];
 }
 int main(void) { @autoreleasepool {
+    // Exact diagnostic12 / worker diagnostic4 values from the tester, not a
+    // synthesized echo of the requested struct. The old request was 0x38b00
+    // with input flags 5; this driver returned 0x30300 and input flags 0.
+    struct termios capturedOriginal = {0}, capturedReadback = {0};
+    capturedOriginal.c_cflag = 768; capturedOriginal.c_cc[VMIN] = 1;
+    assert(!cfsetspeed(&capturedOriginal, 9600));
+    capturedReadback.c_cflag = 197376; capturedReadback.c_cc[VMIN] = 1;
+    assert(!cfsetspeed(&capturedReadback, 3000000));
+    struct termios capturedRequest = capturedOriginal;
+    NSDictionary *capturedComparison = NWBTUARTTestConfiguration(&capturedRequest, &capturedReadback);
+    assert([capturedComparison[@"matches"] boolValue]);
+    assert(capturedRequest.c_cflag == 232192 && capturedRequest.c_iflag == 5);
+    assert([capturedComparison[@"reported_differences"] containsObject:@"20H240_kernel_control_tty_flags"]);
+    assert(capturedRequest.c_oflag == 0 && capturedRequest.c_lflag == 0);
+    assert(!memcmp(capturedRequest.c_cc, capturedOriginal.c_cc, sizeof(capturedOriginal.c_cc)));
+    // Missing either hardware flow-control direction must still fail.
+    const tcflag_t flowBits[] = {CCTS_OFLOW, CRTS_IFLOW};
+    for (NSUInteger i=0; i<2; ++i) {
+        struct termios incomplete = capturedReadback;
+        incomplete.c_cflag &= ~flowBits[i];
+        capturedRequest = capturedOriginal;
+        assert(![NWBTUARTTestConfiguration(&capturedRequest, &incomplete)[@"matches"] boolValue]);
+    }
     // Kernel-control streams are not tty reads. A driver may normalize unused
     // line-editing characters without changing framing, speed or H4 octets.
     struct termios original = {0}, wanted = {0}, observed = {0};
@@ -98,6 +121,6 @@ int main(void) { @autoreleasepool {
     assert(![uart send:[NSData dataWithBytes:command length:3]] && uart.error);
     assert(NSProcessInfo.processInfo.systemUptime-started < 2.0);
     [uart close]; close(fds[1]);
-    puts("UART effective configuration, hardware rejection, socketpair, cancellation, EOF and ownership passed");
+    puts("UART captured 20H240 readback, effective configuration, hardware rejection, socketpair, cancellation, EOF and ownership passed");
     return 0;
 } }

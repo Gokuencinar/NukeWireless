@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic13: contrato UART contrastado con el readback del tester.**
+Reconoce la representación 0x30300/0 que el driver devuelve al solicitar
+0x38b00/5, conservando la solicitud, velocidad, framing, flujo y recuperación.
+Añade regresión con los valores reales de iPhone10,2 / 20H240. Bluetooth
+`2.0.0~diagnostic5`. Candidata; respuestas HCI y emisión física pendientes.
+Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC13.md).
+
 **2.0.0~diagnostic12: corrección de validación UART y trazas de configuración.**
 Conserva los caracteres de terminal del socket y valida los parámetros efectivos
 del enlace H4, con velocidad y control de flujo obligatorios. Distingue error de
