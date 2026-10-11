@@ -1,0 +1,12 @@
+{
+  "app_version": "2.0.0~diagnostic10",
+  "source_commit": "9210fb073c03a7c69a1c610d206708d236403545",
+  "machine": "iPhone11,2",
+  "ios_version": "16.3.1",
+  "scheme": "roothide",
+  "swift_unblock_hook": "unavailable",
+  "owned_block_launch_recorded": true,
+  "root_stop_recorded_for_test_peer": false,
+  "user_observation": "Blocking stopped only after restarting the app",
+  "physical_fix_acceptance": "pending"
+}

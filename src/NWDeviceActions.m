@@ -5,9 +5,13 @@
 #import "NWScanBridge.h"
 #import <objc/runtime.h>
 
-static char handlerKey, sheetKey, deviceKey;
+static char handlerKey, sheetKey, deviceKey, hotspotKey;
 void NWConfigureDeviceMenu(UIAlertController *menu, NSDictionary *device) {
     objc_setAssociatedObject(menu, &deviceKey, [device copy], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+void NWConfigureHotspotDeviceMenu(UIAlertController *menu, NSDictionary *device) {
+    NWConfigureDeviceMenu(menu, device);
+    objc_setAssociatedObject(menu, &hotspotKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 // Legacy menus may put every field in their title. Resolve presentation data
 // from an exact, unique IPv4 token; keep their original action handlers intact.
@@ -53,12 +57,15 @@ static BOOL isDeviceMenu(UIAlertController *menu) {
 @property(nonatomic,strong) NSArray<UIAlertAction *> *items;
 @property(nonatomic,strong) NSDictionary *device;
 @property(nonatomic) BOOL invoked;
+@property(nonatomic) BOOL hotspotMenu;
+@property(nonatomic,weak) UIViewController *actionPresenter;
 @end
 @implementation NWDeviceActionController
 - (instancetype)initWithMenu:(UIAlertController *)menu {
     if ((self = [super initWithStyle:UITableViewStyleInsetGrouped])) {
         self.menu = menu;
         self.device = deviceForMenu(menu);
+        self.hotspotMenu = [objc_getAssociatedObject(menu, &hotspotKey) boolValue];
         NSMutableArray *items = [NSMutableArray new];
         for (UIAlertAction *action in menu.actions) if (action.style != UIAlertActionStyleCancel) [items addObject:action];
         self.items = items;
@@ -139,8 +146,26 @@ static BOOL isDeviceMenu(UIAlertController *menu) {
 }
 - (void)invoke:(UIAlertAction *)action {
     if (self.invoked) return; self.invoked = YES;
+    // The native Swift closure can bypass Objective-C dispatch. Route Wi-Fi
+    // unblock through the verified bridge, including the native row menu.
+    // Hotspot keeps its own filter handler. A stale Wi-Fi row must fail the
+    // bridge validation, never fall back to a Swift closure that skips cleanup.
+    if (titleMatches(action, @"Unblock Device") && self.device && !self.hotspotMenu) {
+        if (!NWDeviceSetBlocked(self.device, NO, ^(BOOL success) {
+            if (!success) [self showUnblockFailure];
+        })) [self showUnblockFailure];
+        return;
+    }
     void (^handler)(UIAlertAction *) = action ? objc_getAssociatedObject(action, &handlerKey) : nil;
     if (handler) handler(action);
+}
+- (void)showUnblockFailure {
+    UIViewController *presenter = self.actionPresenter;
+    if (!presenter.view.window || presenter.presentedViewController) return;
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"browser.actionFailed")
+        message:NWText(@"browser.actionRetry") preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:NWText(@"ok") style:UIAlertActionStyleDefault handler:nil]];
+    [presenter presentViewController:alert animated:YES completion:nil];
 }
 - (UIAlertAction *)cancelAction {
     for (UIAlertAction *action in self.menu.actions) if (action.style == UIAlertActionStyleCancel) return action;
@@ -162,6 +187,7 @@ static void (*oldPresent)(UIViewController *, SEL, UIViewController *, BOOL, voi
 static void present(UIViewController *presenter, SEL selector, UIViewController *controller, BOOL animated, void (^completion)(void)) {
     if ([controller isKindOfClass:UIAlertController.class] && isDeviceMenu((UIAlertController *)controller)) {
         NWDeviceActionController *sheet = [[NWDeviceActionController alloc] initWithMenu:(UIAlertController *)controller];
+        sheet.actionPresenter = presenter;
         UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:sheet];
         navigation.modalPresentationStyle = UIModalPresentationPageSheet;
         navigation.sheetPresentationController.detents = @[UISheetPresentationControllerDetent.mediumDetent, UISheetPresentationControllerDetent.largeDetent];
@@ -200,6 +226,23 @@ int NWDeviceActionUIRegressionCheck(UIAlertController *menu) {
     if (deviceForMenu(legacy)) return 4;
     [legacy addTextFieldWithConfigurationHandler:nil];
     if (isDeviceMenu(legacy)) return 6;
+    // Legacy Wi-Fi menus have a Swift closure. It must be replaced by the
+    // verified bridge even when the target is already unblocked (idempotent).
+    if (!NWDeviceCanSetBlocked(sheet.device, NO)) return 7;
+    UIAlertController *unblockMenu = [UIAlertController alertControllerWithTitle:nil message:nil preferredStyle:UIAlertControllerStyleAlert];
+    NWConfigureDeviceMenu(unblockMenu, sheet.device);
+    __block BOOL swiftHandlerCalled = NO;
+    UIAlertAction *unblock = [UIAlertAction actionWithTitle:NWNativeText(@"Unblock Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        (void)action; swiftHandlerCalled = YES;
+    }];
+    [unblockMenu addAction:unblock];
+    NWDeviceActionController *unblockSheet = [[NWDeviceActionController alloc] initWithMenu:unblockMenu];
+    [unblockSheet invoke:unblock];
+    if (swiftHandlerCalled || !unblockSheet.invoked) return 8;
+    NWConfigureHotspotDeviceMenu(unblockMenu, sheet.device);
+    unblockSheet = [[NWDeviceActionController alloc] initWithMenu:unblockMenu];
+    [unblockSheet invoke:unblock];
+    if (!swiftHandlerCalled) return 9;
     return 0;
 }
 #endif

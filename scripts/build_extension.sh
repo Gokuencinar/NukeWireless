@@ -24,6 +24,8 @@ clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_DIAGNOSTIC_TESTING -framewo
 build/audit/test_diagnostics
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_DIAGNOSTIC_TESTING -framework Foundation src/NWDiagnosticReport.m src/NWTaskDiagnostics.m tests/test_task_diagnostics.m -o build/audit/test_task_diagnostics
 build/audit/test_task_diagnostics
+clang -Wall -Wextra -Werror -fobjc-arc -framework Foundation src/compat/NWWiFiUnblock.m tests/test_wifi_unblock.m -o build/audit/test_wifi_unblock
+build/audit/test_wifi_unblock
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -isysroot "$sdk" \
   -Wall -Wextra -Werror -O2 -Isrc/hotspot/vendor src/hotspot/NWHotspotFilter.c -o build/audit/nw-hotspot

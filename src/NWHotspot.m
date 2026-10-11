@@ -301,7 +301,7 @@ static BOOL refresh(void) {
     [table deselectRowAtIndexPath:index animated:YES]; if (!self.rows.count || self.presentedViewController) return;
     NSDictionary *row=self.rows[index.row]; BOOL value=[row[@"blocked"] boolValue];
     UIAlertController *menu=[UIAlertController alertControllerWithTitle:row[@"name"] message:[NSString stringWithFormat:@"%@\n%@\n%@",row[@"ip"],row[@"mac"],row[@"vendor"]] preferredStyle:UIAlertControllerStyleActionSheet];
-    NWConfigureDeviceMenu(menu,row);
+    NWConfigureHotspotDeviceMenu(menu,row);
     UIAlertAction *toggle=[UIAlertAction actionWithTitle:NWNativeText(value ? @"Unblock Device":@"Block Device") style:value ? UIAlertActionStyleDefault:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) { (void)action; [self setBlocked:!value row:row]; }];
     toggle.enabled=![row[@"local"] boolValue] && !NWHotspotBusy() && !NWScanBusy() && !NWBulkBusy(); [menu addAction:toggle];
     UIAlertAction *rename=[UIAlertAction actionWithTitle:NWNativeText(@"Rename Device") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) { (void)action; [self renameDevice:row]; }];

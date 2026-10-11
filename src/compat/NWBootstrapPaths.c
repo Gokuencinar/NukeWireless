@@ -1,5 +1,6 @@
 #include "../NWLegacyABI.h"
 #include "../NWInstallLayout.h"
+#include "NWWiFiUnblock.h"
 #include "../NWRouteNeighbors.h"
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
@@ -55,8 +56,6 @@ static void (*original_arguments)(id, SEL, id);
 static void (*original_terminate)(id, SEL);
 static void (*original_interrupt)(id, SEL);
 static void (*original_launch)(id, SEL);
-static void (*original_swift_unblock)(uint64_t, uint64_t);
-static id (*swift_string_to_nsstring)(uint64_t, uint64_t);
 static void (*original_did_appear)(id, SEL, BOOL);
 static void (*original_found_device)(id, SEL, id);
 static id (*original_scanner_init)(id, SEL, id, BOOL);
@@ -707,29 +706,10 @@ static void stop_block_for_ip(const char *ip_text) {
     }
 }
 
-static void patched_swift_unblock(uint64_t first, uint64_t second) {
-    char raw[80];
-    snprintf(raw, sizeof(raw), "%016llx %016llx",
-        (unsigned long long)first, (unsigned long long)second);
-    debug_line("swift-unblock-raw", raw);
-    char ip[32];
-    int n = 0;
-    if (swift_string_to_nsstring) {
-        id text = swift_string_to_nsstring(first, second);
-        const char *value = utf8(text);
-        while (value && n < 15 &&
-            ((value[n] >= '0' && value[n] <= '9') || value[n] == '.')) {
-            ip[n] = value[n];
-            ++n;
-        }
-    }
-    ip[n] = 0;
-    debug_line("swift-unblock", ip);
+static void prepare_block_stop(const char *ip) {
     void (*will_stop)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticWillStop");
     if (will_stop) for (int i = 0; i < 64; ++i)
         if (equals(blocks[i].ip, ip)) will_stop(blocks[i].task);
-    original_swift_unblock(first, second);
-    if (n >= 7) stop_block_for_ip(ip);
 }
 
 static id block_processes_for_ip(const char *ip) {
@@ -1713,41 +1693,8 @@ static void install_paths(void) {
             (IMP)patched_found_device);
         debug_line("scan-hook", "installed");
     } else debug_line("scan-hook", "unavailable");
-    void (*hook_function)(void *, void *, void **) = (void *)dlsym((void *)-2,
-        "MSHookFunction");
-    const char *(*image_header)(unsigned) = (void *)dlsym((void *)-2,
-        "_dyld_get_image_header");
-    const char *(*image_name)(unsigned) = (void *)dlsym((void *)-2,
-        "_dyld_get_image_name");
-    unsigned (*image_count)(void) = (void *)dlsym((void *)-2,
-        "_dyld_image_count");
-    const char *app_header = 0;
-    if (image_header && image_name && image_count) {
-        for (unsigned i = 0; i < image_count(); ++i) {
-            const char *name = image_name(i);
-            if (contains(name, NWInstalledAppSuffix)) {
-                app_header = image_header(i);
-                break;
-            }
-        }
-    }
-    static const unsigned char unblock_prologue[] = {
-        0xfc,0x6f,0xba,0xa9,0xfa,0x67,0x01,0xa9,0xf8,0x5f,0x02,0xa9,0xf6,0x57,0x03,0xa9
-    };
-    static const unsigned char string_stub[] = {
-        0x1f,0x20,0x03,0xd5,0x50,0xbb,0x21,0x58,0x00,0x02,0x1f,0xd6,0x1f,0x20,0x03,0xd5
-    };
-    if (hook_function && app_header &&
-        !memcmp(app_header + 0x39610, unblock_prologue, sizeof(unblock_prologue)) &&
-        !memcmp(app_header + 0x1152fc, string_stub, sizeof(string_stub))) {
-        swift_string_to_nsstring = (void *)(app_header + 0x1152fc);
-        void *target = (void *)(app_header + 0x39610);
-        hook_function(target, (void *)patched_swift_unblock,
-            (void **)&original_swift_unblock);
-        debug_line("swift-unblock-hook", "installed");
-    } else {
-        debug_line("swift-unblock-hook", "unavailable");
-    }
+    BOOL unblock_installed = NWInstallWiFiUnblock(commands, prepare_block_stop, stop_block_for_ip);
+    debug_line("objc-unblock-hook", unblock_installed ? "installed" : "unavailable");
 }
 
 // Called by the embedded UI before it wraps scanner/task methods. Dependency

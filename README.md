@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic15: desbloqueo Wi-Fi sin dependencia de MSHookFunction.**
+Intercala la parada privilegiada en el método Objective-C existente, con firma
+verificada, por IP y proceso propio. Conserva la llamada nativa y ejecuta la
+limpieza incluso si lanza una excepción. Incluye la retención de wake UART de
+diagnostic14; Bluetooth sigue en `2.0.0~diagnostic6`. Aceptación física pendiente.
+Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC15.md).
+
 **2.0.0~diagnostic14: retención de wake durante UART.**
 Abre `/dev/btwake` antes del canal y lo libera tras restaurar y cerrar UART,
 incluidos errores parciales y cancelación. Añade evidencia de apertura/cierre y

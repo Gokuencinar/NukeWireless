@@ -6,6 +6,7 @@ SOURCES = ["src/NWLegacyABI.h", "src/NWInstallLayout.h", "scripts/install_layout
            "scripts/compat_manifest.py", "scripts/build_compat_debs.py", "scripts/compat_macho.py",
            "scripts/compat_layout.py", "scripts/embedded_ui.py", "scripts/build_bluetooth_deb.py",
            "scripts/test_ui_simulator.sh", ".github/workflows/compat-build.yml"]
+SOURCES += ["src/compat/NWWiFiUnblock.h", "src/compat/NWWiFiUnblock.m", "tests/test_wifi_unblock.m"]
 
 def compat_sources():
     return {name: sha((ROOT / name).read_bytes().replace(b"\r\n", b"\n")) for name in SOURCES}
