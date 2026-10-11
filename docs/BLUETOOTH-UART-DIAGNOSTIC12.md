@@ -59,3 +59,24 @@ primero Test Bluetooth controller y exportar JSON. Solo si responde, probar
 un modelo, Detener, finalización natural y repetición. Si aún falla, el nuevo
 JSON debe identificar syscall/longitud/campos reales; no se deben retirar más
 guardas sin esa evidencia. Un ACK del controlador no prueba recepción externa.
+
+## Validación de entrega (11 de octubre de 2026)
+
+Fuentes compiladas: `396618ffdcde2c3124b7cfa3aa059525f1281f81`. Los cuatro workflows pasaron:
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38173466026).
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465992).
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465988).
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465954).
+
+Pasaron las pruebas UART efectivas/socketpair y de retención del diario.
+Ambos targets completaron 46 comprobaciones de interfaz y cuatro ciclos reales
+de segundo plano por idioma (es/en). Se inspeccionaron los tres DEB unificados:
+20 comprobaciones locales ejecutadas pasaron; las tres pruebas dpkg omitidas
+en Windows pasaron en Linux CI. La comprobación del payload real que CI omite
+se ejecutó localmente. Procedencia y hashes en
+[la verificación](evidence/diagnostic12-verification.json).
+
+No se instaló diagnostic12 en un dispositivo ni se confirmó emisión UART.
+El fallo de configuración de diagnostic11 está observado; la eficacia física
+de esta candidata sigue pendiente del tester.

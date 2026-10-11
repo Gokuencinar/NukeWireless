@@ -1,0 +1,135 @@
+{
+  "package_version": "2.0.0~diagnostic12+bundle1",
+  "worker_version": "2.0.0~diagnostic4",
+  "source_commit": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+  "ci": [
+    {
+      "id": 38173466026,
+      "name": "Unified installer packaging",
+      "head_sha": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38173466026",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38173465992,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465992",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38173465988,
+      "name": "Development build",
+      "head_sha": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465988",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38173465954,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38173465954",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic12+bundle1_iphoneos-arm64e.deb",
+      "sha256": "9b548ce2c61f2da23363d2fc8694231c2ed8fd38eda4f5fbef6790a2cd7c1a7c"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic12+bundle1_iphoneos-arm64.deb",
+      "sha256": "d808a9364f75b929054f0369deb9b863587d1c7b2cb7a55a3e0a10be05829ce2"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic12+bundle1_iphoneos-arm.deb",
+      "sha256": "19023bb5133edcb7c94aa42c54d670e829ecfeaec8c1d67042d9af74f4429687"
+    }
+  ],
+  "checks": [
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "catalog_rendering": "cg-bitmap-original-v1",
+  "physical_crash_fix_confirmed": false,
+  "diagnostics": {
+    "important_events_limit": 32,
+    "recent_events_limit": 64,
+    "per_peer_process_results": true,
+    "stderr_raw_output_exported": false,
+    "external_connectivity_verified": false,
+    "xr_wifi_block_fix_confirmed": false
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "configuration_policy": "h4-stream-effective-v1",
+    "prior_failure_stage": "uart_configuration_verify",
+    "physical_uart_advertising_confirmed": false
+  },
+  "input_evidence": {
+    "reports": [
+      {
+        "sha256": "a08ae179879ebaae6a0b8880e9a686fce9fd863dae8a447405d4ba28e3a6c677",
+        "build": "2.0.0~diagnostic11",
+        "failed_emissions": 13,
+        "failed_capability_checks": 0,
+        "channel_opened": true,
+        "configuration_restored": true,
+        "service_restored": true,
+        "readback_values_recorded": false
+      },
+      {
+        "sha256": "bbb41110714f35895376f9effa288682768939af0c8a4f7e56256f2fb6bfc4d9",
+        "build": "2.0.0~diagnostic11",
+        "failed_emissions": 13,
+        "failed_capability_checks": 1,
+        "channel_opened": true,
+        "configuration_restored": true,
+        "service_restored": true,
+        "readback_values_recorded": false
+      }
+    ],
+    "note": "Cumulative exports: repeated events are not independent tests."
+  },
+  "uart_tests": {
+    "effective_configuration_and_rejection_cases": "passed_macos_ci",
+    "h4_and_socketpair": "passed_macos_ci",
+    "diagnostic_retention": "passed_macos_ci",
+    "physical_advertising": "pending_tester"
+  }
+}
