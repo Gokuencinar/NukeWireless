@@ -3,6 +3,7 @@
 #import "NWBTBridge.h"
 #include "../NWCatalogProfiles.h"
 #import "NWBTNative.h"
+#import "NWBTUART.h"
 #include "NWBTControl.h"
 #include "NWBTService.h"
 #include <dlfcn.h>
@@ -179,6 +180,11 @@ static BOOL selectService(void) {
 // bluetoothd can be running before its HCI nexus is republished. EBUSY means
 // the published channel belongs to the restored service, which is expected.
 static NSDictionary *waitForInterface(BOOL cleanup, NSUInteger *attempts) {
+    if ([NWBTNativeTransport() isEqual:@"uart-h4"]) {
+        // Never connect to UART while bluetoothd owns it, including recovery.
+        *attempts = 1;
+        return NWBTUARTProbe();
+    }
     double deadline = uptime() + 5.0;
     NSDictionary *result;
     *attempts = 0;
@@ -199,7 +205,7 @@ static NSDictionary *waitForInterface(BOOL cleanup, NSUInteger *attempts) {
     return result;
 }
 static BOOL interfaceReady(NSDictionary *result) {
-    return [result[@"stage"] isEqual:@"skywalk_opened"] ||
+    return [result[@"stage"] isEqual:@"uart_registered"] || [result[@"stage"] isEqual:@"skywalk_opened"] ||
         ([result[@"stage"] isEqual:@"skywalk_open"] && [result[@"system_errno"] intValue] == EBUSY);
 }
 static BOOL restoreService(void) {
@@ -493,7 +499,8 @@ int main(int argc, char **argv) {
             NSDictionary *compatibility = NWBTNativeAvailability();
             BOOL supported = !compatibility;
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
-                @"native_admission_policy": @"skywalk-runtime-contract-v1",
+                @"native_admission_policy": @"skywalk-or-exact-uart-v2",
+                @"selected_transport": NWBTNativeTransport(),
                 @"reference_device": @(reference),
                 @"compatibility": compatibility ?: @{@"stage": @"runtime_admitted"},
                 @"supports_ping_options": @(reference), @"supports_ping_milliseconds": @(reference),

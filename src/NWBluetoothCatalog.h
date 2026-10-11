@@ -2,6 +2,7 @@
 UIViewController *NWBluetoothCatalogController(void);
 UIViewController *NWBluetoothCatalogControllerWithEmitter(BOOL available,
     void (^emit)(NSUInteger platform, NSArray<NSNumber *> *models));
+void NWBluetoothCatalogSetAvailability(UIViewController *controller, BOOL available, NSString *reason);
 #ifdef NW_UI_TESTING
 int NWBluetoothCatalogUIRegressionCheck(void);
 int NWBluetoothCatalogUIRegressionPresent(int platform);

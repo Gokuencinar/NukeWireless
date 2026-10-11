@@ -1,5 +1,6 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
+#import "NWBTUART.h"
 #include "NWBTSkywalkABI.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -122,18 +123,12 @@ static BOOL managerBooleanSignature(Class cls, SEL selector) {
 
 // Read-only admission: do not create a manager, channel or recovery process.
 // XNU's channel ABI is independent of AppleConvergedTransport's opaque struct.
-NSDictionary *NWBTSkywalkCompatibility(void) {
+static NSDictionary *bluetoothStateCompatibility(void) {
     NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
     struct utsname kernel = {0};
     unsigned darwin = uname(&kernel) == 0 ? (unsigned)strtoul(kernel.release, NULL, 10) : 0;
     if (!NWBTSkywalkOSAllowed((unsigned)os.majorVersion, darwin))
         return failure(@"abi", @"This Skywalk contract covers matching iOS 15-18 / Darwin 21-24 only.");
-    const char *symbols[] = {"os_channel_create", "os_channel_destroy", "os_channel_attr_create",
-        "os_channel_attr_destroy", "os_channel_read_attr", "os_channel_attr_get", "os_channel_ring_id",
-        "os_channel_tx_ring", "os_channel_rx_ring", "os_channel_get_next_slot",
-        "os_channel_set_slot_properties", "os_channel_advance_slot", "os_channel_sync", "os_channel_get_fd"};
-    for (NSUInteger i = 0; i < sizeof(symbols) / sizeof(symbols[0]); ++i)
-        if (!dlsym(RTLD_DEFAULT, symbols[i])) return failure(@"abi", @"Required XNU channel entry point is missing.");
     dlopen("/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager", RTLD_LAZY | RTLD_LOCAL);
     Class cls = NSClassFromString(@"BluetoothManager");
     if (!managerSignature(cls, NSSelectorFromString(@"sharedInstance"), YES, "@", NULL) ||
@@ -144,17 +139,45 @@ NSDictionary *NWBTSkywalkCompatibility(void) {
     return nil;
 }
 
+NSDictionary *NWBTSkywalkCompatibility(void) {
+    NSDictionary *error = bluetoothStateCompatibility(); if (error) return error;
+    const char *symbols[] = {"os_channel_create", "os_channel_destroy", "os_channel_attr_create",
+        "os_channel_attr_destroy", "os_channel_read_attr", "os_channel_attr_get", "os_channel_ring_id",
+        "os_channel_tx_ring", "os_channel_rx_ring", "os_channel_get_next_slot",
+        "os_channel_set_slot_properties", "os_channel_advance_slot", "os_channel_sync", "os_channel_get_fd"};
+    for (NSUInteger i = 0; i < sizeof(symbols) / sizeof(symbols[0]); ++i)
+        if (!dlsym(RTLD_DEFAULT, symbols[i])) return failure(@"abi", @"Required XNU channel entry point is missing.");
+    return nil;
+}
+static NSString *selectedTransport;
 NSDictionary *NWBTNativeAvailability(void) {
+    if (selectedTransport) return nil;
+    NSDictionary *state = bluetoothStateCompatibility(); if (state) return state;
     NSDictionary *error = NWBTSkywalkCompatibility();
-    if (error) return error;
-    NSString *identifier = nativeNexus(@"hci", &error);
-    if (!identifier) return error ?: failure(@"abi", @"A matching HCI Skywalk interface is not available.");
-    uuid_t uuid;
-    return uuid_parse(identifier.UTF8String, uuid) ? failure(@"abi", @"The HCI nexus identifier is invalid.") : nil;
+    NSString *identifier = error ? nil : nativeNexus(@"hci", &error);
+    if (identifier) {
+        uuid_t uuid;
+        if (uuid_parse(identifier.UTF8String, uuid)) return failure(@"abi", @"The HCI nexus identifier is invalid.");
+        selectedTransport = @"skywalk"; return nil;
+    }
+    NSDictionary *uart = NWBTUARTProbe();
+    if (!uart[@"error"]) { selectedTransport = @"uart-h4"; return nil; }
+    // Preserve the original failure on other hardware, with the UART probe as
+    // separate evidence. A present but invalid Skywalk UUID never falls back.
+    NSMutableDictionary *result = [(error ?: failure(@"abi", @"No supported HCI transport is available.")) mutableCopy];
+    result[@"uart_probe"] = uart;
+    if (![uart[@"stage"] isEqual:@"uart_admission"]) {
+        result[@"stage"] = uart[@"stage"]; result[@"error"] = uart[@"error"];
+    }
+    return result;
+}
+NSString *NWBTNativeTransport(void) {
+    if (!selectedTransport) NWBTNativeAvailability();
+    return selectedTransport ?: @"unavailable";
 }
 
 NSDictionary *NWBTVerifyBluetoothOff(void) {
-    NSDictionary *abi = NWBTSkywalkCompatibility(); if (abi) return abi;
+    NSDictionary *abi = bluetoothStateCompatibility(); if (abi) return abi;
     Class cls = NSClassFromString(@"BluetoothManager");
     SEL shared = NSSelectorFromString(@"sharedInstance"), queueSelector = NSSelectorFromString(@"setSharedInstanceQueue:");
     SEL available = NSSelectorFromString(@"available"), enabled = NSSelectorFromString(@"enabled");
@@ -272,7 +295,7 @@ static NSDictionary *skywalkVersion(void *channel, uint64_t capacity) {
 NSDictionary *NWBTNativeGuard(void) {
     if (getuid() != 0) return failure(@"permissions", @"Run this exclusive diagnostic as root.");
     fputs("NWBT phase: ABI guard\n", stderr);
-    NSDictionary *error = NWBTSkywalkCompatibility();
+    NSDictionary *error = NWBTNativeAvailability();
     if (error) return error;
     fputs("NWBT phase: Bluetooth state\n", stderr);
     error = requireBluetoothOff();
@@ -310,7 +333,8 @@ NSDictionary *NWBTDiagnosticContract(void) {
         @"kernel_release": [NSString stringWithUTF8String:system.release],
         @"ios_version": NSProcessInfo.processInfo.operatingSystemVersionString,
         @"skywalk_contract": contract ?: @{@"stage": @"runtime_admitted"},
-        @"hci_registry": availability ?: @{@"stage": @"descriptor_present"},
+        @"hci_registry": availability ?: @{@"stage": [NWBTNativeTransport() isEqual:@"uart-h4"] ? @"uart_registered" : @"descriptor_present"},
+        @"selected_transport": NWBTNativeTransport(), @"uart_probe": NWBTUARTProbe(),
         @"symbols": symbols, @"bluetooth_manager_methods": methods,
         @"channel_opened": @NO, @"hci_commands_submitted": @0,
         @"service_state_changed": @NO, @"functional_compatibility_proven": @NO};

@@ -4,7 +4,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ['src/NWLegacyABI.h', 'src/NWInstallLayout.h', 'src/bluetooth/NWBTBridge.h', 'src/NWBluetoothLimits.h', 'src/bluetooth/NWBTNative.h', 'src/bluetooth/NWBTBridge.m', 'src/bluetooth/NWBTController.m', 'src/bluetooth/NWBTL2Ping.m',
-           'src/bluetooth/NWBTInspector.m', 'scripts/build_bluetooth_inspector.sh',
+           'src/bluetooth/NWBTUART.h', 'src/bluetooth/NWBTUART.m', 'src/bluetooth/NWBTH4.h',
+           'tests/test_bt_h4.c', 'tests/test_bt_uart.m', 'src/bluetooth/NWBTInspector.m', 'scripts/build_bluetooth_inspector.sh',
            'src/bluetooth/NWBTRunner.m', 'src/bluetooth/NWBTSkywalkABI.h', 'src/bluetooth/NWBTService.h', 'tests/test_bt_skywalk.c',
            'scripts/bluetooth_manifest.py', 'src/bluetooth/NWBTHCIRead.h', 'tests/test_hci_read.c',
            'src/bluetooth/NWBTLab.h', 'tests/test_bt_lab.c',
@@ -16,7 +17,7 @@ def sources(): return {name: sha((ROOT / name).read_bytes().replace(b'\r\n', b'\
 
 if __name__ == '__main__':
     output = ROOT / 'build/bluetooth'
-    report = {'version': '2.0.0~diagnostic2', 'target': 'arm64-ios15.0', 'sources': sources(),
+    report = {'version': '2.0.0~diagnostic3', 'target': 'arm64-ios15.0', 'sources': sources(),
               'files': {name: sha((output / name).read_bytes()) for name in ['NukeBluetoothBridge.dylib', 'nwbt-inspect', 'nwbt-run']},
               'l2ping_implemented': True, 'runtime_verified': False}
     if f'#define NWBT_VERSION @"{report["version"]}"' not in (ROOT / 'src/bluetooth/NWBTBridge.h').read_text():

@@ -83,6 +83,7 @@ static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"
 @property(nonatomic, strong) NSMutableArray<NSNumber *> *previousRanks;
 @property(nonatomic, strong) NSArray<NSDictionary<NSString *, id> *> *models;
 @property(nonatomic) BOOL emissionAvailable;
+@property(nonatomic, copy) NSString *availabilityReason;
 @property(nonatomic, copy) NSArray<NSNumber *> *emittingModels;
 @property(nonatomic, copy) void (^emit)(NSUInteger platform, NSArray<NSNumber *> *models);
 - (void)generateModels;
@@ -287,8 +288,8 @@ static NSArray<NSString *> *brandAssets(void) { return @[@"apple", @"google", @"
         content.text = busy ? NWText(stopping ? @"bt.stopping" : @"bt.stop") :
             [NSString stringWithFormat:NWText(@"bt.catalog.emit"), (unsigned long)count];
         content.secondaryText = busy ? NWText(stopping ? @"bt.ui.restoring" : @"bt.lab.running") :
-            NWText(!self.emissionAvailable || !self.emit ? @"bt.catalog.worker_required" :
-                count == self.models.count ? @"bt.catalog.emit_hint" : @"bt.catalog.partial");
+            (!self.emissionAvailable || !self.emit ? (self.availabilityReason ?: NWText(@"bt.catalog.worker_required")) :
+                NWText(count == self.models.count ? @"bt.catalog.emit_hint" : @"bt.catalog.partial"));
         content.image = [UIImage systemImageNamed:busy ? @"stop.circle.fill" : @"play.circle.fill"];
         content.textProperties.color = busy ? UIColor.systemRedColor : enabled ? UIColor.labelColor : UIColor.secondaryLabelColor;
         if (busy) {
@@ -365,6 +366,12 @@ UIViewController *NWBluetoothCatalogControllerWithEmitter(BOOL available,
     void (^emit)(NSUInteger platform, NSArray<NSNumber *> *models)) {
     NWBluetoothCatalogViewController *controller = [NWBluetoothCatalogViewController new];
     controller.emissionAvailable = available; controller.emit = emit; return controller;
+}
+void NWBluetoothCatalogSetAvailability(UIViewController *controller, BOOL available, NSString *reason) {
+    if (![controller isKindOfClass:NWBluetoothCatalogViewController.class]) return;
+    NWBluetoothCatalogViewController *catalog = (NWBluetoothCatalogViewController *)controller;
+    catalog.emissionAvailable = available; catalog.availabilityReason = reason;
+    if (catalog.isViewLoaded) [catalog.tableView reloadData];
 }
 
 #ifdef NW_UI_TESTING
@@ -524,6 +531,13 @@ int NWBluetoothCatalogUIRegressionCheck(void) {
     NSUInteger before = calls;
     [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
     if (calls != before) return 12;
+    NWBluetoothCatalogSetAvailability(controller, NO, NWText(@"bt.checking"));
+    emitCell = [controller tableView:controller.tableView cellForRowAtIndexPath:emitIndex];
+    UIListContentConfiguration *pending = (UIListContentConfiguration *)emitCell.contentConfiguration;
+    if (![pending.secondaryText isEqual:NWText(@"bt.checking")]) return 13;
+    NWBluetoothCatalogSetAvailability(controller, YES, nil);
+    emitCell = [controller tableView:controller.tableView cellForRowAtIndexPath:emitIndex];
+    if (emitCell.selectionStyle == UITableViewCellSelectionStyleNone) return 14;
     return 0;
 }
 #endif

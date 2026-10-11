@@ -265,3 +265,6 @@
 "diag.clear_hint" = "Only diagnostic events are cleared. Previously exported reports and device history are retained.";
 "diag.controller_confirm" = "Turn Bluetooth off in Settings first. This test temporarily owns the controller, performs local reads and restores the service. It does not advertise or create connections. You can press Stop.";
 "diag.start" = "Start test";
+
+"bt.catalog.transport_unavailable" = "Advertising unavailable on this Bluetooth transport. Export a diagnostic report from Info.";
+"bt.catalog.worker_update" = "Update the complete NukeWireless package to use these advertising profiles.";

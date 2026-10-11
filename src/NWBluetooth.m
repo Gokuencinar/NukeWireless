@@ -237,6 +237,7 @@ static NSInteger menuAction(NSIndexPath *index) {
 @interface NWBluetoothViewController : UITableViewController
 @property(nonatomic, strong) NSDictionary *capabilities;
 @property(nonatomic) BOOL checking;
+@property(nonatomic, weak) UIViewController *catalog;
 - (void)runArguments:(NSArray<NSString *> *)arguments operation:(NSString *)operation;
 - (void)stopCurrentOperation;
 - (void)emitCatalogPlatform:(NSUInteger)platform models:(NSArray<NSNumber *> *)models;
@@ -244,6 +245,21 @@ static NSInteger menuAction(NSIndexPath *index) {
 @end
 
 @implementation NWBluetoothViewController
+- (BOOL)catalogAvailable {
+    return [self.capabilities[@"supported"] boolValue] &&
+        [self.capabilities[@"supports_le_catalog_identity_v2"] boolValue] &&
+        [self.capabilities[@"supports_le_catalog_six_models"] boolValue] &&
+        [self.capabilities[@"supports_le_catalog_extended_models"] boolValue];
+}
+- (void)updateCatalogAvailability {
+    NSString *reason = nil;
+    if (!self.capabilities) reason = NWText(@"bt.checking");
+    else if (![self.capabilities[@"available"] boolValue] && ![self.capabilities[@"supported"] boolValue])
+        reason = NWText(@"bt.catalog.worker_required");
+    else if (![self.capabilities[@"supported"] boolValue]) reason = NWText(@"bt.catalog.transport_unavailable");
+    else if (![self catalogAvailable]) reason = NWText(@"bt.catalog.worker_update");
+    NWBluetoothCatalogSetAvailability(self.catalog, [self catalogAvailable], reason);
+}
 - (instancetype)init { return [super initWithStyle:UITableViewStyleInsetGrouped]; }
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = NWText(@"bt.title");
@@ -281,6 +297,7 @@ static NSInteger menuAction(NSIndexPath *index) {
         dispatch_async(dispatch_get_main_queue(), ^{
             NWBluetoothViewController *controller = weakSelf;
             controller.checking = NO; controller.capabilities = capabilities; [controller refresh:nil];
+            [controller updateCatalogAvailability];
         });
     });
 }
@@ -404,6 +421,7 @@ static NSInteger menuAction(NSIndexPath *index) {
             UIViewController *catalog = NWBluetoothCatalogControllerWithEmitter(available, ^(NSUInteger platform, NSArray<NSNumber *> *models) {
                 [weakSelf emitCatalogPlatform:platform models:models];
             });
+            self.catalog = catalog; [self updateCatalogAvailability];
             [self.navigationController pushViewController:catalog animated:YES];
         }
         return;

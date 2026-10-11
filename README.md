@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic11: backend UART experimental.**
+Añade UART H4 para iPhone10,2 / iOS 16.7.4 (20H240), condicionado al registro
+y al contrato de configuración del controlador. Mantiene Skywalk, Detener y
+recuperación del servicio; distingue los avisos de disponibilidad del catálogo
+y actualiza su estado asíncrono. La emisión exige además capacidades HCI reales.
+Componente Bluetooth `2.0.0~diagnostic3`. Prueba física UART pendiente; no declara
+compatibilidad general de A11. Véase [implementación y validación](docs/BLUETOOTH-UART-DIAGNOSTIC11.md).
+
 **2.0.0~diagnostic10: diagnóstico de bloqueos y conservación de fallos.**
 Registra resultados locales por equipo, vida del proceso y contexto IPv4/IPv6.
 Conserva 32 eventos importantes además de los 64 recientes. No considera activo

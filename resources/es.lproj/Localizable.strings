@@ -265,3 +265,6 @@
 "diag.clear_hint" = "Se borran solo los eventos de diagnóstico. Los informes ya exportados y el historial de equipos se conservan.";
 "diag.controller_confirm" = "Apaga Bluetooth en Ajustes antes de continuar. Esta prueba toma temporalmente el controlador, hace lecturas locales y restaura el servicio. No emite anuncios ni crea enlaces. Puedes pulsar Detener.";
 "diag.start" = "Iniciar prueba";
+
+"bt.catalog.transport_unavailable" = "Emisión no disponible con este transporte Bluetooth. Exporta un diagnóstico desde Información.";
+"bt.catalog.worker_update" = "Actualiza el paquete completo de NukeWireless para utilizar estos perfiles de emisión.";

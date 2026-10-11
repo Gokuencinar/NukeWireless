@@ -3,6 +3,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out=build/bluetooth
 mkdir -p "$out"
+clang -std=c11 -Wall -Wextra -Werror tests/test_bt_h4.c -o "$out/test-bt-h4"
+"$out/test-bt-h4"
+rm "$out/test-bt-h4"
+clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_BT_UART_TESTING -framework Foundation \
+  tests/test_bt_uart.m src/bluetooth/NWBTUART.m -o "$out/test-bt-uart"
+"$out/test-bt-uart"
+rm "$out/test-bt-uart"
 clang -std=c11 -Wall -Wextra -Werror tests/test_bt_skywalk.c -o "$out/test-bt-skywalk"
 "$out/test-bt-skywalk"
 rm "$out/test-bt-skywalk"
@@ -22,7 +29,8 @@ sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 -fPIC -dynamiclib \
   -framework Foundation -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeBluetoothBridge.dylib \
-  src/bluetooth/NWBTBridge.m src/bluetooth/NWBTController.m src/bluetooth/NWBTL2Ping.m -o "$out/NukeBluetoothBridge.dylib"
+  src/bluetooth/NWBTBridge.m src/bluetooth/NWBTController.m src/bluetooth/NWBTL2Ping.m \
+  src/bluetooth/NWBTUART.m -o "$out/NukeBluetoothBridge.dylib"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -O2 \
   -framework Foundation -framework OSLog -Wl,-fatal_warnings -Wl,-rpath,@executable_path/../lib \

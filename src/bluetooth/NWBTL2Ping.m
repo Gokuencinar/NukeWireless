@@ -1,5 +1,6 @@
 #import "NWBTBridge.h"
 #import "NWBTNative.h"
+#import "NWBTUART.h"
 #include "NWBTHCIRead.h"
 #include "NWBTLab.h"
 #include "NWBTSkywalkABI.h"
@@ -31,8 +32,13 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
     int (*_advance)(void *, void *);
     int (*_sync)(void *, int);
     NSUInteger _slots, _bytes;
+    NWBTUART *_uart;
+    BOOL _ownsChannel;
 }
 @property(nonatomic, copy) NSString *error;
++ (instancetype)openHCI:(NSDictionary **)error;
+- (void)close;
+- (NSDictionary *)transportDiagnostics;
 - (instancetype)initWithChannel:(void *)channel capacity:(uint64_t)capacity;
 - (BOOL)send:(NSData *)packet;
 - (NSData *)read;
@@ -40,6 +46,39 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
 @end
 
 @implementation NWBTRing
++ (instancetype)openHCI:(NSDictionary **)error {
+    if ([NWBTNativeTransport() isEqual:@"uart-h4"]) {
+        NWBTRing *ring = [NWBTRing new]; ring->_fd = -1;
+        double deadline = now() + 5.0;
+        do {
+            if (NWBTCancelled) { *error = @{@"stage": @"cancelled", @"error": @"Diagnostic cancelled."}; return nil; }
+            ring->_uart = [NWBTUART openExclusive:error];
+            if (ring->_uart) return ring;
+            if (![(*error)[@"stage"] isEqual:@"uart_connect"] || [(*error)[@"errno"] intValue] != EBUSY) return nil;
+            usleep(100000);
+        } while (now() < deadline);
+        return nil;
+    }
+    uint64_t capacity = 0;
+    void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, error);
+    if (!channel) return nil;
+    NWBTRing *ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
+    if (!ring) {
+        NWBTCloseNativeChannel(channel);
+        *error = @{@"stage": @"skywalk_rings", @"error": @"Channel transfer interfaces unavailable."};
+        return nil;
+    }
+    ring->_ownsChannel = YES; return ring;
+}
+- (void)close {
+    if (_uart) [_uart close];
+    if (_ownsChannel && _channel) { NWBTCloseNativeChannel(_channel); _channel = NULL; }
+    _ownsChannel = NO;
+}
+- (NSDictionary *)transportDiagnostics {
+    return _uart ? _uart.diagnostics : @{@"transport": @"skywalk"};
+}
+- (void)dealloc { [self close]; }
 - (instancetype)initWithChannel:(void *)channel capacity:(uint64_t)capacity {
     if (!(self = [super init])) return nil;
     uint32_t (*ringID)(void *, int) = dlsym(RTLD_DEFAULT, "os_channel_ring_id");
@@ -56,8 +95,9 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
     if (!_tx || !_rx || _fd < 0) return nil;
     return self;
 }
-- (int)descriptor { return _fd; }
+- (int)descriptor { return _uart ? _uart.descriptor : _fd; }
 - (BOOL)send:(NSData *)packet {
+    if (_uart) { BOOL sent = [_uart send:packet]; self.error = _uart.error; return sent; }
     if (self.error) return NO;
     SlotProperties properties = {0};
     void *slot = _next(_tx, NULL, &properties);
@@ -71,6 +111,7 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
     return YES;
 }
 - (NSData *)read {
+    if (_uart) { NSData *data = [_uart read]; self.error = _uart.error; return data; }
     if (self.error) return nil;
     if (_sync(_channel, NWBTSkywalkSyncRX)) { self.error = @"RX synchronization failed."; return nil; }
     SlotProperties properties = {0};
@@ -90,16 +131,13 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
 // This operation never opens ACL, connects, scans, advertises or resets firmware.
 NSDictionary *NWBTReadLECapabilities(void) {
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
-    uint64_t capacity = 0;
-    void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
-    if (!channel) return error;
+    NWBTRing *ring = [NWBTRing openHCI:&error];
+    if (!ring) return error;
     NSMutableArray *queries = [NSMutableArray new];
     NSMutableDictionary *report = [@{@"version": NWBT_VERSION, @"stage": @"le_capabilities",
         @"queries": queries, @"advertising_commands_submitted": @0,
         @"connection_commands_submitted": @0, @"capabilities_verified": @NO} mutableCopy];
     @try {
-        NWBTRing *ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
-        if (!ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
         // Retire queued responses before sending the first query.
         for (NSUInteger i = 0; i < 32; ++i) {
             if (![ring read]) break;
@@ -178,7 +216,10 @@ NSDictionary *NWBTReadLECapabilities(void) {
         for (NSDictionary *query in queries) verified = verified && query[@"return_data_hex"] != nil;
         report[@"capabilities_verified"] = @(verified);
         return report;
-    } @finally { NWBTCloseNativeChannel(channel); }
+    } @finally {
+        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
+        if (report[@"transport_details"][@"cleanup_error"]) report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
+    }
 }
 
 @interface NWBTLabSession : NSObject
@@ -255,8 +296,8 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
     if (platform<1 || platform>3) return @{@"error": @"Unknown fixed lab platform."};
     BOOL swiftPair=platform==1, applePairing=platform==2, fastPair=platform==3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
-    uint64_t capacity = 0; void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
-    if (!channel) return error;
+    NWBTRing *ring = [NWBTRing openHCI:&error];
+    if (!ring) return error;
     NWBTLabSession *session = [NWBTLabSession new];
     double advertisingStarted = 0;
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
@@ -299,8 +340,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
     }
     BOOL configured = NO, enableSubmitted = NO;
     @try {
-        session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
-        if (!session.ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
+        session.ring = ring;
         for (NSUInteger i = 0; i < 32; ++i) {
             if (![session.ring read]) break;
             if (i == 31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
@@ -361,8 +401,10 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
         report[@"local_hci_commands_submitted"] = @(session.commands);
         if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
         else if (originalError || session.error) report[@"error"] = originalError ?: session.error;
-        else if (![report[@"controller_advertising_acknowledged"] boolValue]) report[@"error"] = @"Lab advertisement was not enabled.";
-        NWBTCloseNativeChannel(channel);
+        else if (![report[@"controller_advertising_acknowledged"] boolValue] && !report[@"error"]) report[@"error"] = @"Lab advertisement was not enabled.";
+        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
+        if (report[@"transport_details"][@"cleanup_error"])
+            report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
     }
     return report;
 }
@@ -377,8 +419,8 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
     NSUInteger count = catalogModels ? catalogModels.count : NWBT_LAB_PLATFORM_COUNT;
     unsigned catalogPlatform = platform == 1 ? 2 : platform == 2 ? 0 : platform == 3 ? 1 : 3;
     NSDictionary *error = NWBTNativeGuard(); if (error) return error;
-    uint64_t capacity = 0; void *channel = NWBTOpenExclusiveNativeChannel(@"hci", &capacity, &error);
-    if (!channel) return error;
+    NWBTRing *ring = [NWBTRing openHCI:&error];
+    if (!ring) return error;
     NWBTLabSession *session = [NWBTLabSession new];
     session.stream = [NSMutableData new]; session.queries = [NSMutableArray new]; session.credits = 1;
     NSMutableArray *handles = [NSMutableArray new], *powers = [NSMutableArray new];
@@ -408,8 +450,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
     }
     BOOL enableSubmitted = NO; double started = 0;
     @try {
-        session.ring = [[NWBTRing alloc] initWithChannel:channel capacity:capacity];
-        if (!session.ring) { report[@"error"] = @"Channel transfer interfaces unavailable."; return report; }
+        session.ring = ring;
         for (unsigned i=0;i<32;i++) {
             if (![session.ring read]) break;
             if (i==31) session.error = @"Pre-existing HCI traffic exceeded its bound.";
@@ -491,7 +532,9 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         else if (original || !clean || (handles.count && !removed)) report[@"error"] = original ?: @"Advertising cleanup incomplete.";
         else if (![report[@"controller_advertising_acknowledged"] boolValue] && !report[@"error"])
             report[@"error"] = @"Multi-platform advertisements were not enabled.";
-        NWBTCloseNativeChannel(channel);
+        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
+        if (report[@"transport_details"][@"cleanup_error"])
+            report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
     }
     return report;
 }
