@@ -85,5 +85,20 @@ Hashes, versiones y procedencia están en
 [el registro de entrega](evidence/diagnostic15-verification.json).
 Instalación, respuesta HCI y emisión física en el iPhone del tester: pendientes.
 
-Instalación en el XS de referencia y aceptación del desbloqueo: pendientes;
-el intento SSH no obtuvo conexión. No se cerró ni modificó la app del teléfono.
+El primer intento SSH al XS no obtuvo conexión y no modificó la app.
+La instalación se retomó posteriormente, como se registra a continuación.
+
+## Instalación de referencia (12 de octubre de 2026, Europe/Madrid)
+
+Tras recuperar SSH se instaló el DEB unificado RootHide en iPhone XS,
+iOS 16.3.1. Se comprobaron dpkg, versión 20015, commit de fuentes, identidad
+CodeDirectory conservada y fingerprints de los componentes frente a CI.
+Se verificaron los SHA-256 transferidos y se conservó el paquete diagnostic10
+de recuperación en `/var/mobile/Documents/NukeWireless-diagnostic10-backup.deb`.
+No había procesos de bloqueo, trabajador Bluetooth ni dpkg activos antes de
+instalar. Se cerró únicamente NukeWireless.
+
+El diagnóstico de solo lectura confirmó Bluetooth diagnostic6, sin abrir canal
+HCI ni alterar servicios; bluetoothd conservó su PID. No aparecieron nuevos
+informes de crash relevantes durante la instalación. Apertura manual y prueba
+de bloquear/desbloquear sin reiniciar: pendientes de aceptación del usuario.

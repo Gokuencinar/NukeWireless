@@ -79,7 +79,7 @@
   "legacy_installed_paths": false,
   "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
   "ui_integration": "embedded-required-v1",
-  "physical_installation": "pending_reference_phone_ssh_unreachable",
+  "physical_installation": "passed_reference_iphone11_2_ios16_3_1_roothide",
   "physical_functional_acceptance": "pending",
   "release_published": false,
   "catalog_rendering": "cg-bitmap-original-v1",
@@ -318,7 +318,7 @@
   },
   "wifi_unblock_tests": {
     "objective_c_method_abi_original_repetition_superclass_exception_cleanup": "passed_macos_ci",
-    "own_phone_functional_acceptance": "pending_installation"
+    "own_phone_functional_acceptance": "pending_user_test"
   },
   "local_package_tests": {
     "executed_passed": 20,
@@ -328,5 +328,23 @@
     "executed_passed": 8,
     "real_payload_test_skipped": 1,
     "real_payload_verified_locally": true
+  },
+  "reference_phone_installation": {
+    "version": "2.0.0~diagnostic15+bundle1",
+    "worker_version": "2.0.0~diagnostic6",
+    "installed_bundle_version": "20015",
+    "source_commit": "ce471cef352a50e4f3407f5e353602548fa16648",
+    "code_directory": [
+      {
+        "slot": 0,
+        "identifier": "me.midnightchips.harpy-reloaded"
+      }
+    ],
+    "readonly_service_pid_unchanged": true,
+    "new_relevant_crashes": [],
+    "installed_binary_fingerprints_match_ci": true,
+    "package_transfer_sha256_verified": true,
+    "manual_app_load": "pending",
+    "recovery_package": "NukeWireless-diagnostic10-backup.deb"
   }
 }
