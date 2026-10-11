@@ -8,7 +8,9 @@ Nuke Wireless is in development. This repository is public; development builds a
 Registra resultados locales por equipo, vida del proceso y contexto IPv4/IPv6.
 Conserva 32 eventos importantes además de los 64 recientes. No considera activo
 un PID de una tarea terminada. No demuestra el corte de Internet ni confirma la
-causa del reporte externo del XR. Compilación y aceptación física pendientes.
+causa del reporte externo del XR. Ambas compilaciones, pruebas de procesos y diario,
+46 comprobaciones UI y cuatro ciclos de segundo plano por idioma han pasado.
+Paquetes unificados RootHide/rootless/rootful inspeccionados; aceptación física pendiente.
 Véase [diagnóstico ampliado](docs/DIAGNOSTICS-DIAGNOSTIC10.md).
 
 **2.0.0~diagnostic9+bundle1: candidata para el cierre gráfico del catálogo.**

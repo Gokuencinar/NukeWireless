@@ -1,6 +1,6 @@
 # Diagnóstico ampliado: diagnostic10
 
-Estado: fuentes implementadas; compilación, paquete e instalación pendientes.
+Estado: compilación, simulador y paquetes aprobados; instalación y aceptación física pendientes.
 Trabajador Bluetooth sin cambios: 2.0.0~diagnostic2.
 
 El reporte diagnostic8 del XR/iOS 18.5 registra preparación de arpoison y escaneos,
@@ -55,10 +55,32 @@ no una configuración comprobada del router del tester.
 [IPv6 Neighbor Discovery, RFC 4861](https://www.rfc-editor.org/rfc/rfc4861.html)
 es distinto de ARP IPv4; este backend no filtra el tráfico IPv6.
 
-## Validación prevista
+## Validación: 11 de octubre de 2026
 
-Pruebas macOS con procesos locales inofensivos: fallo de lanzamiento, salida
+Pasaron las pruebas macOS con procesos locales inofensivos: fallo de lanzamiento, salida
 inesperada, stderr anonimizado, redirección existente, parada y API ausente.
 Regresión de acciones Wi-Fi en simulador con `internet_cut_confirmed=false`.
-Build, UI en ambos idiomas y paquetes de tres esquemas desde fuentes actuales.
+Pasaron las dos compilaciones, 46 comprobaciones de UI y cuatro ciclos reales de
+segundo plano por idioma en simulador. Se revisaron capturas de diagnóstico en
+español/oscuro e inglés/claro. El simulador no acredita funcionamiento físico.
+
+Fuentes compiladas: `9210fb073c03a7c69a1c610d206708d236403545`.
+
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38104689771)
+- [Compatibilidad y simulador](https://github.com/Gokuencinar/NukeWireless/actions/runs/38104689774)
+- [Instalación y migración dpkg en Linux](https://github.com/Gokuencinar/NukeWireless/actions/runs/38104689786)
+
+Paquetes `2.0.0~diagnostic10+bundle1`, con componente Bluetooth `2.0.0~diagnostic2`:
+
+| Esquema | SHA-256 del DEB |
+| --- | --- |
+| RootHide / iphoneos-arm64e | `62676bbd7663acc42f2b8b4647d0fb791123e5c011ccd3e8487f24a7f655b618` |
+| Rootless / iphoneos-arm64 | `2159a3d22bf67c70cbb504f8af41664971b0c98a1a8a306caed9f4d7d39fb697` |
+| Rootful / iphoneos-arm | `097f87a72136b621041588251a25fb4e2bb6656b92d5627149130f918cdb6d6d` |
+
+Inspección local aprobada: tres pruebas del cargador embebido, ocho de compatibilidad,
+seis de empaquetado unificado y tres de la whitelist ARM64 del auxiliar. Las tres
+pruebas dpkg que Windows omite pasaron en Linux CI para los tres esquemas.
+Manifiestos, identidades, fuentes actuales, rutas canónicas y presencia de ambos
+componentes verificados. Los paquetes no se han instalado ni publicado en APT.
 Aceptación física pendiente; no se afirma corregido el corte real del XR.
