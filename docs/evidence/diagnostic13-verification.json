@@ -1,0 +1,299 @@
+{
+  "package_version": "2.0.0~diagnostic13+bundle1",
+  "worker_version": "2.0.0~diagnostic5",
+  "source_commit": "5c265c96f326b84911342ccb07768cb4998372c4",
+  "ci": [
+    {
+      "id": 38178130740,
+      "name": "Unified installer packaging",
+      "head_sha": "5c265c96f326b84911342ccb07768cb4998372c4",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130740",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38178130716,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "5c265c96f326b84911342ccb07768cb4998372c4",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130716",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38178130739,
+      "name": "Development build",
+      "head_sha": "5c265c96f326b84911342ccb07768cb4998372c4",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130739",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38178130683,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "5c265c96f326b84911342ccb07768cb4998372c4",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130683",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic13+bundle1_iphoneos-arm64e.deb",
+      "sha256": "43776650fd4852aac43d4f3c98f64596885df23625212baaaf1a8c6348104a8c"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic13+bundle1_iphoneos-arm64.deb",
+      "sha256": "9dbe6a2703713c9baabd5a7d510850308dbc04daf6a3e828964cc8df8d2ea441"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic13+bundle1_iphoneos-arm.deb",
+      "sha256": "7d75bc47804c0d8a4681806229cc7a1f965a2f9ac50ea0e2e9f5d26d43f1cf03"
+    }
+  ],
+  "checks": [
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "catalog_rendering": "cg-bitmap-original-v1",
+  "physical_crash_fix_confirmed": false,
+  "diagnostics": {
+    "important_events_limit": 32,
+    "recent_events_limit": 64,
+    "per_peer_process_results": true,
+    "stderr_raw_output_exported": false,
+    "external_connectivity_verified": false,
+    "xr_wifi_block_fix_confirmed": false
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "configuration_policy": "h4-stream-effective-v2",
+    "prior_failure_stage": "uart_configuration_verify",
+    "physical_uart_advertising_confirmed": false
+  },
+  "input_evidence": {
+    "report_sha256": "5bcc45503625527801c75450f3c0139e2e0adec3055859497e6783b4126d428e",
+    "app_build": "2.0.0~diagnostic12",
+    "machine": "iPhone10,2",
+    "ios": "16.7.4",
+    "os_build": "20H240",
+    "package_scheme": "rootless",
+    "worker_version": "2.0.0~diagnostic4",
+    "operation": "le_capabilities",
+    "stage": "uart_configuration_verify",
+    "errno": 0,
+    "source_commit": "396618ffdcde2c3124b7cfa3aa059525f1281f81",
+    "transport_details": {
+      "channel_closed": true,
+      "channel_opened": true,
+      "configuration_comparison": {
+        "matches": 0,
+        "mismatches": [
+          "input_flags",
+          "control_flags"
+        ],
+        "policy": "h4-stream-effective-v1",
+        "reported_differences": [
+          "input_flags"
+        ]
+      },
+      "configuration_readback": {
+        "errno": 0,
+        "result": 0,
+        "size": 72
+      },
+      "configuration_restored": true,
+      "configuration_verified": false,
+      "experimental": true,
+      "ignored_data_packets": 0,
+      "observed_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 197376,
+        "input_flags": 0,
+        "input_speed": 3000000,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 3000000
+      },
+      "original_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 768,
+        "input_flags": 0,
+        "input_speed": 9600,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 9600
+      },
+      "original_read": {
+        "errno": 0,
+        "result": 0,
+        "size": 72
+      },
+      "partial_rx_bytes": 0,
+      "requested_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 232192,
+        "input_flags": 5,
+        "input_speed": 3000000,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 3000000
+      },
+      "restoration_io": {
+        "read_attempted": 1,
+        "read_errno": 0,
+        "read_result": 0,
+        "size": 72,
+        "write_errno": 0,
+        "write_result": 0
+      },
+      "restored_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 768,
+        "input_flags": 0,
+        "input_speed": 9600,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 9600
+      },
+      "rx_bytes": 0,
+      "rx_events": 0,
+      "transport": "uart-h4"
+    },
+    "service_restored": true,
+    "controller_interface_ready": true,
+    "current_worker_emission_events": 0,
+    "interpretation": "The current worker capability test fails on readback. Emission entries in the exported journal are historical diagnostic3 events. HCI and advertising remain unverified."
+  },
+  "uart_tests": {
+    "captured_20H240_readback_and_unchanged_request": "passed_macos_ci",
+    "effective_configuration_and_hardware_rejection": "passed_macos_ci",
+    "h4_socketpair_cancellation_eof_ownership": "passed_macos_ci",
+    "diagnostic_retention": "passed_macos_ci",
+    "physical_hci_response": "pending_tester",
+    "physical_advertising": "pending_tester"
+  },
+  "local_package_tests": {
+    "executed_passed": 20,
+    "linux_only_skipped": 3
+  },
+  "linux_ci_package_tests": {
+    "executed_passed": 8,
+    "real_payload_test_skipped": 1,
+    "real_payload_verified_locally": true
+  }
+}

@@ -57,3 +57,24 @@ ejecutar primero Test Bluetooth controller y exportar JSON. Si responde,
 probar un modelo, Detener, finalización natural y repetición. Si falla,
 exportar antes de repetir; no borrar el diario. No se ha probado diagnostic13
 en el dispositivo del tester ni se declara resuelta la emisión física.
+
+## Validación de entrega (12 de octubre de 2026, Europe/Madrid)
+Fuentes compiladas: `5c265c96f326b84911342ccb07768cb4998372c4`.
+Los cuatro workflows aprobaron:
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130740)
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130716)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130739)
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38178130683)
+
+La regresión UART con los valores del tester pasó en macOS, junto con H4,
+cancelación, EOF y propiedad del descriptor. El simulador pasó 46 comprobaciones
+y cuatro ciclos reales de segundo plano por idioma (español e inglés).
+
+Se generaron los tres DEB unificados con Bluetooth diagnostic5 incluido:
+RootHide, Dopamine/rootless y rootful. Pasaron 20 pruebas locales; las tres
+pruebas exclusivas de dpkg/Linux se cubrieron en CI. CI pasó ocho pruebas
+de empaquetado y omitió una de payload real, cubierta localmente.
+
+Hashes, versiones y procedencia están en
+[el registro de entrega](evidence/diagnostic13-verification.json).
+Instalación, respuesta HCI y emisión física en el iPhone del tester: pendientes.

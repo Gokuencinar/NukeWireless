@@ -9,6 +9,7 @@ Reconoce la representación 0x30300/0 que el driver devuelve al solicitar
 0x38b00/5, conservando la solicitud, velocidad, framing, flujo y recuperación.
 Añade regresión con los valores reales de iPhone10,2 / 20H240. Bluetooth
 `2.0.0~diagnostic5`. Candidata; respuestas HCI y emisión física pendientes.
+Compilación y regresiones aprobadas; DEB unificados validados en los tres esquemas.
 Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC13.md).
 
 **2.0.0~diagnostic12: corrección de validación UART y trazas de configuración.**
