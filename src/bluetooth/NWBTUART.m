@@ -4,12 +4,10 @@
 #include "NWBTH4.h"
 #include "NWBTHCIRead.h"
 #include "NWBTLab.h"
+#include "NWBTUARTABI.h"
 #include <sys/socket.h>
-#include <sys/kern_control.h>
-#include <sys/sys_domain.h>
 #include <sys/sysctl.h>
 #include <sys/ioctl.h>
-#include <sys/ttycom.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
