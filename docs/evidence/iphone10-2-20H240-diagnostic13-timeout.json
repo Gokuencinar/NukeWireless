@@ -1,0 +1,193 @@
+{
+  "report_sha256": "02e77daadc78ace7be697fbd20ccbb508f81809db2427b89f9d5838983d3795f",
+  "app_version": "2.0.0~diagnostic13",
+  "worker_version": "2.0.0~diagnostic5",
+  "machine": "iPhone10,2",
+  "ios_version": "16.7.4",
+  "os_build": "20H240",
+  "package_scheme": "rootless",
+  "source_commit": "5c265c96f326b84911342ccb07768cb4998372c4",
+  "current_worker_emission_events": 0,
+  "failure": {
+    "error": "Controller read completion deadline expired.",
+    "error_code": "transport",
+    "stage": "le_capabilities",
+    "queries": [
+      {
+        "name": "read_local_version",
+        "opcode": 4097,
+        "timed_out": true
+      }
+    ],
+    "local_hci_commands_submitted": 1,
+    "advertising_commands_submitted": 0,
+    "connection_commands_submitted": 0,
+    "capabilities_verified": false,
+    "service_restored": true,
+    "controller_interface_ready": true,
+    "transport_details": {
+      "channel_closed": true,
+      "channel_opened": true,
+      "commands_written": 1,
+      "configuration_comparison": {
+        "matches": 1,
+        "mismatches": [],
+        "policy": "h4-stream-effective-v2",
+        "reported_differences": [
+          "20H240_kernel_control_tty_flags",
+          "input_flags",
+          "control_flags"
+        ]
+      },
+      "configuration_contract": "iphone10_2-20H240-uart-stream-v1",
+      "configuration_readback": {
+        "errno": 0,
+        "result": 0,
+        "size": 72
+      },
+      "configuration_restored": true,
+      "configuration_verified": true,
+      "experimental": true,
+      "ignored_data_packets": 0,
+      "link_speed": 3000000,
+      "observed_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 197376,
+        "input_flags": 0,
+        "input_speed": 3000000,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 3000000
+      },
+      "original_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 768,
+        "input_flags": 0,
+        "input_speed": 9600,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 9600
+      },
+      "original_read": {
+        "errno": 0,
+        "result": 0,
+        "size": 72
+      },
+      "partial_rx_bytes": 0,
+      "requested_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 232192,
+        "input_flags": 5,
+        "input_speed": 3000000,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 3000000
+      },
+      "restoration_io": {
+        "read_attempted": 1,
+        "read_errno": 0,
+        "read_result": 0,
+        "size": 72,
+        "write_errno": 0,
+        "write_result": 0
+      },
+      "restored_configuration": {
+        "control_characters": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "control_flags": 768,
+        "input_flags": 0,
+        "input_speed": 9600,
+        "local_flags": 0,
+        "output_flags": 0,
+        "output_speed": 9600
+      },
+      "rx_bytes": 0,
+      "rx_events": 0,
+      "transport": "uart-h4"
+    }
+  },
+  "note": "One current capability failure; important_events duplicates it. Historical diagnostic11/12 emissions are not diagnostic13 tests."
+}

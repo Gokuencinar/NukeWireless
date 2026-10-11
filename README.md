@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic14: retención de wake durante UART.**
+Abre `/dev/btwake` antes del canal y lo libera tras restaurar y cerrar UART,
+incluidos errores parciales y cancelación. Añade evidencia de apertura/cierre y
+error `uart_wake` si el nodo no está disponible. Bluetooth `2.0.0~diagnostic6`.
+La prueba física diagnostic13 superó la configuración, pero agotó el plazo de
+la primera consulta sin recibir bytes. Esta corrección sigue pendiente de prueba
+física. Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC14.md).
+
 **2.0.0~diagnostic13: contrato UART contrastado con el readback del tester.**
 Reconoce la representación 0x30300/0 que el driver devuelve al solicitar
 0x38b00/5, conservando la solicitud, velocidad, framing, flujo y recuperación.

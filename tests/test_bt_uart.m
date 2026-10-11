@@ -7,12 +7,35 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 atomic_int NWBTCancelled = 0;
 static NWBTUART *pair(int descriptors[2]) {
     assert(!socketpair(AF_UNIX,SOCK_STREAM,0,descriptors));
     return [[NWBTUART alloc] initWithTestDescriptor:descriptors[0]];
 }
 int main(void) { @autoreleasepool {
+    // Real host descriptors check wake ownership independently of the iPhone
+    // driver. /dev/null stands in for a character node, never for physical BT.
+    NSDictionary *wakeError = nil;
+    NWBTUART *wakeOnly = [NWBTUART new];
+    assert([wakeOnly acquireTestWakePath:"/dev/null" error:&wakeError]);
+    int wakeFD = wakeOnly.testWakeDescriptor;
+    assert(wakeFD >= 0 && (fcntl(wakeFD, F_GETFD) & FD_CLOEXEC));
+    assert(fcntl(wakeFD, F_GETFL) & O_NONBLOCK);
+    [wakeOnly close]; [wakeOnly close];
+    assert(wakeOnly.testWakeDescriptor == -1 && fcntl(wakeFD, F_GETFD) == -1);
+    assert([wakeOnly.diagnostics[@"wake_closed"] boolValue]);
+    // Opening a missing path or a regular file must fail before HCI can start.
+    char ordinary[] = "/tmp/nwbt-wake-XXXXXX";
+    int ordinaryFD = mkstemp(ordinary); assert(ordinaryFD >= 0);
+    wakeOnly = [NWBTUART new];
+    assert(![wakeOnly acquireTestWakePath:ordinary error:&wakeError]);
+    assert([wakeError[@"stage"] isEqual:@"uart_wake"] && [wakeError[@"errno"] intValue] == EINVAL);
+    assert(wakeOnly.testWakeDescriptor == -1 && ![wakeOnly.diagnostics[@"wake_opened"] boolValue]);
+    close(ordinaryFD); assert(!unlink(ordinary));
+    assert(![wakeOnly acquireTestWakePath:ordinary error:&wakeError]);
+    assert([wakeError[@"errno"] intValue] == ENOENT);
+    [wakeOnly close];
     // Exact diagnostic12 / worker diagnostic4 values from the tester, not a
     // synthesized echo of the requested struct. The old request was 0x38b00
     // with input flags 5; this driver returned 0x30300 and input flags 0.
@@ -77,6 +100,8 @@ int main(void) { @autoreleasepool {
     observed = wanted; cfsetospeed(&observed, 115200);
     assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
     int fds[2]; NWBTUART *uart = pair(fds);
+    assert([uart acquireTestWakePath:"/dev/null" error:&wakeError]);
+    wakeFD = uart.testWakeDescriptor;
     const uint8_t command[] = {1,16,0}, expected[] = {1,1,16,0};
     assert([uart send:[NSData dataWithBytes:command length:sizeof(command)]]);
     uint8_t frame[4]; assert(read(fds[1],frame,sizeof(frame))==4 && !memcmp(frame,expected,4));
@@ -91,7 +116,8 @@ int main(void) { @autoreleasepool {
     const uint8_t cleanup[] = {0x39,0x20,6,0,1,0,0,0,0};
     assert([uart send:[NSData dataWithBytes:cleanup length:sizeof(cleanup)]]);
     atomic_store(&NWBTCancelled,0);
-    [uart close]; [uart close]; assert(uart.descriptor==-1 && fcntl(fds[0],F_GETFD)==-1); close(fds[1]);
+    [uart close]; [uart close]; assert(uart.descriptor==-1 && fcntl(fds[0],F_GETFD)==-1);
+    assert(fcntl(wakeFD,F_GETFD)==-1 && [uart.diagnostics[@"wake_closed"] boolValue]); close(fds[1]);
     uart=pair(fds);
     const uint8_t forbidden[] = {3,12,0}; // HCI Reset never allowed
     assert(![uart send:[NSData dataWithBytes:forbidden length:3]] && uart.error);
@@ -121,6 +147,6 @@ int main(void) { @autoreleasepool {
     assert(![uart send:[NSData dataWithBytes:command length:3]] && uart.error);
     assert(NSProcessInfo.processInfo.systemUptime-started < 2.0);
     [uart close]; close(fds[1]);
-    puts("UART captured 20H240 readback, effective configuration, hardware rejection, socketpair, cancellation, EOF and ownership passed");
+    puts("UART wake ownership/failure/close, captured 20H240 readback, hardware rejection, socketpair, cancellation and EOF passed");
     return 0;
 } }

@@ -9,7 +9,7 @@ from compat_macho import inspect
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '2.0.0~diagnostic5'
+VERSION = '2.0.0~diagnostic6'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,

@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -120,12 +121,14 @@ static NSDictionary *configurationComparison(const struct termios *wanted, const
 }
 @interface NWBTUART () {
     int _descriptor;
+    int _wakeDescriptor;
     struct termios _original;
     BOOL _configured;
     NWBTH4Parser _parser;
     NSMutableDictionary *_details;
 }
 @property(nonatomic, readwrite, copy) NSString *error;
+- (BOOL)acquireWake:(const char *)path error:(NSDictionary **)error;
 @end
 static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     [uart close];
@@ -136,21 +139,42 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
 @implementation NWBTUART
 - (instancetype)init {
     if ((self = [super init])) {
-        _descriptor = -1;
+        _descriptor = -1; _wakeDescriptor = -1;
         _details = [@{@"transport": @"uart-h4", @"experimental": @YES,
             @"configuration_contract": @"iphone10_2-20H240-uart-stream-v1", @"commands_written": @0,
             @"channel_opened": @NO, @"configuration_verified": @NO} mutableCopy];
     }
     return self;
 }
+- (BOOL)acquireWake:(const char *)path error:(NSDictionary **)error {
+    // InternalBlue ios/main.m f524380 opens /dev/btwake before UART and
+    // retains it until after the H4 socket closes. Never write to this node.
+    int flags = O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW;
+    int fd = open(path, flags);
+    int number = fd < 0 ? errno : 0;
+    struct stat info = {0};
+    if (fd >= 0 && fstat(fd, &info) < 0) number = errno;
+    else if (fd >= 0 && !S_ISCHR(info.st_mode)) number = EINVAL;
+    _details[@"wake_open"] = @{@"errno": @(number), @"character_device": @(fd >= 0 && !number),
+        @"nonblocking": @YES, @"close_on_exec": @YES};
+    if (number) {
+        if (fd >= 0) close(fd);
+        _details[@"wake_opened"] = @NO;
+        *error = uartError(@"uart_wake", @"Cannot acquire the UART Bluetooth wake device.", number);
+        return NO;
+    }
+    _wakeDescriptor = fd; _details[@"wake_opened"] = @YES;
+    return YES;
+}
 + (instancetype)openExclusive:(NSDictionary **)error {
     if (getuid() != 0) { *error = uartError(@"permissions", @"Exclusive UART requires the privileged worker.", 0); return nil; }
     NSDictionary *probe = NWBTUARTProbe();
     if (probe[@"error"]) { *error = probe; return nil; }
     NWBTUART *uart = [NWBTUART new];
+    if (![uart acquireWake:"/dev/btwake" error:error]) { closeWithEvidence(uart, error); return nil; }
     struct ctl_info info;
     uart->_descriptor = controlSocket(&info, error);
-    if (uart->_descriptor < 0) return nil;
+    if (uart->_descriptor < 0) { closeWithEvidence(uart, error); return nil; }
     int fd = uart->_descriptor;
     int flags = fcntl(fd, F_GETFL);
     int noSignal = 1;
@@ -274,8 +298,7 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     return events.length ? events : nil;
 }
 - (void)close {
-    if (_descriptor < 0) return;
-    if (_configured) {
+    if (_descriptor >= 0 && _configured) {
         struct termios observed = {0}; socklen_t size = sizeof(observed);
         int writeResult = setsockopt(_descriptor, SYSPROTO_CONTROL, TIOCSETA, &_original, sizeof(_original));
         int writeError = writeResult < 0 ? errno : 0;
@@ -291,10 +314,19 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
         if (!restored) _details[@"cleanup_error"] = @"Original UART configuration could not be verified after restoration.";
         _configured = NO;
     }
-    close(_descriptor); _descriptor = -1; _details[@"channel_closed"] = @YES;
+    if (_descriptor >= 0) {
+        close(_descriptor); _descriptor = -1; _details[@"channel_closed"] = @YES;
+    }
+    // Release the wake hold only after restoring and closing UART, including
+    // partial-open failures. close() remains idempotent and dealloc owns it.
+    if (_wakeDescriptor >= 0) {
+        close(_wakeDescriptor); _wakeDescriptor = -1; _details[@"wake_closed"] = @YES;
+    }
 }
 - (void)dealloc { [self close]; }
 #ifdef NW_BT_UART_TESTING
+- (BOOL)acquireTestWakePath:(const char *)path error:(NSDictionary **)error { return [self acquireWake:path error:error]; }
+- (int)testWakeDescriptor { return _wakeDescriptor; }
 - (instancetype)initWithTestDescriptor:(int)descriptor {
     if ((self = [self init])) {
         _descriptor = descriptor;

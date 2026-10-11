@@ -19,5 +19,7 @@ NSDictionary *NWBTUARTTestConfiguration(struct termios *value, const struct term
 #ifdef NW_BT_UART_TESTING
 // Ownership is transferred; socketpair tests bypass kernel control / termios.
 - (instancetype)initWithTestDescriptor:(int)descriptor;
+- (BOOL)acquireTestWakePath:(const char *)path error:(NSDictionary **)error;
+- (int)testWakeDescriptor;
 #endif
 @end

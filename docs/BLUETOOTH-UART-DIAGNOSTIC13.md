@@ -78,3 +78,12 @@ de empaquetado y omitió una de payload real, cubierta localmente.
 Hashes, versiones y procedencia están en
 [el registro de entrega](evidence/diagnostic13-verification.json).
 Instalación, respuesta HCI y emisión física en el iPhone del tester: pendientes.
+
+## Resultado físico recibido (12 de octubre de 2026, Europe/Madrid)
+
+El nuevo JSON confirma app diagnostic13, fuentes 5c265c96 y componente Bluetooth
+diagnostic5. `configuration_verified=true`; se escribió una consulta H4,
+Read Local Version (0x1001), pero no llegó ningún byte ni evento antes del plazo.
+No se enviaron comandos de anuncios. Configuración y servicio restaurados.
+La corrección de readback pasó en el dispositivo; la comunicación HCI no funciona
+todavía. [Evidencia sin identificadores personales](evidence/iphone10-2-20H240-diagnostic13-timeout.json).
