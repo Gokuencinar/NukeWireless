@@ -9,6 +9,7 @@ Intercala la parada privilegiada en el método Objective-C existente, con firma
 verificada, por IP y proceso propio. Conserva la llamada nativa y ejecuta la
 limpieza incluso si lanza una excepción. Incluye la retención de wake UART de
 diagnostic14; Bluetooth sigue en `2.0.0~diagnostic6`. Aceptación física pendiente.
+Compilación y regresiones aprobadas; DEB unificados validados en los tres esquemas.
 Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC15.md).
 
 **2.0.0~diagnostic14: retención de wake durante UART.**

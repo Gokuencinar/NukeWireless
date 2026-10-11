@@ -59,3 +59,31 @@ NukeWireless; repetir. La restauración de Internet requiere esa aceptación man
 En el iPhone 8 Plus: seguir la prueba de controlador UART de diagnostic14 y
 exportar JSON antes de repetir si falla. No se declara que despertar el enlace
 esté resuelto físicamente hasta recibir una respuesta HCI.
+
+## Validación de entrega (12 de octubre de 2026, Europe/Madrid)
+Fuentes compiladas: `ce471cef352a50e4f3407f5e353602548fa16648`.
+Los cuatro workflows aprobaron:
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38180682543)
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38180682546)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38180682544)
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38180899976)
+
+Las regresiones de ownership y fallo de wake, y UART con los valores del
+tester, pasaron en macOS, junto con H4,
+cancelación, EOF y propiedad del descriptor. También pasó la regresión de desbloqueo Objective-C
+con comprobación de ABI, repetición, clase padre y limpieza ante excepción. El simulador pasó 46 comprobaciones
+y cuatro ciclos reales de segundo plano por idioma (español e inglés).
+
+Se generaron los tres DEB unificados con Bluetooth diagnostic6 incluido:
+RootHide, Dopamine/rootless y rootful.
+Pasaron 20 pruebas locales; las tres
+pruebas exclusivas de dpkg/Linux se cubrieron en CI. CI pasó ocho pruebas
+de empaquetado y omitió una de payload real, cubierta localmente.
+
+Hashes, versiones y procedencia están en
+[el registro de entrega](evidence/diagnostic15-verification.json).
+Instalación, respuesta HCI y emisión física en el iPhone del tester: pendientes.
+
+Instalación en el XS de referencia y aceptación del desbloqueo: pendientes;
+el intento SSH no obtuvo conexión. No se cerró ni modificó la app del teléfono.
