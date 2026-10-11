@@ -19,8 +19,15 @@ int main(void) {
         for (NSString *secret in @[@"my-network", @"sensitive", @"192.168.1.22", @"fe80::1234", @"/var/mobile", @"11:22:33:44:55:66"])
             assert(![text containsString:secret]);
         assert([safe[@"macho_uuid"] isEqual:uuid]); assert([safe[@"peripheral"] isEqual:@"[redacted]"]);
+        NWDiagnosticRecord(@"wifi_block_process", @"failed", @{@"error_code": @"block_process_exited", @"ip": @"192.168.1.42"});
         for (unsigned i = 0; i < 80; ++i) NWDiagnosticRecord(@"fixture", @"captured", @{@"sequence": @(i)});
         assert([NWDiagnosticSnapshot()[@"events"] count] == 64);
+        NSArray *important = NWDiagnosticSnapshot()[@"important_events"];
+        assert(important.count == 2); // Interrupted previous session and child failure survived scan noise.
+        assert([important.lastObject[@"details"][@"ip"] isEqual:@"[redacted]"]);
+        for (unsigned i = 0; i < 40; ++i) NWDiagnosticRecord(@"fixture", @"failed", @{@"sequence": @(i)});
+        assert([NWDiagnosticSnapshot()[@"important_events"] count] == 32);
+        assert([NWDiagnosticSnapshot()[@"important_events"] firstObject][@"details"][@"sequence"]);
         NWDiagnosticRecord(@"wifi_scan", @"running", @{}); assert(NWDiagnosticSnapshot()[@"pending_tests"][@"wifi_scan"]);
         NWDiagnosticRecord(@"wifi_scan", @"empty", @{}); assert(!NWDiagnosticSnapshot()[@"pending_tests"][@"wifi_scan"]);
         NSMutableDictionary *huge = [NSMutableDictionary new];
@@ -36,7 +43,11 @@ int main(void) {
         for (NSURL *item in [NSFileManager.defaultManager contentsOfDirectoryAtURL:folder includingPropertiesForKeys:nil options:0 error:NULL])
             if ([item.lastPathComponent hasPrefix:@"NukeWireless-"]) ++exports;
         assert(exports == 5);
+        NWDiagnosticFlushForTesting();
+        NSDictionary *saved = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfURL:[folder URLByAppendingPathComponent:@"latest.json"]] options:0 error:NULL];
+        assert([saved[@"important_events"] count] == 32);
         NWDiagnosticClear(); assert([NWDiagnosticSnapshot()[@"events"] count] == 1);
+        assert([NWDiagnosticSnapshot()[@"important_events"] count] == 0);
         NWDiagnosticFlushForTesting();
         assert([NSFileManager.defaultManager removeItemAtURL:folder error:NULL]);
         puts("diagnostics: redaction, provenance UUID, interrupted session, bounds, pending, export, retention and clear passed");

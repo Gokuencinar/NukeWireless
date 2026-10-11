@@ -169,7 +169,7 @@ def build(app_path, worker_path, output, scheme):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--inputs", type=Path, required=True, help="directory with both DEBs and manifests per scheme")
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic9-unified")
+    parser.add_argument("--output", type=Path, default=ROOT / "dist/diagnostic10-unified")
     parser.add_argument("--scheme", choices=["all", *SCHEMES], default="all")
     args = parser.parse_args()
     for scheme in SCHEMES if args.scheme == "all" else [args.scheme]:

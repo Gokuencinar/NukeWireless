@@ -253,13 +253,13 @@
 "diag.ble_hint" = "Open the scanner to check permission, state, scan start and reception. You start discovery.";
 "diag.controller_hint" = "Read local controller capabilities and check restoration. Requires Bluetooth off in Settings.";
 "diag.advertising_hint" = "Open Bluetooth to advertise one or all from the catalog. Stop remains available; then record what the receiver observed.";
-"diag.observation" = "Add receiver observation";
+"diag.observation" = "Add test observation";
 "diag.export" = "Export JSON report";
 "diag.clear" = "Clear diagnostic journal";
 "diag.save_failed" = "The report could not be saved. Try again.";
-"diag.observation_hint" = "Enter the test, receiver model and OS, and what happened. Do not include personal names, passwords or addresses.";
+"diag.observation_hint" = "Enter the feature, device and OS, and what happened. For blocking, note whether new content loaded on the other device with mobile data off. Do not include personal details or addresses.";
 "diag.test_name" = "Test and advertised model";
-"diag.receiver" = "Receiver model and OS version";
+"diag.receiver" = "Tested device and OS version";
 "diag.what_happened" = "Observed result or error";
 "diag.save" = "Save observation";
 "diag.clear_hint" = "Only diagnostic events are cleared. Previously exported reports and device history are retained.";

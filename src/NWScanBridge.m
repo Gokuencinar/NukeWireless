@@ -1,6 +1,7 @@
 #import "NWScanBridge.h"
 #import "NWHotspot.h"
 #import "NWDiagnosticReport.h"
+#import "NWTaskDiagnostics.h"
 #import "NWLegacyABI.h"
 #import "NWInstallLayout.h"
 #import "NWPolicy.h"
@@ -14,6 +15,7 @@
 #import <errno.h>
 #import <string.h>
 #import <dlfcn.h>
+#include <sys/sysctl.h>
 #import <QuartzCore/QuartzCore.h>
 
 // Names below are ABI identifiers in the unchanged, SHA-256-pinned app.
@@ -35,6 +37,25 @@ static NSTimer *watchdog;
 static BOOL bulkBusy;
 static NSObject *deviceActionToken;
 static NSUInteger bulkFailures;
+static NSUInteger bulkMatches, actionSequence;
+static NSDictionary *deviceDiagnosticContext, *bulkDiagnosticContext;
+static NSMutableDictionary *peerTags;
+static NSString *peerTag(NSString *address) {
+    if (!peerTags) peerTags = [NSMutableDictionary new];
+    if (!peerTags[address] && peerTags.count < 128) peerTags[address] = [NSString stringWithFormat:@"peer-%lu", (unsigned long)peerTags.count + 1];
+    return peerTags[address] ?: @"peer-untracked";
+}
+static NSDictionary *actionContext(BOOL blocked, BOOL all) {
+    return @{@"operation_id": [NSString stringWithFormat:@"wifi-%lu", (unsigned long)++actionSequence],
+        @"operation": blocked ? @"block" : @"unblock", @"scope": all ? @"bulk" : @"individual",
+        @"mechanism": @"arp_ipv4", @"internet_cut_confirmed": @NO};
+}
+static void deviceOutcome(NSString *status, NSString *error) {
+    NSMutableDictionary *details = [deviceDiagnosticContext mutableCopy];
+    if (error) details[@"error_code"] = error;
+    NWDiagnosticRecord(@"wifi_device_action", status, details);
+    NWTaskDiagnosticContext(nil);
+}
 static NSString *scanNetwork;
 static __weak NWLegacyScanner *activeScanner;
 static NSString *recoveryNetwork;
@@ -337,6 +358,7 @@ static void verifyDeviceBlock(NSDictionary *row, BOOL blocked, NSObject *token, 
         }); return;
     }
     if (currentDevice(row)) updateDeviceState(row[@"ip"]);
+    deviceOutcome(success ? (blocked ? @"process_active" : @"stopped") : @"failed", success ? nil : @"process_state_mismatch_or_stale_device");
     deviceActionToken = nil; bulkBusy = NO; notify();
     if (completion) completion(success);
 }
@@ -346,12 +368,16 @@ BOOL NWDeviceSetBlocked(NSDictionary *row, BOOL blocked, void (^completion)(BOOL
         updateDeviceState(row[@"ip"]); notify(); if (completion) completion(YES); return YES;
     }
     NSObject *token = [NSObject new]; deviceActionToken = token; bulkBusy = YES; notify();
-    if (!currentDevice(row)) { deviceActionToken = nil; bulkBusy = NO; notify(); return NO; }
+    NSMutableDictionary *details = [actionContext(blocked, NO) mutableCopy]; details[@"peer_tag"] = peerTag(row[@"ip"]);
+    details[@"network_context"] = NWScanDiagnosticSnapshot(); deviceDiagnosticContext = details;
+    NWTaskDiagnosticContext(details); NWDiagnosticRecord(@"wifi_device_action", @"running", details);
+    if (!currentDevice(row)) { deviceOutcome(@"failed", @"stale_device"); deviceActionToken = nil; bulkBusy = NO; notify(); return NO; }
     @try {
         if (blocked) ((void (*)(id, SEL, id, id))objc_msgSend)(commands(), NSSelectorFromString(@"blockGivenIPWithIp:targetMac:"), row[@"ip"], row[@"mac"]);
         else ((void (*)(id, SEL, id))objc_msgSend)(commands(), NSSelectorFromString(@"unblockIPWithIp:"), row[@"ip"]);
     } @catch (NSException *exception) {
-        (void)exception; deviceActionToken = nil; bulkBusy = NO; notify(); return NO;
+        NWDiagnosticRecord(@"wifi_device_exception", @"failed", @{@"exception_name": exception.name ?: @"unknown"});
+        deviceOutcome(@"failed", @"native_action_exception"); deviceActionToken = nil; bulkBusy = NO; notify(); return NO;
     }
     verifyDeviceBlock([row copy], blocked, token, 0, [completion copy]); return YES;
 }
@@ -392,7 +418,23 @@ static BOOL refreshScan(BOOL manual) {
 BOOL NWRefreshScan(void) { return refreshScan(YES); }
 NSDictionary *NWScanDiagnosticSnapshot(void) {
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
+    BOOL ipv6LinkLocal = NO, ipv6Other = NO; struct ifaddrs *list = NULL;
+    int interfaceError = getifaddrs(&list) ? errno : 0;
+    for (struct ifaddrs *p = list; p; p = p->ifa_next) {
+        if (!p->ifa_name || strcmp(p->ifa_name, "en0") || !p->ifa_addr || p->ifa_addr->sa_family != AF_INET6) continue;
+        const struct in6_addr *address = &((struct sockaddr_in6 *)p->ifa_addr)->sin6_addr;
+        if (IN6_IS_ADDR_LINKLOCAL(address)) ipv6LinkLocal = YES;
+        else if (!IN6_IS_ADDR_LOOPBACK(address) && !IN6_IS_ADDR_MULTICAST(address) && !IN6_IS_ADDR_UNSPECIFIED(address)) ipv6Other = YES;
+    }
+    if (list) freeifaddrs(list);
+    int forwarding = 0; size_t size = sizeof(forwarding);
+    BOOL forwardingKnown = !sysctlbyname("net.inet.ip.forwarding", &forwarding, &size, NULL, 0);
     return @{@"phase": @(state.phase), @"generation": @(state.generation),
+        @"network_context": @{@"en0_ipv6_link_local": @(ipv6LinkLocal), @"en0_ipv6_other": @(ipv6Other),
+            @"interface_read_errno": @(interfaceError), @"ipv4_forwarding_known": @(forwardingKnown),
+            @"ipv4_forwarding": forwardingKnown ? @(forwarding != 0) : NSNull.null,
+            @"peer_traffic_family": @"unknown", @"router_arp_protection": @"unknown",
+            @"blocking_scope": @"ARP IPv4; no IPv6 filtering", @"internet_cut_confirmed": @NO},
         @"elapsed_seconds": @(state.started ? MAX(0, CACurrentMediaTime() - state.started) : 0),
         @"device_count": @(devices.count), @"adapter_present": @(wifiAdapter != nil),
         @"native_queue_count": @(activeScanner.queue.operationCount), @"native_start_returned": @(nativeStartReturned),
@@ -457,26 +499,48 @@ NSString *NWBulkTitle(void) {
 }
 static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock,
                            uint64_t generation, NSString *network, NSUInteger attempt);
+static void bulkOutcome(NSUInteger requested, NSString *error) {
+    NSMutableDictionary *details = [bulkDiagnosticContext mutableCopy];
+    details[@"requested_count"] = @(requested); details[@"process_state_matches"] = @(bulkMatches);
+    details[@"failed_or_unprocessed_count"] = @(bulkFailures);
+    if (error) details[@"error_code"] = error;
+    NWDiagnosticRecord(@"wifi_bulk_action", bulkFailures ? @"failed" : @"process_states_observed", details);
+    NWTaskDiagnosticContext(nil);
+}
+static NSDictionary *bulkItemContext(NSArray *items, NSUInteger index) {
+    NSMutableDictionary *details = [bulkDiagnosticContext mutableCopy];
+    details[@"item_index"] = @(index + 1); details[@"peer_tag"] = peerTag(items[index][@"ip"]);
+    return details;
+}
 static void bulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock, uint64_t generation, NSString *network) {
     if (index >= items.count || (!unblock && (state.generation != generation || ![network isEqualToString:networkIdentity()]))) {
         if (index < items.count) bulkFailures += items.count - index;
+        bulkOutcome(items.count, index < items.count ? @"network_changed" : nil);
         bulkBusy = NO; notify(); return;
     }
     NSString *ip = items[index][@"ip"];
     if (isBlocked(ip) == !unblock) {
+        ++bulkMatches;
+        NWDiagnosticRecord(@"wifi_bulk_item", @"already_in_requested_process_state", bulkItemContext(items, index));
         dispatch_async(dispatch_get_main_queue(), ^{ bulkStep(items, index + 1, unblock, generation, network); }); return;
     }
     // The preserved native process registry has 64 slots. Never launch a task it
     // cannot track and subsequently release; report the remaining items as failures.
     id registered = readObject(commands(), @"runningBlocksForArp");
     if (!unblock && (![registered isKindOfClass:NSArray.class] || [registered count] >= 64)) {
-        bulkFailures += items.count - index; bulkBusy = NO; notify(); return;
+        bulkFailures += items.count - index; bulkOutcome(items.count, @"process_registry_unavailable_or_full"); bulkBusy = NO; notify(); return;
     }
+    NWTaskDiagnosticContext(bulkItemContext(items, index));
     @try {
         Class cls = commands();
         if (unblock) ((void (*)(id, SEL, id))objc_msgSend)(cls, NSSelectorFromString(@"unblockIPWithIp:"), ip);
         else ((void (*)(id, SEL, id, id))objc_msgSend)(cls, NSSelectorFromString(@"blockGivenIPWithIp:targetMac:"), ip, items[index][@"mac"]);
-    } @catch (NSException *exception) { NSLog(@"Nuke Wireless: bulk item exception (%@)", exception.name); }
+    } @catch (NSException *exception) {
+        NSMutableDictionary *details = [bulkItemContext(items, index) mutableCopy]; details[@"exception_name"] = exception.name ?: @"unknown";
+        details[@"error_code"] = @"native_action_exception";
+        NWDiagnosticRecord(@"wifi_bulk_item", @"failed", details); ++bulkFailures;
+        bulkStep(items, index + 1, unblock, generation, network); return;
+    }
     verifyBulkStep(items, index, unblock, generation, network, 0);
 }
 static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOOL unblock,
@@ -490,6 +554,11 @@ static void verifyBulkStep(NSArray<NSDictionary *> *items, NSUInteger index, BOO
             return;
         }
         if (!success) ++bulkFailures;
+        else ++bulkMatches;
+        NSMutableDictionary *details = [bulkItemContext(items, index) mutableCopy];
+        details[@"verification_attempts"] = @(attempt + 1);
+        if (!success) details[@"error_code"] = @"process_state_mismatch";
+        NWDiagnosticRecord(@"wifi_bulk_item", success ? (unblock ? @"stopped" : @"process_active") : @"failed", details);
         if (success && !unblock) [bulkOwned addObject:ip];
         updateDeviceState(ip); notify();
         bulkStep(items, index + 1, unblock, generation, network);
@@ -518,7 +587,10 @@ void NWConfirmBulk(UIViewController *presenter) {
         (void)action;
         if (bulkBusy || (!unblock && (state.generation != generation || NWScanBusy() || ![network isEqualToString:networkIdentity()]))) return;
         if (![commands() respondsToSelector:NSSelectorFromString(@"blockGivenIPWithIp:targetMac:")] || ![commands() respondsToSelector:NSSelectorFromString(@"unblockIPWithIp:")]) return;
-        bulkBusy = YES; bulkFailures = 0; notify();
+        bulkBusy = YES; bulkFailures = 0; bulkMatches = 0;
+        NSMutableDictionary *details = [actionContext(!unblock, YES) mutableCopy]; details[@"requested_count"] = @(snapshot.count);
+        details[@"network_context"] = NWScanDiagnosticSnapshot(); bulkDiagnosticContext = details;
+        NWDiagnosticRecord(@"wifi_bulk_action", @"running", details); notify();
         bulkStep(snapshot, 0, unblock, generation, network);
     }]];
     [presenter presentViewController:alert animated:YES completion:nil];
@@ -582,6 +654,9 @@ int NWDeviceActionsUIRegressionCheck(void) {
         if (NWDeviceSetNickname(stale, @"Incorrecto") || NWDeviceSetBlocked(stale, YES, nil)) return 4;
         __block BOOL completed = NO, success = NO;
         if (!NWDeviceSetBlocked(row, YES, ^(BOOL result) { completed = YES; success = result; }) || !completed || !success) return 5;
+        NSDictionary *event = [NWDiagnosticSnapshot()[@"events"] lastObject];
+        if (![event[@"status"] isEqual:@"process_active"] || [event[@"details"][@"internet_cut_confirmed"] boolValue] ||
+            ![event[@"details"][@"peer_tag"] hasPrefix:@"peer-"]) return 11;
         if (![NWDeviceCommandFixtureCalls() isEqual:@[@[@"block", @"192.0.2.42", @"00:11:22:33:44:55"]]] ||
             ![NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 6;
         if (!NWDeviceSetBlocked(row, NO, nil) || [NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 7;

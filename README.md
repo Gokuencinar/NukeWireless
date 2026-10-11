@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic10: diagnóstico de bloqueos y conservación de fallos.**
+Registra resultados locales por equipo, vida del proceso y contexto IPv4/IPv6.
+Conserva 32 eventos importantes además de los 64 recientes. No considera activo
+un PID de una tarea terminada. No demuestra el corte de Internet ni confirma la
+causa del reporte externo del XR. Compilación y aceptación física pendientes.
+Véase [diagnóstico ampliado](docs/DIAGNOSTICS-DIAGNOSTIC10.md).
+
 **2.0.0~diagnostic9+bundle1: candidata para el cierre gráfico del catálogo.**
 Sustituye los logos template y su estilizado en botones configurados por bitmaps
 coloreados con CoreGraphics y botones custom. Conserva alineación, marcas,

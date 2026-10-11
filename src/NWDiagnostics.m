@@ -112,7 +112,11 @@ static void collectEnvironment(void) {
     }
 }
 - (void)refresh {
-    self.events = [[NWDiagnosticSnapshot()[@"events"] reverseObjectEnumerator] allObjects];
+    NSDictionary *report = NWDiagnosticSnapshot();
+    NSMutableArray *visible = [report[@"events"] mutableCopy];
+    for (NSDictionary *event in report[@"important_events"]) if (![visible containsObject:event]) [visible addObject:event];
+    [visible sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [b[@"time"] compare:a[@"time"]]; }];
+    self.events = visible;
     [self.tableView reloadData]; self.tableView.backgroundColor = NWCanvasColor();
     if (NWBluetoothBusy()) {
         self.navigationItem.hidesBackButton = YES; self.navigationController.interactivePopGestureRecognizer.enabled = NO;
@@ -129,7 +133,7 @@ static void collectEnvironment(void) {
 - (void)stop { NWBluetoothStop(); }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return 4; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; return section == 0 ? 1 : section == 1 ? 5 : section == 2 ? 3 : MIN((NSUInteger)12, self.events.count);
+    (void)table; return section == 0 ? 1 : section == 1 ? 5 : section == 2 ? 3 : self.events.count;
 }
 - (NSString *)tableView:(UITableView *)table titleForHeaderInSection:(NSInteger)section {
     (void)table; return NWText(@[@"diag.edition", @"diag.tests", @"diag.report", @"diag.history"][section]);
@@ -205,7 +209,8 @@ static void collectEnvironment(void) {
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"diag.save") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
         (void)action; NSMutableArray *values = [NSMutableArray new];
         for (UITextField *field in alert.textFields) [values addObject:[(field.text ?: @"") substringToIndex:MIN((NSUInteger)400, field.text.length)]];
-        NWDiagnosticRecord(@"tester_observation", @"user_report", @{@"test_name": values[0], @"receiver_model_and_os": values[1], @"observation": values[2]});
+        NWDiagnosticRecord(@"tester_observation", @"user_report", @{@"test_name": values[0], @"receiver_model_and_os": values[1],
+            @"observation": values[2], @"source": @"user_report_unverified", @"wifi_context": NWScanDiagnosticSnapshot()});
     }]]; [self presentViewController:alert animated:YES completion:nil];
 }
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)index {

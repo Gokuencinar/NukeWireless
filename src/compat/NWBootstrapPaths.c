@@ -73,12 +73,23 @@ struct active_block {
     char ip[32];
     char real_mac[32];
     int pid;
+    id task; /* Retained original task, never a detached PID. */
 };
 static struct active_block blocks[64];
 static struct active_block pending_block;
 static int repair_in_progress;
 static int capture_root_task;
 static id captured_root_task;
+static int block_is_running(int slot) {
+    id task = blocks[slot].task;
+    SEL selector = sel_registerName("isRunning");
+    Method method = task ? class_getInstanceMethod(object_getClass(task), selector) : 0;
+    char type[8] = {0};
+    if (method) method_getReturnType(method, type, sizeof(type));
+    if (!method || method_getNumberOfArguments(method) != 2 || (type[0] != 'B' && type[0] != 'c')) return 0;
+    @try { return ((BOOL (*)(id, SEL))objc_msgSend)(task, selector); }
+    @catch (id exception) { (void)exception; return 0; }
+}
 struct scanned_device {
     char ip[32];
     char mac[32];
@@ -567,7 +578,12 @@ static void patched_interrupt(id self, SEL cmd) {
 }
 
 static void patched_launch(id self, SEL cmd) {
-    original_launch(self, cmd);
+    @try { original_launch(self, cmd); }
+    @catch (id exception) {
+        void (*failed)(id, id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticLaunchFailed");
+        if (failed) failed(self, exception);
+        @throw;
+    }
     id launch_path = ((id (*)(id, SEL))objc_msgSend)(self,
         sel_registerName("launchPath"));
     debug_line("task-launched-path", utf8(launch_path));
@@ -596,13 +612,17 @@ static void patched_launch(id self, SEL cmd) {
             for (int i = 0; i < 64; ++i)
                 if (equals(blocks[i].ip, pending_block.ip)) { slot = i; break; }
             if (slot < 0) for (int i = 0; i < 64; ++i)
-                if (!blocks[i].ip[0]) { slot = i; break; }
+                if (!block_is_running(i)) { slot = i; break; }
             if (slot >= 0) {
+                ((void (*)(id, SEL))objc_msgSend)(blocks[slot].task, sel_registerName("release"));
                 blocks[slot] = pending_block;
                 blocks[slot].pid = pid;
+                blocks[slot].task = ((id (*)(id, SEL))objc_msgSend)(self, sel_registerName("retain"));
             }
         }
         memset(&pending_block, 0, sizeof(pending_block));
+        void (*launched)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticLaunched");
+        if (launched) launched(self);
     }
 }
 
@@ -663,7 +683,9 @@ static void stop_block_for_ip(const char *ip_text) {
     char kill_path[256], poison_path[256];
     snprintf(kill_path, sizeof(kill_path), "%s/usr/bin/kill", root);
     const char *kill_args[] = {"-TERM", pid_text};
-    run_as_root(kill_path, kill_args, 2);
+    // A dead task's PID may already belong to something else. Its cached MAC
+    // can still be restored, but it must never be signalled.
+    if (block_is_running(slot)) run_as_root(kill_path, kill_args, 2);
     debug_line("unblock-kill", pid_text);
     char gateway_ip[32], gateway_mac[32];
     if (blocks[slot].real_mac[0] &&
@@ -677,7 +699,12 @@ static void stop_block_for_ip(const char *ip_text) {
         repair_in_progress = 0;
         debug_line("unblock-repair", blocks[slot].real_mac);
     }
-    memset(&blocks[slot], 0, sizeof(blocks[slot]));
+    // Keep ownership if termination failed or has not completed yet. The UI
+    // verifies the task's state rather than assuming that sending TERM worked.
+    if (!block_is_running(slot)) {
+        ((void (*)(id, SEL))objc_msgSend)(blocks[slot].task, sel_registerName("release"));
+        memset(&blocks[slot], 0, sizeof(blocks[slot]));
+    }
 }
 
 static void patched_swift_unblock(uint64_t first, uint64_t second) {
@@ -698,6 +725,9 @@ static void patched_swift_unblock(uint64_t first, uint64_t second) {
     }
     ip[n] = 0;
     debug_line("swift-unblock", ip);
+    void (*will_stop)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticWillStop");
+    if (will_stop) for (int i = 0; i < 64; ++i)
+        if (equals(blocks[i].ip, ip)) will_stop(blocks[i].task);
     original_swift_unblock(first, second);
     if (n >= 7) stop_block_for_ip(ip);
 }
@@ -707,7 +737,7 @@ static id block_processes_for_ip(const char *ip) {
     id array = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
         array_class, sel_registerName("arrayWithCapacity:"), 2);
     for (int i = 0; i < 64; ++i) {
-        if (blocks[i].pid <= 0 || (ip && !equals(blocks[i].ip, ip))) continue;
+        if (!block_is_running(i) || (ip && !equals(blocks[i].ip, ip))) continue;
         char pid_text[32];
         snprintf(pid_text, sizeof(pid_text), "%d", blocks[i].pid);
         ((void (*)(id, SEL, id))objc_msgSend)(array,
@@ -848,10 +878,6 @@ static void set_bulk_title(const char *title) {
             sel_registerName("setTitle:forState:"), string_from_utf8(title), 0);
 }
 
-static int pid_is_alive(int pid) {
-    return pid > 0 && (kill(pid, 0) == 0 || errno == EPERM);
-}
-
 static int valid_mac(const char *mac) {
     if (!mac || strlen(mac) != 17) return 0;
     for (int i = 0; i < 17; ++i) {
@@ -867,7 +893,7 @@ static int valid_mac(const char *mac) {
 static int running_block_count(void) {
     int count = 0;
     for (int i = 0; i < 64; ++i)
-        if (pid_is_alive(blocks[i].pid)) ++count;
+        if (block_is_running(i)) ++count;
     return count;
 }
 
@@ -1052,7 +1078,7 @@ static void bulk_button_tapped(id self, SEL cmd, id sender) {
         int launched = 0;
         for (int j = 0; j < 64; ++j)
             if (equals(blocks[j].ip, candidates[i].ip) &&
-                pid_is_alive(blocks[j].pid)) launched = 1;
+                block_is_running(j)) launched = 1;
         if (launched && bulk_count < 64) {
             snprintf(bulk_ips[bulk_count], sizeof(bulk_ips[bulk_count]), "%s", candidates[i].ip);
             ++bulk_count;
@@ -1204,7 +1230,7 @@ static void show_status_tapped(id self, SEL cmd, id sender) {
         struct scanned_device *device = &scanned_devices[i];
         int active = 0;
         for (int j = 0; j < 64; ++j)
-            if (equals(blocks[j].ip, device->ip) && pid_is_alive(blocks[j].pid))
+            if (equals(blocks[j].ip, device->ip) && block_is_running(j))
                 active = 1;
         const char *state = equals(device->ip, local_ip) ||
             equals(device->ip, router_ip) ? "Excluido" :
@@ -1566,7 +1592,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
                 sel_registerName("dictionaryWithObject:forKey:"),
                 string_from_utf8(has_gateway ? "ready" : "gateway_identity_unavailable"),
                 string_from_utf8("preflight"));
-            record(string_from_utf8("wifi_block_launch"),
+            record(string_from_utf8("wifi_block_preflight"),
                 string_from_utf8(has_gateway ? "captured" : "failed"), details);
         }
     }
@@ -1600,6 +1626,10 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
             result, sel_registerName("addObject:"), rewrite_argument(item));
     }
     original_arguments(self, cmd, result);
+    if (is_arpoison && !repair_in_progress) {
+        void (*prepare)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticPrepare");
+        if (prepare) prepare(self);
+    }
     if (capture_root_task) {
         id task_path = ((id (*)(id, SEL))objc_msgSend)(self,
             sel_registerName("launchPath"));

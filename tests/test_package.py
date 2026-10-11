@@ -49,7 +49,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless Dev')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
-        self.assertEqual(info['CFBundleVersion'], '20009')
+        self.assertEqual(info['CFBundleVersion'], '20010')
         self.assertTrue(info['UIFileSharingEnabled'])
         self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
         self.assertEqual(info['NukeWirelessWorkerVersion'], package.WORKER_VERSION)

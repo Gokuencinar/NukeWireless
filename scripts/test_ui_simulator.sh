@@ -26,7 +26,7 @@ xcrun --sdk iphonesimulator clang -arch "$arch" "-mios-simulator-version-min=$mi
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWDiagnosticReport.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios$minimum_ios-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"

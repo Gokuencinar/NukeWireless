@@ -3,11 +3,24 @@
 
 NSString *const NWDiagnosticChanged = @"NukeWirelessDiagnosticChanged";
 static NSMutableArray *events;
+static NSMutableArray *importantEvents;
 static NSMutableDictionary *pending;
 static NSString *session;
 static NSObject *guard;
 static dispatch_queue_t writer;
 static const NSUInteger maximumEvents = 64;
+static const NSUInteger maximumImportantEvents = 32;
+static NSString *storageError;
+static BOOL important(NSDictionary *event) {
+    NSString *status = event[@"status"], *test = event[@"test"];
+    return [@[@"failed", @"warning", @"interrupted", @"user_report"] containsObject:status] ||
+        ([@[@"wifi_bulk_action", @"wifi_device_action"] containsObject:test] && ![status isEqual:@"running"]);
+}
+static void retainImportant(NSDictionary *event) {
+    if (!important(event) || [importantEvents containsObject:event]) return;
+    [importantEvents addObject:event];
+    while (importantEvents.count > maximumImportantEvents) [importantEvents removeObjectAtIndex:0];
+}
 #ifdef NW_DIAGNOSTIC_TESTING
 static NSURL *testDirectory;
 void NWDiagnosticUseTestDirectory(NSURL *url) { testDirectory = url; }
@@ -62,36 +75,48 @@ static NSDictionary *snapshot(void) {
     return @{@"schema_version": @1, @"product": NW_BUILD_NAME, @"build": NW_BUILD_VERSION,
         @"build_marker": @NW_BUILD_MARKER, @"session_id": session, @"generated_at": @(NSDate.date.timeIntervalSince1970),
         @"privacy": @"No serial, UDID, network names, peer names or addresses. User observations are included after redaction.",
-        @"pending_tests": [pending copy], @"events": [events copy]};
+        @"pending_tests": [pending copy], @"events": [events copy], @"important_events": [importantEvents copy],
+        @"journal_storage_error": storageError ?: @"none",
+        @"limits": @{@"recent_events": @(maximumEvents), @"important_events": @(maximumImportantEvents),
+            @"unexpected_exit_cause": @"unknown unless confirmed by an OS crash or termination report"}};
 }
 static void persist(NSDictionary *report) {
     dispatch_async(writer, ^{
         NSURL *folder = directory();
-        if (!folder || ![NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:nil error:NULL]) return;
+        NSError *error = nil;
+        if (!folder || ![NSFileManager.defaultManager createDirectoryAtURL:folder withIntermediateDirectories:YES attributes:nil error:&error]) {
+            @synchronized (guard) { storageError = [NSString stringWithFormat:@"create_directory:%ld", (long)error.code]; } return;
+        }
         NSData *data = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingSortedKeys error:NULL];
-        if (data.length <= 1024 * 1024) [data writeToURL:[folder URLByAppendingPathComponent:@"latest.json"] options:NSDataWritingAtomic error:NULL];
+        BOOL saved = data && data.length <= 1024 * 1024 && [data writeToURL:[folder URLByAppendingPathComponent:@"latest.json"] options:NSDataWritingAtomic error:&error];
+        @synchronized (guard) { storageError = saved ? nil : [NSString stringWithFormat:@"write_journal:%ld", (long)error.code]; }
     });
 }
 void NWDiagnosticInitialize(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         guard = [NSObject new]; writer = dispatch_queue_create("app.nukewireless.diagnostics.files", DISPATCH_QUEUE_SERIAL);
-        events = [NSMutableArray new]; pending = [NSMutableDictionary new]; session = NSUUID.UUID.UUIDString;
+        events = [NSMutableArray new]; importantEvents = [NSMutableArray new]; pending = [NSMutableDictionary new]; session = NSUUID.UUID.UUIDString;
         // The old journal is bounded before parsing. Pending does not imply a crash.
         NSURL *file = [directory() URLByAppendingPathComponent:@"latest.json"];
         NSNumber *size = nil; [file getResourceValue:&size forKey:NSURLFileSizeKey error:NULL];
         if (size.unsignedLongLongValue > 0 && size.unsignedLongLongValue <= 1024 * 1024) {
             NSData *data = [NSData dataWithContentsOfURL:file];
             id old = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
-            if ([old isKindOfClass:NSDictionary.class] && [old[@"events"] isKindOfClass:NSArray.class])
-                for (id event in old[@"events"]) {
+            for (NSString *list in @[@"important_events", @"events"]) {
+            if ([old isKindOfClass:NSDictionary.class] && [old[list] isKindOfClass:NSArray.class])
+                for (id event in old[list]) {
                     if (![event isKindOfClass:NSDictionary.class] || ![event[@"test"] isKindOfClass:NSString.class] ||
                         ![event[@"status"] isKindOfClass:NSString.class] || ![event[@"time"] isKindOfClass:NSNumber.class] ||
                         ![event[@"details"] isKindOfClass:NSDictionary.class]) continue;
                     id safe = NWDiagnosticRedact(event);
                     NSData *encoded = [NSJSONSerialization dataWithJSONObject:safe options:0 error:NULL];
-                    if (encoded && encoded.length <= 10000) [events addObject:safe];
+                    if (encoded && encoded.length <= 10000) {
+                        if ([list isEqual:@"events"]) [events addObject:safe];
+                        retainImportant(safe);
+                    }
                 }
+            }
             if ([old isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] isKindOfClass:NSDictionary.class] && [old[@"pending_tests"] count]) {
                 NSMutableArray *names = [NSMutableArray new];
                 for (id name in old[@"pending_tests"]) if ([name isKindOfClass:NSString.class] && names.count < 32)
@@ -100,6 +125,7 @@ void NWDiagnosticInitialize(void) {
                     @"details": @{ @"pending_test_names": names, @"cause": @"unknown; interruption alone is not crash evidence"}}];
             }
         }
+        for (NSDictionary *event in events) retainImportant(event);
         while (events.count > maximumEvents) [events removeObjectAtIndex:0];
     });
 }
@@ -120,7 +146,9 @@ void NWDiagnosticRecord(NSString *test, NSString *status, NSDictionary *details)
     NSDictionary *report;
     @synchronized (guard) {
         if ([status isEqual:@"running"] && pending.count < 32) pending[test] = @(NSDate.date.timeIntervalSince1970); else [pending removeObjectForKey:test];
-        [events addObject:@{@"test": test, @"status": status, @"time": @(NSDate.date.timeIntervalSince1970), @"details": safe}];
+        NSDictionary *event = @{@"test": test, @"status": status, @"time": @(NSDate.date.timeIntervalSince1970),
+            @"build": NW_BUILD_VERSION, @"session_id": session, @"details": safe};
+        [events addObject:event]; retainImportant(event);
         while (events.count > maximumEvents) [events removeObjectAtIndex:0];
         report = snapshot(); persist(report);
     }
@@ -152,7 +180,7 @@ NSURL *NWDiagnosticSaveExport(NSError **error) {
     }
 }
 void NWDiagnosticClear(void) {
-    NWDiagnosticInitialize(); @synchronized (guard) { [events removeAllObjects]; [pending removeAllObjects]; persist(snapshot()); }
+    NWDiagnosticInitialize(); @synchronized (guard) { [events removeAllObjects]; [importantEvents removeAllObjects]; [pending removeAllObjects]; persist(snapshot()); }
     NWDiagnosticRecord(@"journal", @"cleared", @{});
 }
 #ifdef NW_DIAGNOSTIC_TESTING
