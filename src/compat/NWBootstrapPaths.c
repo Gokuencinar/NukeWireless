@@ -29,6 +29,8 @@ _Static_assert(offsetof(struct rt_msghdr, rtm_addrs) == 12, "Darwin route addres
 #include <time.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <mach-o/loader.h>
 #include <netdb.h>
 
 // Use the SDK's runtime types and dispatcher declaration, compiled as ObjC
@@ -56,6 +58,9 @@ static void (*original_arguments)(id, SEL, id);
 static void (*original_terminate)(id, SEL);
 static void (*original_interrupt)(id, SEL);
 static void (*original_launch)(id, SEL);
+static void (*original_swift_unblock)(uint64_t, uint64_t);
+static id (*swift_string_to_nsstring)(uint64_t, uint64_t);
+static void *unblock_backend;
 static void (*original_did_appear)(id, SEL, BOOL);
 static void (*original_found_device)(id, SEL, id);
 static id (*original_scanner_init)(id, SEL, id, BOOL);
@@ -711,6 +716,79 @@ static void prepare_block_stop(const char *ip) {
     if (will_stop) for (int i = 0; i < 64; ++i)
         if (equals(blocks[i].ip, ip)) will_stop(blocks[i].task);
 }
+
+static void patched_swift_unblock(uint64_t first, uint64_t second) {
+    // The pinned Swift String -> NSString stub preserves heap and small strings.
+    id value = swift_string_to_nsstring(first, second);
+    debug_line("swift-unblock-entry", "entered");
+    NWPerformWiFiUnblock(value, ^{ original_swift_unblock(first, second); });
+}
+
+static void *resolve_function_hook(void) {
+    void *symbol = dlsym((void *)-2, "MSHookFunction");
+    if (symbol) { debug_line("unblock-backend", "already_loaded"); return symbol; }
+    const char *root = utf8(jailbreak_prefix());
+    if (!root) return 0;
+    // Load the API library, never the tweak injector. ElleKit installs the
+    // Substrate alias here; rootful Substrate also provides its framework.
+    const char *suffixes[] = {"/usr/lib/libsubstrate.dylib", "/usr/lib/libellekit.dylib",
+        "/Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate"};
+    for (unsigned i = 0; i < sizeof(suffixes)/sizeof(suffixes[0]); ++i) {
+        char path[4096]; struct stat info;
+        int n = snprintf(path, sizeof(path), "%s%s", root, suffixes[i]);
+        if (n <= 0 || n >= (int)sizeof(path) || stat(path, &info) ||
+            !S_ISREG(info.st_mode) || info.st_uid != 0 || (info.st_mode & 0022)) continue;
+        void *handle = dlopen(path, 1 /* RTLD_LAZY, local API handle */);
+        if (!handle) continue;
+        symbol = dlsym(handle, "MSHookFunction");
+        if (symbol) {
+            unblock_backend = handle; // Keep the backend/trampoline loaded.
+            debug_line("unblock-backend", suffixes[i]); return symbol;
+        }
+        // Keep unsuccessful handles loaded too: constructors may retain state.
+    }
+    debug_line("unblock-backend", "unavailable"); return 0;
+}
+
+static void install_native_unblock(void) {
+    void (*hook)(void *, void *, void **) = (void *)resolve_function_hook();
+    const char *(*header)(unsigned) = (void *)dlsym((void *)-2, "_dyld_get_image_header");
+    const char *(*name)(unsigned) = (void *)dlsym((void *)-2, "_dyld_get_image_name");
+    unsigned (*count)(void) = (void *)dlsym((void *)-2, "_dyld_image_count");
+    const char *app = 0;
+    if (header && name && count) for (unsigned i = 0; i < count(); ++i)
+        if (contains(name(i), NWInstalledAppSuffix)) { app = header(i); break; }
+    // These are the same checked entry/stub of the SHA-pinned native executable.
+    // A different binary is rejected; Objective-C menus retain their own hook.
+    static const unsigned char entry[] = {
+        0xfc,0x6f,0xba,0xa9,0xfa,0x67,0x01,0xa9,0xf8,0x5f,0x02,0xa9,0xf6,0x57,0x03,0xa9};
+    static const unsigned char bridge[] = {
+        0x1f,0x20,0x03,0xd5,0x50,0xbb,0x21,0x58,0x00,0x02,0x1f,0xd6,0x1f,0x20,0x03,0xd5};
+    int text_covers_entries = 0;
+    if (app && ((const struct mach_header_64 *)app)->magic == MH_MAGIC_64) {
+        const struct mach_header_64 *mh = (const void *)app;
+        const char *cursor = app + sizeof(*mh), *end = cursor + mh->sizeofcmds;
+        for (unsigned i = 0; i < mh->ncmds && end - cursor >= (long)sizeof(struct load_command); ++i) {
+            const struct load_command *command = (const void *)cursor;
+            if (command->cmdsize < sizeof(*command) || command->cmdsize > (unsigned long)(end - cursor)) break;
+            if (command->cmd == LC_SEGMENT_64 && command->cmdsize >= sizeof(struct segment_command_64)) {
+                const struct segment_command_64 *segment = (const void *)cursor;
+                if (!strncmp(segment->segname, "__TEXT", sizeof(segment->segname)) &&
+                    !segment->fileoff && segment->vmsize >= 0x1152fc + sizeof(bridge))
+                    text_covers_entries = 1;
+            }
+            cursor += command->cmdsize;
+        }
+    }
+    if (hook && text_covers_entries && !memcmp(app + 0x39610, entry, sizeof(entry)) &&
+        !memcmp(app + 0x1152fc, bridge, sizeof(bridge))) {
+        swift_string_to_nsstring = (void *)(app + 0x1152fc);
+        hook((void *)(app + 0x39610), (void *)patched_swift_unblock, (void **)&original_swift_unblock);
+    }
+    debug_line("swift-unblock-hook", original_swift_unblock ? "installed" : "unavailable");
+}
+
+int NWNativeUnblockAvailable(void) { return original_swift_unblock != 0; }
 
 static id block_processes_for_ip(const char *ip) {
     Class array_class = objc_getClass("NSMutableArray");
@@ -1695,6 +1773,7 @@ static void install_paths(void) {
     } else debug_line("scan-hook", "unavailable");
     BOOL unblock_installed = NWInstallWiFiUnblock(commands, prepare_block_stop, stop_block_for_ip);
     debug_line("objc-unblock-hook", unblock_installed ? "installed" : "unavailable");
+    if (unblock_installed) install_native_unblock();
 }
 
 // Called by the embedded UI before it wraps scanner/task methods. Dependency

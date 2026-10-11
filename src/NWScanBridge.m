@@ -417,6 +417,7 @@ static BOOL refreshScan(BOOL manual) {
 }
 BOOL NWRefreshScan(void) { return refreshScan(YES); }
 NSDictionary *NWScanDiagnosticSnapshot(void) {
+    int (*nativeUnblock)(void) = dlsym(RTLD_DEFAULT, "NWNativeUnblockAvailable");
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
     BOOL ipv6LinkLocal = NO, ipv6Other = NO; struct ifaddrs *list = NULL;
     int interfaceError = getifaddrs(&list) ? errno : 0;
@@ -439,7 +440,8 @@ NSDictionary *NWScanDiagnosticSnapshot(void) {
         @"device_count": @(devices.count), @"adapter_present": @(wifiAdapter != nil),
         @"native_queue_count": @(activeScanner.queue.operationCount), @"native_start_returned": @(nativeStartReturned),
         @"automatic_retries": @(recoveryRetries), @"ipv4_subnet_ready": @(NWScanInterfaceReady(local, mask)),
-        @"hooks": @{@"start": @(oldStart != NULL), @"found": @(oldFound != NULL),
+        @"hooks": @{@"native_unblock": nativeUnblock ? @(nativeUnblock() != 0) : NSNull.null,
+            @"start": @(oldStart != NULL), @"found": @(oldFound != NULL),
             @"finished": @(oldFinished != NULL), @"failed": @(oldFailed != NULL), @"progress": @(oldProgress != NULL)},
         @"executable_loaded": @(appExecutableBase() != NULL)};
 }

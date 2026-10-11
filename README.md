@@ -4,13 +4,19 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
-**2.0.0~diagnostic15: desbloqueo Wi-Fi sin dependencia de MSHookFunction.**
-Intercala la parada privilegiada en el método Objective-C existente, con firma
-verificada, por IP y proceso propio. Conserva la llamada nativa y ejecuta la
-limpieza incluso si lanza una excepción. Incluye la retención de wake UART de
-diagnostic14; Bluetooth sigue en `2.0.0~diagnostic6`. Aceptación física pendiente.
-Compilación y regresiones aprobadas; DEB unificados validados en los tres esquemas.
-Véase [evidencia, corrección y límites](docs/BLUETOOTH-UART-DIAGNOSTIC15.md).
+**2.0.0~diagnostic16: candidata para el desbloqueo directo de Swift.**
+Conserva el método Objective-C y cubre la entrada Swift del ejecutable fijado,
+con comprobación de bytes y carga explícita de la API del backend si hace falta.
+Las llamadas anidadas limpian una vez el proceso propio de la misma IP.
+El JSON indica si el hook nativo está instalado. Bluetooth sigue en diagnostic6.
+Pruebas, instalación y aceptación pendientes; la caída del resto de la red
+comunicada por el usuario sigue sin causa confirmada.
+Véase [implementación y límites](docs/WIFI-UNBLOCK-DIAGNOSTIC16.md).
+
+**2.0.0~diagnostic15: corrección incompleta en dispositivo.**
+CI, paquetes e instalación pasaron, pero el usuario confirmó que Desbloquear
+sigue dejando la mano roja. El hook Objective-C cargó; la ruta directa Swift
+no quedó cubierta. Se conserva [la evidencia y el resultado](docs/BLUETOOTH-UART-DIAGNOSTIC15.md).
 
 **2.0.0~diagnostic14: retención de wake durante UART.**
 Abre `/dev/btwake` antes del canal y lo libera tras restaurar y cerrar UART,

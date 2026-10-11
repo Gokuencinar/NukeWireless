@@ -102,3 +102,16 @@ El diagnóstico de solo lectura confirmó Bluetooth diagnostic6, sin abrir canal
 HCI ni alterar servicios; bluetoothd conservó su PID. No aparecieron nuevos
 informes de crash relevantes durante la instalación. Apertura manual y prueba
 de bloquear/desbloquear sin reiniciar: pendientes de aceptación del usuario.
+
+## Resultado físico posterior: corrección incompleta
+
+El usuario confirmó diagnostic15 cargada, pero Desbloquear dejó la mano roja.
+El hook Objective-C se observó instalado; no hubo entrada a su limpieza durante
+la prueba. La inspección del ejecutable fijado confirma que la entrada Swift
+nativa usa `/bin/kill` por shell y puede saltarse el método Objective-C.
+Diagnostic15 no resuelve esa ruta directa. Véase diagnostic16.
+
+El usuario también comunicó pérdida de Internet en los demás equipos tras
+bloquear uno solo, recuperada al cerrar la app. Una lectura posterior no encontró
+procesos de bloqueo activos. La causa y el alcance de esa incidencia siguen sin
+confirmar; no se repitieron emisiones para recopilar evidencia.

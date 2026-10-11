@@ -80,7 +80,7 @@
   "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
   "ui_integration": "embedded-required-v1",
   "physical_installation": "passed_reference_iphone11_2_ios16_3_1_roothide",
-  "physical_functional_acceptance": "pending",
+  "physical_functional_acceptance": "failed_user_report_wifi_unblock",
   "release_published": false,
   "catalog_rendering": "cg-bitmap-original-v1",
   "physical_crash_fix_confirmed": false,
@@ -318,7 +318,7 @@
   },
   "wifi_unblock_tests": {
     "objective_c_method_abi_original_repetition_superclass_exception_cleanup": "passed_macos_ci",
-    "own_phone_functional_acceptance": "pending_user_test"
+    "own_phone_functional_acceptance": "failed_hand_stays_red"
   },
   "local_package_tests": {
     "executed_passed": 20,
@@ -344,7 +344,15 @@
     "new_relevant_crashes": [],
     "installed_binary_fingerprints_match_ci": true,
     "package_transfer_sha256_verified": true,
-    "manual_app_load": "pending",
-    "recovery_package": "NukeWireless-diagnostic10-backup.deb"
+    "manual_app_load": "passed_user_report",
+    "recovery_package": "NukeWireless-diagnostic10-backup.deb",
+    "objc_unblock_hook": "installed_observed",
+    "unblock_hook_invocation": "not_observed_after_test"
+  },
+  "network_wide_incident": {
+    "user_action": "block_one_device",
+    "user_observation": "Other devices lost internet; closing app restored it",
+    "cause": "unconfirmed",
+    "post_close_block_processes": "not_observed_readonly"
   }
 }

@@ -8,18 +8,29 @@ static void (*originalUnblock)(id, SEL, id);
 static void (*prepareStop)(const char *);
 static void (*stopOwned)(const char *);
 
-static void unblock(id self, SEL selector, id value) {
+static __thread const char *activeIP;
+
+void NWPerformWiFiUnblock(id value, void (^original)(void)) {
     char ip[INET_ADDRSTRLEN] = {0};
     struct in_addr address;
     if ([value isKindOfClass:NSString.class] && [value length] < sizeof(ip) &&
         inet_pton(AF_INET, [value UTF8String], &address) == 1)
         strlcpy(ip, [value UTF8String], sizeof(ip));
-    if (ip[0] && prepareStop) prepareStop(ip);
-    @try { originalUnblock(self, selector, value); }
-    @finally {
-        // Even an exception in native terminate cannot skip privileged cleanup.
-        if (ip[0]) stopOwned(ip);
+    BOOL owner = ip[0] && stopOwned && (!activeIP || strcmp(activeIP, ip));
+    const char *previous = activeIP;
+    if (owner) activeIP = ip;
+    @try {
+        if (owner && prepareStop) prepareStop(ip);
+        original();
     }
+    @finally {
+        @try { if (owner) stopOwned(ip); }
+        @finally { activeIP = previous; }
+    }
+}
+
+static void unblock(id self, SEL selector, id value) {
+    NWPerformWiFiUnblock(value, ^{ originalUnblock(self, selector, value); });
 }
 
 BOOL NWInstallWiFiUnblock(Class commands, void (*prepare)(const char *), void (*stop)(const char *)) {

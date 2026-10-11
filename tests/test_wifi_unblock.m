@@ -5,7 +5,8 @@
 #include <stdio.h>
 
 static NSUInteger originals, preparations, stops;
-static BOOL throwNative;
+static BOOL throwNative, nestedNative;
+static NSUInteger nativeEntryCalls;
 static char stoppedIP[16];
 @interface NativeCommands : NSObject
 + (void)unblockIPWithIp:(NSString *)ip;
@@ -13,6 +14,7 @@ static char stoppedIP[16];
 @implementation NativeCommands
 + (void)unblockIPWithIp:(NSString *)ip {
     (void)ip; ++originals;
+    if (nestedNative) NWPerformWiFiUnblock(ip, ^{ ++nativeEntryCalls; });
     if (throwNative) @throw [NSException exceptionWithName:@"NativeStopFailure" reason:nil userInfo:nil];
 }
 @end
@@ -47,6 +49,17 @@ int main(void) { @autoreleasepool {
     @try { [AppCommands unblockIPWithIp:@"192.168.1.45"]; assert(0); }
     @catch (NSException *exception) { assert([exception.name isEqual:@"NativeStopFailure"]); }
     assert(originals==6 && preparations==3 && stops==3);
-    puts("Wi-Fi Objective-C unblock: ABI guard, original, matching cleanup, repetition, superclass and exception cleanup passed");
+    throwNative=NO; nestedNative=YES;
+    [AppCommands unblockIPWithIp:@"192.168.1.45"];
+    assert(originals==7 && preparations==4 && stops==4 && nativeEntryCalls==1);
+    NWPerformWiFiUnblock(@"192.168.1.45", ^{ ++nativeEntryCalls; });
+    assert(preparations==5 && stops==5 && nativeEntryCalls==2);
+    throwNative=YES;
+    @try { [AppCommands unblockIPWithIp:@"192.168.1.45"]; assert(0); }
+    @catch (NSException *exception) { assert([exception.name isEqual:@"NativeStopFailure"]); }
+    assert(originals==8 && preparations==6 && stops==6 && nativeEntryCalls==3);
+    NWPerformWiFiUnblock(@"192.168.1.45", ^{ ++nativeEntryCalls; });
+    assert(preparations==7 && stops==7 && nativeEntryCalls==4);
+    puts("Wi-Fi Objective-C/native unblock: nested cleanup once, direct entry, ABI guard, original, matching cleanup, repetition, superclass and exception cleanup passed");
     return 0;
 } }

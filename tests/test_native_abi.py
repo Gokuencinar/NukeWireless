@@ -73,3 +73,9 @@ assert device['setNickName:'] == 'v24@0:8@16'
 assert device['isLocalDevice'] == device['isBlocking'] == 'B16@0:8'
 assert device['setIsBlocking:'] == 'v20@0:8B16'
 print('PASS: native scanner class, adapter callbacks and shared individual/bulk command ABI')
+
+# Direct Swift callers bypass the Objective-C thunk. Pin both native entry and
+# String bridge before the adapter installs its optional function hook.
+assert data[file_offset(0x100039610):file_offset(0x100039610)+16] == bytes.fromhex('fc6fbaa9fa6701a9f85f02a9f65703a9')
+assert data[file_offset(0x1001152fc):file_offset(0x1001152fc)+16] == bytes.fromhex('1f2003d550bb215800021fd61f2003d5')
+print('PASS: pinned native Swift unblock entry and String bridge fingerprints')
