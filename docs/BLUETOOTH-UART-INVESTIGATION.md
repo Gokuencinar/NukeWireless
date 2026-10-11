@@ -4,6 +4,46 @@ Investigación del 11 de octubre de 2026. Fuentes NukeWireless revisadas:
 `ca10b07` (binarios diagnostic9 compilados desde `57a6e91`).
 No modifica los binarios ni acredita emisión en un dispositivo nuevo.
 
+## Confirmación del firmware exacto: iPhone10,2 / 20H240
+
+Revisión posterior del 11 de octubre, con las fuentes en `2d33bdb`:
+se ha confirmado **UART en el árbol de dispositivos del firmware**, no todavía
+acceso funcional desde el jailbreak. Se extrajo exclusivamente
+`Firmware/all_flash/DeviceTree.d21ap.im4p` del
+[IPSW oficial de Apple 16.7.4 / 20H240](https://updates.cdn-apple.com/2023FallFCS/fullrestores/052-24015/4594AE7B-8566-4E2C-9E11-917E3A2A7294/iPhone_5.5_P3_16.7.4_20H240_Restore.ipsw).
+El modelo del árbol es `iPhone10,2`, compatible `D21AP`, exactamente el del JSON
+del tester; no se usa como sustituto el volcado público D211AP/iPhone10,5.
+
+El nodo `/device-tree/arm-io/uart1/bluetooth` tiene `device_type=bluetooth` y
+`compatible=bluetooth,n88`. Su padre es `uart1`, `device_type=uart` y
+`compatible=uart-1,samsung`. `transport-speed` contiene 3000000 y
+`transport-encoding` contiene 3, ambos uint32 little endian. La velocidad es
+configuración del enlace local; no es potencia de emisión. No se deduce el
+contrato H4 ni parámetros de socket únicamente del valor de encoding.
+
+La descarga por rangos requirió 41187 bytes, sin descargar el IPSW de 6 GB.
+Se comprobó el CRC ZIP de la entrada, su contenedor IM4P/dtre y la descompresión
+LZFSE con el código de Apple `lzfse/lzfse` en
+`e634ca58b4821d9f3d560cdc6df5dec02ffc93fd`, compilado localmente con GCC.
+El parser consumió exactamente 185436 bytes y 254 nodos. No se verificó la
+firma criptográfica de IM4P ni el hash del IPSW completo; se conservan URL y
+hashes de la entrada y del árbol en
+[la evidencia estructurada](evidence/iphone10-2-20H240-bluetooth-transport.json).
+
+Conclusión: el backend Skywalk actual no cubre el transporte UART declarado para
+este hardware. La falta de coincidencias en el registro del tester es coherente
+con ello, pero ese resultado por sí solo no probaba UART. Queda por consultar en
+su teléfono el registro `com.apple.uart.bluetooth` y comprobar ABI, acceso,
+capacidades y recuperación antes de implementar emisión. No se ha conectado al
+controlador, enviado comandos ni cambiado firmware o servicios del tester.
+
+Se compararon también los manifiestos rootless unificados de diagnostic8 y
+diagnostic10: las fuentes y los hashes de todos los binarios del componente
+Bluetooth `2.0.0~diagnostic2` son idénticos. Diagnostic10 conserva la mitigación
+gráfica de diagnostic9, pero no incorpora UART ni corrige aún el aviso genérico
+del catálogo. La recogida de registro descrita abajo sigue siendo necesaria para
+determinar la interfaz disponible en el proceso real.
+
 ## Evidencia del caso
 
 El tester anterior corresponde a iPhone10,2, iPhone 8 Plus, iOS 16.7.4
@@ -59,8 +99,9 @@ no explica por sí sola el fallo de registro guardado del tester.
   declara `net.systm.kctl.reg_list` de lectura y separa `CTLIOCGINFO`
   (consulta del registro) de la conexión al controlador.
 
-La hipótesis principal es que el dispositivo requiere el transporte UART que
-NukeWireless todavía no implementa. Instalar otra vez el mismo componente o
+En la investigación inicial, la hipótesis principal era UART; la extracción
+posterior del firmware exacto confirma la topología UART, pero no su acceso en
+runtime. NukeWireless todavía no implementa ese transporte. Instalar otra vez el mismo componente o
 retirar la comprobación Skywalk no añade ese transporte. No se generaliza la
 hipótesis a todos los chips A11/A12 ni se atribuye a una limitación de potencia.
 

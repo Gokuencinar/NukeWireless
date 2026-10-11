@@ -1,0 +1,172 @@
+{
+  "model": "iPhone10,2",
+  "compatible": "D21AP | iPhone10,2 | AppleARM",
+  "version": "16.7.4",
+  "build": "20H240",
+  "tree_sha256": "c6c2590abba6887a907f2d11b1025166b6814842b73ae8598214e46b05b4c858",
+  "decoded_bytes": 185436,
+  "bytes_parsed": 185436,
+  "nodes": 254,
+  "transport_nodes": [
+    {
+      "path": "/device-tree/arm-io/uart0",
+      "properties": {
+        "name": "uart0",
+        "compatible": "uart-1,samsung",
+        "device_type": "uart",
+        "reg": {
+          "hex": "0000602e000000000040000000000000"
+        },
+        "uart-version": {
+          "hex": "01000000",
+          "u32_le": 1
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart0/debug-console",
+      "properties": {
+        "name": "debug-console"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart1",
+      "properties": {
+        "name": "uart1",
+        "compatible": "uart-1,samsung",
+        "device_type": "uart",
+        "reg": {
+          "hex": "0040602e000000000040000000000000"
+        },
+        "uart-version": {
+          "hex": "01000000",
+          "u32_le": 1
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart1/bluetooth",
+      "properties": {
+        "name": "bluetooth",
+        "compatible": "bluetooth,n88",
+        "device_type": "bluetooth",
+        "transport-speed": {
+          "hex": "c0c62d00",
+          "u32_le": 3000000
+        },
+        "transport-encoding": {
+          "hex": "03000000",
+          "u32_le": 3
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart3",
+      "properties": {
+        "name": "uart3",
+        "compatible": "uart-1,samsung",
+        "device_type": "uart",
+        "reg": {
+          "hex": "00c0602e000000000040000000000000"
+        },
+        "uart-version": {
+          "hex": "01000000",
+          "u32_le": 1
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart3/stockholm",
+      "properties": {
+        "name": "stockholm",
+        "compatible": "nfc,primary,gpio",
+        "device_type": "stockholm"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart4",
+      "properties": {
+        "name": "uart4",
+        "compatible": "uart-1,samsung",
+        "device_type": "uart",
+        "reg": {
+          "hex": "0000612e000000000040000000000000"
+        },
+        "uart-version": {
+          "hex": "01000000",
+          "u32_le": 1
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart4/wlan",
+      "properties": {
+        "name": "wlan",
+        "compatible": "wlan-pcie-uart,bcm4357 | wlan-pcie-uart,bcm",
+        "device_type": "wlan"
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart6",
+      "properties": {
+        "name": "uart6",
+        "compatible": "uart-1,samsung",
+        "device_type": "uart",
+        "reg": {
+          "hex": "0080612e000000000040000000000000"
+        },
+        "uart-version": {
+          "hex": "01000000",
+          "u32_le": 1
+        }
+      }
+    },
+    {
+      "path": "/device-tree/arm-io/uart6/iap-uart-1",
+      "properties": {
+        "name": "iap-uart-1",
+        "compatible": "iap,uart",
+        "device_type": "iap-uart"
+      }
+    }
+  ],
+  "hardware_transport": "uart",
+  "firmware_tree_confirmed": true,
+  "decoder_source_commit": "e634ca58b4821d9f3d560cdc6df5dec02ffc93fd",
+  "runtime_registration_tested": false,
+  "emission_tested": false,
+  "provenance": {
+    "identifier": "iPhone10,2",
+    "version": "16.7.4",
+    "buildid": "20H240",
+    "url": "https://updates.cdn-apple.com/2023FallFCS/fullrestores/052-24015/4594AE7B-8566-4E2C-9E11-917E3A2A7294/iPhone_5.5_P3_16.7.4_20H240_Restore.ipsw",
+    "filesize": 6158055743,
+    "entry": "Firmware/all_flash/DeviceTree.d21ap.im4p",
+    "entry_sha256": "ad3cbd403d871aa9238ad18e13456da6830917d34a5d97d5d1137cc2341575f3",
+    "bytes_downloaded": 41187,
+    "full_ipsw_downloaded": false,
+    "device_runtime_verified": false
+  },
+  "verification": {
+    "zip_entry_crc_checked": true,
+    "im4p_type": "dtre",
+    "full_tree_consumed": true,
+    "im4p_signature_verified": false,
+    "full_ipsw_hash_verified": false
+  },
+  "worker_comparison": {
+    "versions": [
+      "2.0.0~diagnostic8+bundle1",
+      "2.0.0~diagnostic10+bundle1"
+    ],
+    "scheme": "rootless",
+    "worker_version": "2.0.0~diagnostic2",
+    "source_maps_identical": true,
+    "binary_hash_maps_identical": true,
+    "binary_hashes": {
+      "NukeBluetoothBridge.dylib": "96198583fd407a284f7b7592831a94b5fae530b2e65eea4c5d52bd03b2c5fd0b",
+      "nwbt-inspect": "452dd67f66314a671305cbbafce1f63b52d3ce84f7878ba3031d5aa1ba647bee",
+      "nwbt-run": "00893bf38e7170c9cc558d161aac04940e1315b2f92f879a0ce2dd9cb0406832"
+    }
+  }
+}
