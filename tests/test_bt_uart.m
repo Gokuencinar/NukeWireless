@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 atomic_int NWBTCancelled = 0;
 static NWBTUART *pair(int descriptors[2]) {
     assert(!socketpair(AF_UNIX,SOCK_STREAM,0,descriptors));
@@ -39,6 +40,17 @@ int main(void) { @autoreleasepool {
     assert(![uart read] && uart.error); [uart close]; close(fds[1]);
     uart=pair(fds); close(fds[1]);
     assert(![uart send:[NSData dataWithBytes:command length:3]] && uart.error); [uart close];
+    // Saturate the transmit socket and prove that backpressure cannot hang the
+    // privileged worker. Nothing consumes data on the peer during this test.
+    uart=pair(fds);
+    int small=1024; assert(!setsockopt(fds[0],SOL_SOCKET,SO_SNDBUF,&small,sizeof(small)));
+    uint8_t padding[512]={0};
+    while (send(fds[0],padding,sizeof(padding),0)>0) {}
+    assert(errno==EAGAIN || errno==EWOULDBLOCK);
+    double started=NSProcessInfo.processInfo.systemUptime;
+    assert(![uart send:[NSData dataWithBytes:command length:3]] && uart.error);
+    assert(NSProcessInfo.processInfo.systemUptime-started < 2.0);
+    [uart close]; close(fds[1]);
     puts("UART socketpair framing, cancellation cleanup, allowlist, EOF and ownership passed");
     return 0;
 } }

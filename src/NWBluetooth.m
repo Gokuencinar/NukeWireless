@@ -254,8 +254,10 @@ static NSInteger menuAction(NSIndexPath *index) {
 - (void)updateCatalogAvailability {
     NSString *reason = nil;
     if (!self.capabilities) reason = NWText(@"bt.checking");
-    else if (![self.capabilities[@"available"] boolValue] && ![self.capabilities[@"supported"] boolValue])
+    else if ([self.capabilities[@"error_code"] isEqual:@"missing"])
         reason = NWText(@"bt.catalog.worker_required");
+    else if (self.capabilities[@"error_code"])
+        reason = NWText([@"bt.error." stringByAppendingString:self.capabilities[@"error_code"]]);
     else if (![self.capabilities[@"supported"] boolValue]) reason = NWText(@"bt.catalog.transport_unavailable");
     else if (![self catalogAvailable]) reason = NWText(@"bt.catalog.worker_update");
     NWBluetoothCatalogSetAvailability(self.catalog, [self catalogAvailable], reason);

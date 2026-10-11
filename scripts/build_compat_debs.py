@@ -97,7 +97,7 @@ def package(scheme, core, artifact, output):
               "runtime_verified": False, "source_core_version": core_manifest["version"],
               "app_signing_identifier": "me.midnightchips.harpy-reloaded",
               "bluetooth_native_verified_environment": {"machine": "iPhone11,2", "ios": "16.3.1", "bootstrap": "roothide"},
-              "bluetooth_native_admission_policy": "skywalk-runtime-contract-v1",
+              "bluetooth_native_admission_policy": "skywalk-or-exact-uart-v2",
               "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
               "ui_integration": {"mode": "embedded-required-v1", "mandatory_loads": list(LOADS),

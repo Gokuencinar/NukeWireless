@@ -81,8 +81,10 @@ chmod 4755 {root}/usr/bin/nwbt-run
 exit 0
 '''.encode()
     report.update(scheme=scheme, architecture=architecture, bootstrap=label,
-                  native_admission_policy='skywalk-runtime-contract-v1',
+                  native_admission_policy='skywalk-or-exact-uart-v2',
                   native_ios_range=[15, 18],
+                  experimental_uart_allowlist=[{'machine': 'iPhone10,2', 'ios': '16.7.4', 'build': '20H240'}],
+                  uart_runtime_verified=False,
                   legacy_runtime_allowlist=[{'machine': 'iPhone11,2', 'ios': '16.3.1'}],
                   physical_reference={'machine': 'iPhone11,2', 'ios': '16.3.1'},
                   verified_bootstrap='roothide', runtime_verified=False)
