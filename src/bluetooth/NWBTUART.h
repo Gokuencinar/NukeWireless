@@ -3,6 +3,7 @@
 // Probe only queries the kernel-control ID. It never connects, configures the
 // UART, retires bluetoothd, or submits HCI. Admission is firmware-specific.
 NSDictionary *NWBTUARTProbe(void);
+void NWBTRecordTransportClosure(NSMutableDictionary *report, NSDictionary *details);
 @interface NWBTUART : NSObject
 @property(nonatomic, readonly) int descriptor;
 @property(nonatomic, readonly, copy) NSString *error;

@@ -217,8 +217,7 @@ NSDictionary *NWBTReadLECapabilities(void) {
         report[@"capabilities_verified"] = @(verified);
         return report;
     } @finally {
-        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
-        if (report[@"transport_details"][@"cleanup_error"]) report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
+        [ring close]; NWBTRecordTransportClosure(report, [ring transportDiagnostics]);
     }
 }
 
@@ -402,9 +401,7 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
         if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
         else if (originalError || session.error) report[@"error"] = originalError ?: session.error;
         else if (![report[@"controller_advertising_acknowledged"] boolValue] && !report[@"error"]) report[@"error"] = @"Lab advertisement was not enabled.";
-        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
-        if (report[@"transport_details"][@"cleanup_error"])
-            report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
+        [ring close]; NWBTRecordTransportClosure(report, [ring transportDiagnostics]);
     }
     return report;
 }
@@ -532,9 +529,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         else if (original || !clean || (handles.count && !removed)) report[@"error"] = original ?: @"Advertising cleanup incomplete.";
         else if (![report[@"controller_advertising_acknowledged"] boolValue] && !report[@"error"])
             report[@"error"] = @"Multi-platform advertisements were not enabled.";
-        [ring close]; report[@"transport_details"] = [ring transportDiagnostics];
-        if (report[@"transport_details"][@"cleanup_error"])
-            report[@"error"] = report[@"error"] ?: report[@"transport_details"][@"cleanup_error"];
+        [ring close]; NWBTRecordTransportClosure(report, [ring transportDiagnostics]);
     }
     return report;
 }

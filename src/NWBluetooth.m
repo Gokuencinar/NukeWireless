@@ -60,7 +60,7 @@ static NSString *reportText(NSDictionary *report) {
     if ([code isEqual:@"cancelled"] && labOperation(report[@"operation"]) &&
         [report[@"controller_advertising_acknowledged"] boolValue])
         return NWText([report[@"advertising_stopped_acknowledged"] boolValue] &&
-            [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] ?
+            [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] && !report[@"cleanup_warning"] ?
             @"bt.lab.stopped" : @"bt.lab.stop_unconfirmed");
     if (!code && labOperation(report[@"operation"]))
         return NWText(emissionFinishedCleanly(report) ? @"bt.lab.accepted" : @"bt.lab.incomplete");
@@ -622,6 +622,10 @@ int NWBluetoothUIRegressionCheck(void) {
         NSMutableDictionary *notReady = [quiet mutableCopy];
         notReady[@"controller_interface_ready"] = @NO;
         if (emissionFinishedCleanly(notReady)) return 67;
+        NSMutableDictionary *uartRestoreFailure = [quiet mutableCopy];
+        uartRestoreFailure[@"cleanup_warning"] = @"UART configuration restoration failed.";
+        if (emissionFinishedCleanly(uartRestoreFailure) ||
+            ![reportText(uartRestoreFailure) isEqual:NWText(@"bt.lab.stop_unconfirmed")]) return 68;
         for (NSUInteger row = 0; row < 3; ++row) {
             NSNumber *model = selectionBefore[row][@"model"];
             NSIndexPath *singleIndex = [NSIndexPath indexPathForRow:row inSection:1];

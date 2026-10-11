@@ -19,6 +19,13 @@
 _Static_assert(sizeof(struct sockaddr_ctl) == 32, "Darwin kernel control address");
 _Static_assert(sizeof(struct termios) == 72, "64-bit Darwin termios");
 static double uartTime(void) { return NSProcessInfo.processInfo.systemUptime; }
+void NWBTRecordTransportClosure(NSMutableDictionary *report, NSDictionary *details) {
+    report[@"transport_details"] = details;
+    if (details[@"cleanup_error"]) {
+        report[@"cleanup_warning"] = details[@"cleanup_error"];
+        report[@"error"] = report[@"error"] ?: details[@"cleanup_error"];
+    }
+}
 static NSDictionary *uartError(NSString *stage, NSString *message, int number) {
     return @{@"version": NWBT_VERSION, @"stage": stage, @"error": message,
         @"errno": @(number), @"transport": @"uart-h4", @"experimental": @YES};
@@ -76,7 +83,7 @@ static BOOL sameConfiguration(const struct termios *a, const struct termios *b) 
 static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     [uart close];
     NSMutableDictionary *report = [*error mutableCopy];
-    report[@"transport_details"] = uart.diagnostics;
+    NWBTRecordTransportClosure(report, uart.diagnostics);
     *error = report;
 }
 @implementation NWBTUART

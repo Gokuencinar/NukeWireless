@@ -33,6 +33,13 @@ int main(void) { @autoreleasepool {
     const uint8_t forbidden[] = {3,12,0}; // HCI Reset never allowed
     assert(![uart send:[NSData dataWithBytes:forbidden length:3]] && uart.error);
     [uart close]; close(fds[1]);
+    NSMutableDictionary *cancelled = [@{@"error": @"Diagnostic cancelled."} mutableCopy];
+    NWBTRecordTransportClosure(cancelled, @{@"cleanup_error": @"UART restore rejected."});
+    assert([cancelled[@"cleanup_warning"] isEqual:@"UART restore rejected."]);
+    assert([cancelled[@"error"] isEqual:@"Diagnostic cancelled."]);
+    NSMutableDictionary *successful = [NSMutableDictionary new];
+    NWBTRecordTransportClosure(successful, @{@"configuration_restored": @YES});
+    assert(!successful[@"cleanup_warning"] && !successful[@"error"]);
     uart=pair(fds); close(fds[1]);
     assert(![uart read] && uart.error); [uart close];
     uart=pair(fds);
