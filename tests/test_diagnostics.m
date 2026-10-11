@@ -34,6 +34,13 @@ int main(void) {
         for (unsigned i = 0; i < 80; ++i) huge[@(i).stringValue] = [@"x" stringByPaddingToLength:2048 withString:@"x" startingAtIndex:0];
         NWDiagnosticRecord(@"oversize", @"captured", huge);
         assert([NWDiagnosticSnapshot()[@"events"] lastObject][@"details"][@"truncated"]);
+        NSMutableDictionary *transportFailure = [@{@"transport": @"uart-h4", @"payload": huge} mutableCopy];
+        transportFailure[@"transport_details"] = @{@"configuration_comparison": @{@"matches": @NO, @"mismatches": @[@"control_flags"]},
+            @"configuration_readback": @{@"result": @0, @"errno": @0, @"size": @72}};
+        NWDiagnosticRecord(@"le_catalog_test", @"failed", transportFailure);
+        NSDictionary *bounded = [NWDiagnosticSnapshot()[@"events"] lastObject][@"details"];
+        assert(bounded[@"truncated"] && [bounded[@"transport"] isEqual:@"uart-h4"]);
+        assert([bounded[@"transport_details"][@"configuration_comparison"][@"mismatches"][0] isEqual:@"control_flags"]);
         for (unsigned i = 0; i < 7; ++i) {
             NSError *error = nil; NSURL *file = NWDiagnosticSaveExport(&error); assert(file && !error);
             NSData *data = [NSData dataWithContentsOfURL:file]; assert(data.length < 1024 * 1024);

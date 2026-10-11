@@ -71,6 +71,45 @@ static BOOL sameConfiguration(const struct termios *a, const struct termios *b) 
         cfgetispeed(a) == cfgetispeed(b) && cfgetospeed(a) == cfgetospeed(b) &&
         !memcmp(a->c_cc, b->c_cc, sizeof(a->c_cc));
 }
+static NSDictionary *configurationSnapshot(const struct termios *value) {
+    NSMutableArray *characters = [NSMutableArray new];
+    for (NSUInteger i = 0; i < NCCS; ++i) [characters addObject:@(value->c_cc[i])];
+    return @{@"input_flags": @(value->c_iflag), @"output_flags": @(value->c_oflag),
+        @"control_flags": @(value->c_cflag), @"local_flags": @(value->c_lflag),
+        @"input_speed": @(cfgetispeed(value)), @"output_speed": @(cfgetospeed(value)),
+        @"control_characters": characters};
+}
+static void configureStream(struct termios *value) {
+    // This is a kernel-control SOCK_STREAM, not a tty. VMIN/VTIME and line
+    // editing characters are not socket receive controls; leave them intact.
+    cc_t characters[NCCS]; memcpy(characters, value->c_cc, sizeof(characters));
+    cfmakeraw(value); memcpy(value->c_cc, characters, sizeof(characters));
+    value->c_iflag |= IGNPAR;
+    value->c_cflag = CS8 | CREAD | CLOCAL | CRTSCTS;
+}
+static NSDictionary *configurationComparison(const struct termios *wanted, const struct termios *observed) {
+    NSMutableArray *mismatches = [NSMutableArray new], *normalizations = [NSMutableArray new];
+    // Compare effective byte processing, not inactive tty bookkeeping. With
+    // 8N1, parity-error handling flags cannot change ordinary H4 octets.
+    tcflag_t inputMask = IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY;
+    if ((wanted->c_cflag | observed->c_cflag) & PARENB) inputMask |= INPCK | IGNPAR;
+    tcflag_t localMask = ICANON | ISIG | IEXTEN | ECHO | ECHONL | FLUSHO;
+    if ((wanted->c_iflag & inputMask) != (observed->c_iflag & inputMask)) [mismatches addObject:@"input_flags"];
+    if ((wanted->c_oflag & OPOST) != (observed->c_oflag & OPOST)) [mismatches addObject:@"output_processing"];
+    // All hardware control bits must match, including framing and RTS/CTS.
+    if (wanted->c_cflag != observed->c_cflag) [mismatches addObject:@"control_flags"];
+    if ((wanted->c_lflag & localMask) != (observed->c_lflag & localMask)) [mismatches addObject:@"local_processing"];
+    speed_t inputSpeed = cfgetispeed(observed) ?: cfgetospeed(observed);
+    if (cfgetispeed(wanted) != inputSpeed) [mismatches addObject:@"input_speed"];
+    if (cfgetospeed(wanted) != cfgetospeed(observed)) [mismatches addObject:@"output_speed"];
+    if (wanted->c_iflag != observed->c_iflag) [normalizations addObject:@"input_flags"];
+    if (wanted->c_oflag != observed->c_oflag) [normalizations addObject:@"output_flags"];
+    if (wanted->c_lflag != observed->c_lflag) [normalizations addObject:@"local_flags"];
+    if (memcmp(wanted->c_cc, observed->c_cc, sizeof(wanted->c_cc))) [normalizations addObject:@"tty_control_characters"];
+    if (!cfgetispeed(observed)) [normalizations addObject:@"input_speed_follows_output"];
+    return @{@"policy": @"h4-stream-effective-v1", @"matches": @(mismatches.count == 0),
+        @"mismatches": mismatches, @"reported_differences": normalizations};
+}
 @interface NWBTUART () {
     int _descriptor;
     struct termios _original;
@@ -137,18 +176,21 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     }
     uart->_details[@"channel_opened"] = @YES;
     socklen_t size = sizeof(uart->_original);
-    if (getsockopt(fd, SYSPROTO_CONTROL, TIOCGETA, &uart->_original, &size) < 0 || size != sizeof(uart->_original)) {
-        *error = uartError(@"uart_configuration_read", @"UART termios contract could not be read.", errno);
+    int readResult = getsockopt(fd, SYSPROTO_CONTROL, TIOCGETA, &uart->_original, &size);
+    int readError = readResult < 0 ? errno : 0;
+    uart->_details[@"original_read"] = @{@"result": @(readResult), @"errno": @(readError), @"size": @(size)};
+    if (readResult < 0 || size != sizeof(uart->_original)) {
+        *error = uartError(@"uart_configuration_read", @"UART termios contract could not be read.", readError);
         closeWithEvidence(uart, error); return nil;
     }
+    uart->_details[@"original_configuration"] = configurationSnapshot(&uart->_original);
     struct termios configured = uart->_original;
-    cfmakeraw(&configured);
-    configured.c_iflag |= IGNPAR;
-    configured.c_cflag = CS8 | CREAD | CLOCAL | CRTSCTS;
+    configureStream(&configured);
     if (cfsetspeed(&configured, 3000000) < 0) {
         *error = uartError(@"uart_configuration_speed", @"UART link speed could not be configured.", errno);
         closeWithEvidence(uart, error); return nil;
     }
+    uart->_details[@"requested_configuration"] = configurationSnapshot(&configured);
     // A rejected setsockopt might have changed fields: always attempt restoration.
     uart->_configured = YES;
     if (setsockopt(fd, SYSPROTO_CONTROL, TIOCSETA, &configured, sizeof(configured)) < 0) {
@@ -156,9 +198,18 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
         closeWithEvidence(uart, error); return nil;
     }
     struct termios observed = {0}; size = sizeof(observed);
-    if (getsockopt(fd, SYSPROTO_CONTROL, TIOCGETA, &observed, &size) < 0 ||
-        size != sizeof(observed) || !sameConfiguration(&configured, &observed)) {
-        *error = uartError(@"uart_configuration_verify", @"UART configuration readback differs from the requested contract.", errno);
+    readResult = getsockopt(fd, SYSPROTO_CONTROL, TIOCGETA, &observed, &size);
+    readError = readResult < 0 ? errno : 0;
+    uart->_details[@"configuration_readback"] = @{@"result": @(readResult), @"errno": @(readError), @"size": @(size)};
+    if (readResult < 0 || size != sizeof(observed)) {
+        *error = uartError(@"uart_configuration_readback", @"UART configuration readback failed or returned an invalid length.", readError);
+        closeWithEvidence(uart, error); return nil;
+    }
+    uart->_details[@"observed_configuration"] = configurationSnapshot(&observed);
+    NSDictionary *comparison = configurationComparison(&configured, &observed);
+    uart->_details[@"configuration_comparison"] = comparison;
+    if (![comparison[@"matches"] boolValue]) {
+        *error = uartError(@"uart_configuration_verify", @"UART effective configuration differs from the requested contract.", 0);
         closeWithEvidence(uart, error); return nil;
     }
     uart->_details[@"configuration_verified"] = @YES;
@@ -217,9 +268,16 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
     if (_descriptor < 0) return;
     if (_configured) {
         struct termios observed = {0}; socklen_t size = sizeof(observed);
-        BOOL restored = setsockopt(_descriptor, SYSPROTO_CONTROL, TIOCSETA, &_original, sizeof(_original)) == 0 &&
-            getsockopt(_descriptor, SYSPROTO_CONTROL, TIOCGETA, &observed, &size) == 0 &&
-            size == sizeof(observed) && sameConfiguration(&_original, &observed);
+        int writeResult = setsockopt(_descriptor, SYSPROTO_CONTROL, TIOCSETA, &_original, sizeof(_original));
+        int writeError = writeResult < 0 ? errno : 0;
+        int readResult = writeResult < 0 ? -1 : getsockopt(_descriptor, SYSPROTO_CONTROL, TIOCGETA, &observed, &size);
+        int readError = writeResult < 0 ? 0 : readResult < 0 ? errno : 0;
+        _details[@"restoration_io"] = @{@"write_result": @(writeResult), @"write_errno": @(writeError),
+            @"read_attempted": @(writeResult == 0), @"read_result": @(readResult), @"read_errno": @(readError), @"size": @(size)};
+        BOOL validRead = writeResult == 0 && readResult == 0 && size == sizeof(observed);
+        if (validRead) _details[@"restored_configuration"] = configurationSnapshot(&observed);
+        // Restore the full original state; do not weaken recovery validation.
+        BOOL restored = validRead && sameConfiguration(&_original, &observed);
         _details[@"configuration_restored"] = @(restored);
         if (!restored) _details[@"cleanup_error"] = @"Original UART configuration could not be verified after restoration.";
         _configured = NO;
@@ -239,3 +297,9 @@ static void closeWithEvidence(NWBTUART *uart, NSDictionary **error) {
 }
 #endif
 @end
+#ifdef NW_BT_UART_TESTING
+NSDictionary *NWBTUARTTestConfiguration(struct termios *value, const struct termios *observed) {
+    configureStream(value); cfsetspeed(value, 3000000);
+    return configurationComparison(value, observed);
+}
+#endif

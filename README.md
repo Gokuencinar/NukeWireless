@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic12: corrección de validación UART y trazas de configuración.**
+Conserva los caracteres de terminal del socket y valida los parámetros efectivos
+del enlace H4, con velocidad y control de flujo obligatorios. Distingue error de
+lectura, longitud y campos discrepantes; elimina errno residual y conserva los
+valores de configuración y restauración en el JSON. Componente Bluetooth
+`2.0.0~diagnostic4`. Candidata para el fallo del iPhone 8 Plus; aceptación física
+pendiente. Véase [detalle y límites](docs/BLUETOOTH-UART-DIAGNOSTIC12.md).
+
 **2.0.0~diagnostic11: backend UART experimental.**
 Añade UART H4 para iPhone10,2 / iOS 16.7.4 (20H240), condicionado al registro
 y al contrato de configuración del controlador. Mantiene Skywalk, Detener y

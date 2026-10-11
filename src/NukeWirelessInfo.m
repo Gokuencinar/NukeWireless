@@ -696,7 +696,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic11 embedded UI loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic12 embedded UI loaded");
     // Both are mandatory app dependencies. Initialize our adapter exactly once
     // before wrapping its methods, regardless of dyld constructor order.
     void (*initializeAdapter)(void) = dlsym(RTLD_DEFAULT, "NWBootstrapInitialize");

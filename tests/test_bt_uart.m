@@ -13,6 +13,46 @@ static NWBTUART *pair(int descriptors[2]) {
     return [[NWBTUART alloc] initWithTestDescriptor:descriptors[0]];
 }
 int main(void) { @autoreleasepool {
+    // Kernel-control streams are not tty reads. A driver may normalize unused
+    // line-editing characters without changing framing, speed or H4 octets.
+    struct termios original = {0}, wanted = {0}, observed = {0};
+    memset(original.c_cc, 7, sizeof(original.c_cc));
+    wanted = original;
+    NWBTUARTTestConfiguration(&wanted, &observed);
+    assert(!memcmp(wanted.c_cc, original.c_cc, sizeof(original.c_cc)));
+    observed = wanted;
+    assert([NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    observed.c_cc[VMIN] = 0; observed.c_cc[VTIME] = 9;
+    observed.c_cc[VEOF] = 4;
+    observed.c_iflag ^= IGNPAR; // parity is disabled (8N1)
+    observed.c_oflag ^= ONLCR; // ignored when OPOST is off
+    observed.c_lflag ^= ECHOE; // ignored when echo and canonical mode are off
+    cfsetispeed(&observed, 0); // Darwin/POSIX: input follows output speed
+    NSDictionary *comparison = NWBTUARTTestConfiguration(&original, &observed);
+    assert([comparison[@"matches"] boolValue] && [comparison[@"reported_differences"] count] >= 4);
+    // Do not admit a different baud rate, framing, hardware flow control,
+    // byte translation, software flow control, echo or canonical processing.
+    const tcflag_t hardware[] = {CSIZE, CREAD, CLOCAL, CRTSCTS, PARENB, CSTOPB, HUPCL};
+    for (NSUInteger i=0; i<sizeof(hardware)/sizeof(hardware[0]); ++i) {
+        observed = wanted; observed.c_cflag ^= hardware[i];
+        assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    }
+    const tcflag_t inputs[] = {IGNBRK, BRKINT, PARMRK, ISTRIP, INLCR, IGNCR, ICRNL, IXON, IXOFF, IXANY};
+    for (NSUInteger i=0; i<sizeof(inputs)/sizeof(inputs[0]); ++i) {
+        observed = wanted; observed.c_iflag ^= inputs[i];
+        assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    }
+    const tcflag_t locals[] = {ICANON, ISIG, IEXTEN, ECHO, ECHONL, FLUSHO};
+    for (NSUInteger i=0; i<sizeof(locals)/sizeof(locals[0]); ++i) {
+        observed = wanted; observed.c_lflag ^= locals[i];
+        assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    }
+    observed = wanted; observed.c_oflag |= OPOST;
+    assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    observed = wanted; cfsetispeed(&observed, 115200);
+    assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
+    observed = wanted; cfsetospeed(&observed, 115200);
+    assert(![NWBTUARTTestConfiguration(&original, &observed)[@"matches"] boolValue]);
     int fds[2]; NWBTUART *uart = pair(fds);
     const uint8_t command[] = {1,16,0}, expected[] = {1,1,16,0};
     assert([uart send:[NSData dataWithBytes:command length:sizeof(command)]]);
@@ -58,6 +98,6 @@ int main(void) { @autoreleasepool {
     assert(![uart send:[NSData dataWithBytes:command length:3]] && uart.error);
     assert(NSProcessInfo.processInfo.systemUptime-started < 2.0);
     [uart close]; close(fds[1]);
-    puts("UART socketpair framing, cancellation cleanup, allowlist, EOF and ownership passed");
+    puts("UART effective configuration, hardware rejection, socketpair, cancellation, EOF and ownership passed");
     return 0;
 } }
