@@ -9,7 +9,8 @@ Añade UART H4 para iPhone10,2 / iOS 16.7.4 (20H240), condicionado al registro
 y al contrato de configuración del controlador. Mantiene Skywalk, Detener y
 recuperación del servicio; distingue los avisos de disponibilidad del catálogo
 y actualiza su estado asíncrono. La emisión exige además capacidades HCI reales.
-Componente Bluetooth `2.0.0~diagnostic3`. Prueba física UART pendiente; no declara
+Componente Bluetooth `2.0.0~diagnostic3`. CI, socketpair, UI y paquetes de los
+tres esquemas comprobados. Prueba física UART pendiente; no declara
 compatibilidad general de A11. Véase [implementación y validación](docs/BLUETOOTH-UART-DIAGNOSTIC11.md).
 
 **2.0.0~diagnostic10: diagnóstico de bloqueos y conservación de fallos.**

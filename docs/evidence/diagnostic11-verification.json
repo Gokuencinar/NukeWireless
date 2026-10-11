@@ -1,0 +1,110 @@
+{
+  "package_version": "2.0.0~diagnostic11+bundle1",
+  "worker_version": "2.0.0~diagnostic3",
+  "source_commit": "985a1705e724d7bf133f8d5a2c53530f6d991401",
+  "ci": [
+    {
+      "id": 38149905835,
+      "name": "Unified installer packaging",
+      "head_sha": "985a1705e724d7bf133f8d5a2c53530f6d991401",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38149905835",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38149871297,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "985a1705e724d7bf133f8d5a2c53530f6d991401",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871297",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38149871316,
+      "name": "Development build",
+      "head_sha": "985a1705e724d7bf133f8d5a2c53530f6d991401",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871316",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38149871304,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "985a1705e724d7bf133f8d5a2c53530f6d991401",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871304",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic11+bundle1_iphoneos-arm64e.deb",
+      "sha256": "dc25823062b0340eced4015c79accd91a4edc968b1d3ccde3a36fd1064f45da6"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic11+bundle1_iphoneos-arm64.deb",
+      "sha256": "b2898d97dc7bd15f809702cd8aa4017917ed6a454936b9a37afac57a0689dd57"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic11+bundle1_iphoneos-arm.deb",
+      "sha256": "7d86f340ee4e9a4eb1e505c2f374ab1229cee67d4ebf605eace82bf9cb9b51de"
+    }
+  ],
+  "checks": [
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "arm64_parent_guard_emulation": "passed",
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "catalog_rendering": "cg-bitmap-original-v1",
+  "physical_crash_fix_confirmed": false,
+  "diagnostics": {
+    "important_events_limit": 32,
+    "recent_events_limit": 64,
+    "per_peer_process_results": true,
+    "stderr_raw_output_exported": false,
+    "external_connectivity_verified": false,
+    "xr_wifi_block_fix_confirmed": false
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "normal_and_cancelled_restore_warnings_preserved": true
+  },
+  "package_validation": {
+    "local_passed": 20,
+    "local_skipped_linux_fixtures": 3,
+    "linux_ci_fixture_passed": 8,
+    "linux_ci_real_payload_test_skipped": 1,
+    "real_payload_test_passed_locally": true
+  }
+}

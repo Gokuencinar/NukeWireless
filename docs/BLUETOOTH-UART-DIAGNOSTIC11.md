@@ -74,3 +74,28 @@ Referencias de contrato:
 - [XNU 8792.61.2 kern_control.h](https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/bsd/sys/kern_control.h).
 - [XNU termios.h](https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/bsd/sys/termios.h).
 - [InternalBlue ios-proxy.m, revisión fijada](https://github.com/seemoo-lab/internalblue/blob/f524380672564dc4869f3d9a6cbcdeaf5b8a6b85/ios/ios-proxy.m): evidencia histórica de nombre del control, H4 y opciones termios; no prueba de acceso en 20H240.
+
+## Resultados de compilación y paquete (11 de octubre de 2026)
+
+Fuentes compiladas: `985a1705e724d7bf133f8d5a2c53530f6d991401`. Los cuatro workflows terminaron correctamente:
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38149905835).
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871297).
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871316).
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38149871304).
+
+Pasaron las pruebas H4 y socketpair, incluida contrapresión de escritura y
+conservación del fallo de restauración al cancelar. Los dos targets de app
+compilaron y completaron 46 comprobaciones UI y cuatro ciclos reales de segundo
+plano por idioma (es/en).
+
+Se generaron e inspeccionaron los unificados RootHide, rootless y rootful con
+el componente Bluetooth diagnostic3. Las pruebas locales de contenido, carga
+obligatoria, firma/identidad y procedencia pasaron. Las tres pruebas de dpkg
+que se omiten en Windows pasaron en Linux CI; el test de payload real que CI
+omite se ejecutó localmente. Hashes y límites físicos se conservan en
+[la verificación](evidence/diagnostic11-verification.json).
+
+No se instaló esta entrega en un dispositivo ni se comprobó UART físico.
+La restauración de configuración fallida conserva un aviso de limpieza incluso
+si se pulsa Detener; ese caso no se oculta como una finalización correcta.
