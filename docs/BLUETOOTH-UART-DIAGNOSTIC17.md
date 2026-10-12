@@ -65,7 +65,17 @@ usan el timeout de lectura del tester, rechazan cierre/restauración incompletos
 y exigen ACK de parada/eliminación cuando pudo modificarse publicidad.
 Continúan H4, backpressure, cancelación, ownership wake y readback del firmware.
 
-Compilación, simulador y paquetes se registrarán al terminar CI. No hay acceso
-al iPhone del tester: no se declara resuelto el timeout físico ni confirmada la
+Las cuatro validaciones CI pasaron para `6c05a35008ac94d17cfc512e116dca98f1941dfc`:
+compilación principal, candidatos con destino iOS 15, trabajador Bluetooth y
+migración del instalador. El simulador completó 46 comprobaciones y cuatro
+ciclos reales de segundo plano por idioma, español e inglés. Los DEB completos
+RootHide, rootless y rootful incluyen Bluetooth diagnostic7; pasaron las
+comprobaciones locales de integración, procedencia, firma, dependencias y rutas.
+Las tres pruebas que requieren dpkg/Linux se ejecutaron allí, y la prueba del
+payload real que omite ese trabajo CI se ejecutó localmente sobre los DEB finales.
+Hashes, trabajos y resultados en [la verificación](evidence/diagnostic17-verification.json).
+Los archivos `src/compat` son idénticos a diagnostic16.
+
+No hay acceso al iPhone del tester: no se declara resuelto el timeout físico ni confirmada la
 recepción de anuncios. Esta entrega busca corregir el ciclo de vida con los
 reportes existentes, sin pedir otra recogida previa al tester.

@@ -9,6 +9,8 @@ Parte de diagnostic16 y conserva su corrección Wi-Fi. Bluetooth diagnostic7
 usa la exclusividad del socket UART, mantiene el servicio y verifica su PID
 al terminar. Conserva wake, restauración termios, Detener y recuperación
 independiente ante cierre inesperado o limpieza incompleta. Skywalk no cambia.
+Las cuatro validaciones CI pasaron para las fuentes `6c05a35`; DEB completos
+validados en RootHide, rootless y rootful, con Bluetooth incluido.
 Respuesta HCI y emisión en el iPhone 8 Plus siguen pendientes de aceptación física.
 Véase [investigación y cambio](docs/BLUETOOTH-UART-DIAGNOSTIC17.md).
 

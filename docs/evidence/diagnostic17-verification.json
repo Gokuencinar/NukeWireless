@@ -1,0 +1,105 @@
+{
+  "package_version": "2.0.0~diagnostic17+bundle1",
+  "worker_version": "2.0.0~diagnostic7",
+  "source_commit": "6c05a35008ac94d17cfc512e116dca98f1941dfc",
+  "ci": [
+    {
+      "id": 38194615344,
+      "name": "Unified installer packaging",
+      "head_sha": "6c05a35008ac94d17cfc512e116dca98f1941dfc",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38194615344",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38194594113,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "6c05a35008ac94d17cfc512e116dca98f1941dfc",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38194594113",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38194594075,
+      "name": "Development build",
+      "head_sha": "6c05a35008ac94d17cfc512e116dca98f1941dfc",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38194594075",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38194594179,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "6c05a35008ac94d17cfc512e116dca98f1941dfc",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38194594179",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic17+bundle1_iphoneos-arm64e.deb",
+      "sha256": "637dae4ffdde2294c3002316bbf8d53ec3e936a28e7193e3a3bca05d17069b83"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic17+bundle1_iphoneos-arm64.deb",
+      "sha256": "f94355ff889f35872e2053e6093653dc856d47c12d86162ec33e27354442e85a"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic17+bundle1_iphoneos-arm.deb",
+      "sha256": "eff40d52582f056ca798ccf82f93b856750373e24064437b9f14c1aac519077d"
+    }
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "configuration_policy": "h4-stream-effective-v2",
+    "prior_failure_stage": "le_capabilities_hci_completion_timeout",
+    "service_strategy": "uart-preserve-v1",
+    "wake_ownership": "btwake_fd_session_v1",
+    "physical_uart_advertising_confirmed": false
+  },
+  "base": "2be985fc9dbbf14bd040afa5b1f650f7e81a9667",
+  "wifi_compat_sources_identical_to_diagnostic16": true,
+  "local_package_checks": {
+    "embedded_ui": {
+      "passed": 3
+    },
+    "compatibility": {
+      "passed": 8
+    },
+    "unified_delivery": {
+      "passed": 6,
+      "skipped_linux_only": 3
+    },
+    "layout": {
+      "passed": 3
+    }
+  },
+  "linux_ci_package_checks": {
+    "passed": 8,
+    "skipped_real_payload_checked_locally": 1
+  },
+  "physical_iphone8_uart_response_confirmed": false,
+  "physical_iphone8_advertising_confirmed": false,
+  "physical_installation_this_delivery": "not_performed",
+  "published_release": false,
+  "investigation": "Existing reports, pinned InternalBlue UART client and exact Apple 20H240 kernel. Service retirement as cause remains a hypothesis."
+}
