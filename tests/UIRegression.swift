@@ -154,7 +154,7 @@ struct RegressionTabs: View {
             var result: [String: Any] = ["class": String(describing: type(of: controller))]
             if controller.isViewLoaded {
                 let view = controller.view!
-                result["frame"] = NSStringFromCGRect(view.frame)
+                result["frame"] = String(describing: view.frame)
                 result["hidden"] = view.isHidden
                 result["alpha"] = view.alpha
                 result["attached"] = view.window != nil
@@ -169,7 +169,7 @@ struct RegressionTabs: View {
         let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
         let roots = windows.compactMap { $0.rootViewController }.map { describe($0, depth: 0) }
         writeReport(["roots": roots, "ipad": UIDevice.current.userInterfaceIdiom == .pad,
-                     "window_sizes": windows.map { NSStringFromCGSize($0.bounds.size) }], "startup-hierarchy.json")
+                     "window_sizes": windows.map { String(describing: $0.bounds.size) }], "startup-hierarchy.json")
     }
     private func captureCatalog(_ platform: Int32) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
