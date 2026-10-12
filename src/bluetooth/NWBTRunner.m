@@ -231,11 +231,18 @@ static int recover(void) {
     close(5);
     // Before arming, EOF or timeout means no service mutation was authorized.
     struct pollfd descriptor = {3, POLLIN | POLLHUP, 0}; char byte = 0;
-    if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 || byte != 'a') return 0;
+    if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 || (byte != 'a' && byte != 'u')) return 0;
+    char arm = byte; byte = 0;
     // This child survives app/worker exit and owns the inherited flock until
     // restoration finishes. EOF, completion or process termination restores.
-    if (poll(&descriptor, 1, -1) > 0) read(3, &byte, 1);
-    BOOL restored = restoreService(); close(3); close(4);
+    int received = poll(&descriptor, 1, -1) > 0 ? (int)read(3, &byte, 1) : -1;
+    enum NWBTRecoveryAction action = NWBTRecoveryDecision(arm, received, byte);
+    // A normal UART session closed/restored its own socket and stopped its
+    // advertising handles. Do not reset the initialized controller afterwards.
+    // Worker death/EOF or uncertain cleanup still has independent recovery.
+    if (action == NWBTRecoveryRetireAndRestore) control("bootout", service, NULL);
+    BOOL restored = action == NWBTRecoveryObserve ? running() : restoreService();
+    close(3); close(4);
     return restored ? 0 : 1;
 }
 
@@ -303,6 +310,8 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         if (lock >= 0) close(lock); return errorReport(@"busy");
     }
     int writer = -1; pid_t recovery = -1; BOOL armed = NO;
+    BOOL uart = [NWBTNativeTransport() isEqual:@"uart-h4"], preserveService = NO, serviceRetired = NO;
+    int initialServicePID = 0;
     NSString *preflightStage = nil;
     NSMutableDictionary *report = nil;
     @try {
@@ -315,6 +324,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             details[@"service_exit"] = @(initialStatus); details[@"service_output"] = [state substringToIndex:MIN(state.length, 1024)] ?: @"";
             return details;
         }
+        if (uart && !(initialServicePID = NWBTServicePID(state.UTF8String))) return errorReport(@"service");
         if (control("print-disabled", serviceDomain, &disabled) ||
             [disabled containsString:@"\"com.apple.bluetoothd\" => disabled"] || [disabled containsString:@"\"com.apple.bluetoothd\" => true"])
             return errorReport(@"service");
@@ -341,10 +351,19 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         }
         recovery = startRecovery(ownPath, lock, &writer);
         if (recovery <= 0) return errorReport(@"recovery");
-        if (write(writer, "a", 1) != 1) return errorReport(@"recovery");
+        if (write(writer, uart ? "u" : "a", 1) != 1) return errorReport(@"recovery");
         armed = YES;
-        if (control("bootout", service, NULL)) report = [errorReport(@"service") mutableCopy];
+        if (uart) {
+            // InternalBlue's UART path leaves bluetoothd running with Bluetooth
+            // off. The kernel socket acquires the serial port exclusively;
+            // EBUSY never falls back to killing the daemon. Skywalk is separate.
+            report = [(lab ? (catalogModels ? NWBTAdvertiseCatalogLab(catalogPlatform, catalogModels) :
+                multiPlatform ? NWBTAdvertiseMultiDeviceLab(multiPlatform) : fastPair ? NWBTAdvertiseFastPairLab() :
+                applePairing ? NWBTAdvertiseApplePairingLab() : NWBTAdvertiseSwiftPairLab()) : NWBTReadLECapabilities()) mutableCopy];
+        }
+        else if (control("bootout", service, NULL)) report = [errorReport(@"service") mutableCopy];
         else {
+            serviceRetired = YES;
             double deadline = uptime() + 3.0; NSString *state = nil; int status = 0;
             do { status = control("print", service, &state); if (status) break; usleep(100000); } while (uptime() < deadline && !NWBTCancelled);
             if (!status || ![state containsString:@"Could not find service"]) {
@@ -364,7 +383,12 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         // A late Stop still marks cancellation but cannot truncate readiness
         // checks after the advertisement has already stopped.
         alarm(26);
-        if (writer >= 0) { if (armed) write(writer, "r", 1); close(writer); }
+        if (uart && armed && NWBTUARTCanPreserveService(report)) {
+            NSString *state = nil;
+            preserveService = !control("print", service, &state) &&
+                [state containsString:@"\n\tstate = running\n"] && NWBTServicePID(state.UTF8String) == initialServicePID;
+        }
+        if (writer >= 0) { if (armed) write(writer, preserveService ? "p" : "r", 1); close(writer); }
         if (recovery > 0) {
             int status = 0; BOOL exited = NO; double deadline = uptime() + 18.0;
             // Service recovery owns cancellation from here. A hard worker exit
@@ -376,6 +400,7 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             if (armed && report) {
                 BOOL restored = exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
                 report[@"service_restored"] = @(restored);
+                if (uart) report[@"service_preserved"] = @(preserveService && restored);
                 if (restored) {
                     NSUInteger attempts = 0; double started = uptime();
                     NSDictionary *readiness = waitForInterface(YES, &attempts);
@@ -395,6 +420,8 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
     if (!report) report = [errorReport(@"transport") mutableCopy];
     report[@"radio_state_verified_before_exclusive"] = @YES;
     report[@"service_domain"] = [NSString stringWithUTF8String:serviceDomain];
+    report[@"service_strategy"] = uart ? @"uart-preserve-v1" : @"skywalk-retire-v1";
+    report[@"service_retired_before_operation"] = @(serviceRetired);
     if (preflightStage) report[@"preflight_stage"] = preflightStage;
     if (NWBTCancelled) { report[@"error"] = @"Diagnostic cancelled."; report[@"error_code"] = @"cancelled"; }
     if (report[@"error"] && !report[@"error_code"]) report[@"error_code"] = codeForReport(report);

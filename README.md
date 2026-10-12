@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic17: sesión UART sin retirar bluetoothd.**
+Parte de diagnostic16 y conserva su corrección Wi-Fi. Bluetooth diagnostic7
+usa la exclusividad del socket UART, mantiene el servicio y verifica su PID
+al terminar. Conserva wake, restauración termios, Detener y recuperación
+independiente ante cierre inesperado o limpieza incompleta. Skywalk no cambia.
+Respuesta HCI y emisión en el iPhone 8 Plus siguen pendientes de aceptación física.
+Véase [investigación y cambio](docs/BLUETOOTH-UART-DIAGNOSTIC17.md).
+
 **2.0.0~diagnostic16: candidata para el desbloqueo directo de Swift.**
 Conserva el método Objective-C y cubre la entrada Swift del ejecutable fijado,
 con comprobación de bytes y carga explícita de la API del backend si hace falta.

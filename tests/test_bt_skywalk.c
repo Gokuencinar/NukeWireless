@@ -29,6 +29,22 @@ int main(void) {
     assert(!NWBTServiceDomain(2) && !NWBTServiceLabel(2));
     assert(!strcmp(NWBTServiceLabel(0), "user/501/com.apple.bluetoothd"));
     assert(!strcmp(NWBTServiceLabel(1), "system/com.apple.bluetoothd"));
+    // Only a complete, unambiguous live PID snapshot can preserve a UART job.
+    assert(NWBTServicePID("system/com.apple.bluetoothd = {\n\tpid = 123\n}") == 123);
+    const char *badPID[] = {NULL, "", "\n\tpid = 1\n", "\n\tpid = 0\n", "\n\tpid = -2\n",
+        "\n\tpid = 12", "\n\tpid = 12x\n", "\n\tpid = 2147483648\n",
+        "\n\tpid = 12\n\tpid = 13\n", "\n\tpid = \n"};
+    for (size_t i = 0; i < sizeof badPID / sizeof *badPID; ++i) assert(!NWBTServicePID(badPID[i]));
+    assert(NWBTRecoveryDecision('u', 1, 'p') == NWBTRecoveryObserve);
+    // EOF, unknown completion and cleanup failure must recover, never preserve.
+    assert(NWBTRecoveryDecision('u', 0, 'p') == NWBTRecoveryRetireAndRestore);
+    assert(NWBTRecoveryDecision('u', -1, 'p') == NWBTRecoveryRetireAndRestore);
+    assert(NWBTRecoveryDecision('u', 1, 'r') == NWBTRecoveryRetireAndRestore);
+    assert(NWBTRecoveryDecision('u', 1, 'x') == NWBTRecoveryRetireAndRestore);
+    assert(NWBTRecoveryDecision('a', 1, 'p') == NWBTRecoveryRestore);
+    assert(NWBTRecoveryDecision('a', 0, 0) == NWBTRecoveryRestore);
+    assert(NWBTRecoveryDecision(0, 0, 0) == NWBTRecoveryNone);
+    assert(NWBTRecoveryDecision('x', 1, 'r') == NWBTRecoveryNone);
     puts("Skywalk admission, controller capabilities and recovery domains passed");
     return 0;
 }

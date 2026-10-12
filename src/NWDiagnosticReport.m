@@ -139,7 +139,8 @@ void NWDiagnosticRecord(NSString *test, NSString *status, NSDictionary *details)
     if (!encoded || encoded.length > 8192) {
         NSMutableDictionary *summary = [@{@"truncated": @YES, @"reason": @"Event exceeds 8192 bytes"} mutableCopy];
         for (NSString *key in @[@"error", @"error_code", @"stage", @"operation", @"worker_process", @"cleanup_warning",
-            @"service_restored", @"controller_interface_ready", @"capabilities_verified", @"controller_advertising_acknowledged",
+            @"service_restored", @"service_preserved", @"service_strategy", @"service_retired_before_operation",
+            @"controller_interface_ready", @"capabilities_verified", @"controller_advertising_acknowledged",
             @"advertising_stopped_acknowledged", @"advertising_set_removed", @"transport"]) if (safe[key]) summary[key] = safe[key];
         if (safe[@"transport_details"]) {
             NSData *transport = [NSJSONSerialization dataWithJSONObject:safe[@"transport_details"] options:0 error:NULL];

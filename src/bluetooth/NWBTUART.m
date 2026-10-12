@@ -20,6 +20,24 @@
 _Static_assert(sizeof(struct sockaddr_ctl) == 32, "Darwin kernel control address");
 _Static_assert(sizeof(struct termios) == 72, "64-bit Darwin termios");
 static double uartTime(void) { return NSProcessInfo.processInfo.systemUptime; }
+BOOL NWBTUARTCanPreserveService(NSDictionary *report) {
+    NSDictionary *details = report[@"transport_details"];
+    if (![details[@"transport"] isEqual:@"uart-h4"] || report[@"cleanup_warning"] || details[@"cleanup_error"]) return NO;
+    if ([details[@"wake_opened"] boolValue] && ![details[@"wake_closed"] boolValue]) return NO;
+    if ([details[@"channel_opened"] boolValue] && ![details[@"channel_closed"] boolValue]) return NO;
+    if ((details[@"requested_configuration"] || details[@"restoration_io"]) &&
+        ![details[@"configuration_restored"] boolValue]) return NO;
+    if ([details[@"commands_written"] unsignedIntegerValue] && ![report[@"queries"] count]) return NO;
+    BOOL changedController = NO;
+    for (NSDictionary *query in report[@"queries"]) {
+        uint16_t opcode = [query[@"opcode"] unsignedShortValue];
+        if (!NWBTReadReplySize(opcode) && opcode != 0x203b) changedController = YES;
+    }
+    // Even a write with a lost completion may have changed controller state.
+    // Never infer successful cleanup just from cancellation or an error string.
+    return !changedController || ([report[@"advertising_stopped_acknowledged"] boolValue] &&
+        [report[@"advertising_set_removed"] boolValue]);
+}
 void NWBTRecordTransportClosure(NSMutableDictionary *report, NSDictionary *details) {
     report[@"transport_details"] = details;
     if (details[@"cleanup_error"]) {

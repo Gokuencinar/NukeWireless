@@ -17,6 +17,31 @@ int main(void) { @autoreleasepool {
     // Real host descriptors check wake ownership independently of the iPhone
     // driver. /dev/null stands in for a character node, never for physical BT.
     NSDictionary *wakeError = nil;
+    // Captured diagnostic13 failure: one read-only query, zero RX, verified
+    // closure/restoration. A timeout alone must not force daemon retirement.
+    NSMutableDictionary *closure = [@{@"transport": @"uart-h4", @"commands_written": @1,
+        @"channel_opened": @YES, @"channel_closed": @YES, @"wake_opened": @YES,
+        @"wake_closed": @YES, @"requested_configuration": @{}, @"configuration_restored": @YES} mutableCopy];
+    NSMutableDictionary *readTimeout = [@{@"transport_details": closure,
+        @"queries": @[@{@"opcode": @0x1001}], @"error": @"Controller read completion deadline expired."} mutableCopy];
+    assert(NWBTUARTCanPreserveService(readTimeout));
+    assert(!NWBTUARTCanPreserveService(@{}));
+    closure[@"channel_closed"] = @NO; assert(!NWBTUARTCanPreserveService(readTimeout));
+    closure[@"channel_closed"] = @YES;
+    closure[@"wake_closed"] = @NO; assert(!NWBTUARTCanPreserveService(readTimeout));
+    closure[@"wake_closed"] = @YES;
+    closure[@"configuration_restored"] = @NO; assert(!NWBTUARTCanPreserveService(readTimeout));
+    closure[@"configuration_restored"] = @YES;
+    readTimeout[@"queries"] = @[]; assert(!NWBTUARTCanPreserveService(readTimeout));
+    // A possibly accepted advertising write needs explicit stop/remove ACKs.
+    readTimeout[@"queries"] = @[@{@"opcode": @0x2039, @"submitted": @YES}];
+    assert(!NWBTUARTCanPreserveService(readTimeout));
+    readTimeout[@"advertising_stopped_acknowledged"] = @YES;
+    assert(!NWBTUARTCanPreserveService(readTimeout));
+    readTimeout[@"advertising_set_removed"] = @YES;
+    assert(NWBTUARTCanPreserveService(readTimeout));
+    readTimeout[@"cleanup_warning"] = @"Uncertain cleanup";
+    assert(!NWBTUARTCanPreserveService(readTimeout));
     NWBTUART *wakeOnly = [NWBTUART new];
     assert([wakeOnly acquireTestWakePath:"/dev/null" error:&wakeError]);
     int wakeFD = wakeOnly.testWakeDescriptor;

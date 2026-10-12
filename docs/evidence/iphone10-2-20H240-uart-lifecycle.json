@@ -1,0 +1,28 @@
+{
+  "machine": "iPhone10,2",
+  "ios_version": "16.7.4",
+  "os_build": "20H240",
+  "firmware_url": "https://updates.cdn-apple.com/2023FallFCS/fullrestores/052-24015/4594AE7B-8566-4E2C-9E11-917E3A2A7294/iPhone_5.5_P3_16.7.4_20H240_Restore.ipsw",
+  "entry": "kernelcache.release.iphone10",
+  "entry_sha256": "0b6f406df856d3522e0e7f9f00be28c0f49ef3a8742878bb2e8ea2495e648e02",
+  "decoded_fat_kernel_sha256": "983bec3226d36228a7d338cc65b008fc3d2252b03a36f7adf098a7fed35bc6d1",
+  "decoded_bytes": 51019804,
+  "zip_entry_crc_verified": true,
+  "full_ipsw_hash_verified": false,
+  "image4_signature_verified": false,
+  "disassembly": "arm64 slice, Capstone; static only",
+  "uart_driver": "com.apple.driver.AppleOnboardSerial",
+  "uart_socket_connect_callback": "0xfffffff005811be0",
+  "exclusive_access_to_ebusy_branch": [
+    "0xfffffff005811c0c",
+    "0xfffffff005811c18",
+    "0xfffffff005811d08"
+  ],
+  "wake_driver": "com.apple.driver.AppleBluetooth",
+  "wake_open_callback": "0xfffffff0062a97dc",
+  "wake_close_callback": "0xfffffff0062a986c",
+  "interpretation": "UART connect rejects existing exclusive ownership with EBUSY; wake open/close asserts/deasserts WAKE. These observations do not prove controller power state after bluetoothd bootout or physical advertising.",
+  "reference_commit": "f524380672564dc4869f3d9a6cbcdeaf5b8a6b85",
+  "reference_uart_service_retirement": false,
+  "physical_uart_diagnostic17_tested": false
+}
