@@ -109,7 +109,10 @@ int main(void) { @autoreleasepool {
     assert(report[@"error"] && peer.enables == 1 && !countOpcode(0x203b)); clean(report);
     assert([report[@"controller_advertising_acknowledged"] boolValue] && ![report[@"selection_completed"] boolValue]);
     reset(); peer.dropOpcode = 0x2039; report = NWBTAdvertiseCatalogLab(0, models);
-    assert(report[@"error"] && peer.enables == 1 && countOpcode(0x203c) == 1 && peer.closed);
+    // Lost completion also loses command credit: cleanup must not invent credit
+    // to force another write. Closure remains mandatory; runner must recover.
+    assert(report[@"error"] && peer.enables == 1 && !countOpcode(0x203c) && peer.closed);
+    assert(![report[@"advertising_set_removed"] boolValue]);
     assert(!NWBTUARTCanPreserveService(report));
     reset(); peer.failOpcode = 0x2037; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && !peer.enables && countOpcode(0x203c) == 1 && peer.closed);
