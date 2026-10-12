@@ -130,12 +130,13 @@ static NSString *networkIdentity(void) {
 static BOOL hasCustomName(id device) {
     if ([readObject(device, @"nickName") length]) return YES;
     NSString *mac = readObject(device, @"macAddress");
-    for (NSString *key in @[@"NukeWirelessDeviceAliases", @NWLegacyAliasesKey]) {
-        NSDictionary *aliases = [NSUserDefaults.standardUserDefaults dictionaryForKey:key];
-        for (NSString *stored in aliases)
-            if ([stored caseInsensitiveCompare:mac ?: @""] == NSOrderedSame &&
-                [aliases[stored] isKindOfClass:NSString.class] && [aliases[stored] length]) return YES;
-    }
+    // Match the adapter's migration policy: an existing new store (including
+    // an empty one after clearing aliases) supersedes the legacy store.
+    NSDictionary *aliases = [NSUserDefaults.standardUserDefaults dictionaryForKey:@"NukeWirelessDeviceAliases"];
+    if (!aliases) aliases = [NSUserDefaults.standardUserDefaults dictionaryForKey:@NWLegacyAliasesKey];
+    for (NSString *stored in aliases)
+        if ([stored caseInsensitiveCompare:mac ?: @""] == NSOrderedSame &&
+            [aliases[stored] isKindOfClass:NSString.class] && [aliases[stored] length]) return YES;
     return NO;
 }
 static void applyResolvedName(NSString *ip, NSString *mac, NSString *name, uint64_t generation, NSString *network) {
