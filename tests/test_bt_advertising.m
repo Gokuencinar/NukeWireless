@@ -87,7 +87,7 @@ static void clean(NSDictionary *report) {
     assert(NWBTUARTCanPreserveService(report));
 }
 int main(void) { @autoreleasepool {
-    NSArray *models = @[@0, @1, @2, @3, @4, @5];
+    NSArray *models = @[@0, @1, @2, @3, @4, @6]; // AirPods 4 (index 5) has no verified profile.
     reset(); NSDictionary *report = NWBTAdvertiseCatalogLab(0, @[@0]);
     assert(!report[@"error"] && peer.enables == 1 && !countOpcode(0x203b)); clean(report);
     reset(); report = NWBTAdvertiseCatalogLab(0, models);
@@ -96,8 +96,8 @@ int main(void) { @autoreleasepool {
     assert([report[@"models_enabled_count"] unsignedIntValue] == 6 && clockValue <= 110.021);
     for (unsigned i = 0; i < 6; ++i) {
         const uint8_t *address = peer.addresses[i].bytes; const uint8_t *data = peer.payloads[i].bytes;
-        assert(address[0] == NWBT_LAB_MULTI_HANDLE && address[1] == i+1 && data[0] == address[0]);
-        assert(u16(data+11) == NWCatalogProfileID(0, i));
+        assert(address[0] == NWBT_LAB_MULTI_HANDLE && address[1] == models[i].unsignedIntValue+1 && data[0] == address[0]);
+        assert(u16(data+11) == NWCatalogProfileID(0, models[i].unsignedIntValue));
     }
     reset(); peer.capacityQuery = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert(!report[@"error"] && countOpcode(0x203b) == 1 && [report[@"advertising_schedule"] isEqual:@"simultaneous"]); clean(report);
