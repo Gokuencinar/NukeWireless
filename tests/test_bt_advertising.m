@@ -36,7 +36,7 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
 @property(nonatomic, strong) NSMutableArray<NSData *> *addresses;
 @property(nonatomic, strong) NSMutableArray<NSData *> *payloads;
 @property(nonatomic) BOOL capacityQuery, missingSetter, closed, failCleanup;
-@property(nonatomic) unsigned capacity, failOpcode, dropOpcode, enables;
+@property(nonatomic) unsigned setLimit, failOpcode, dropOpcode, enables;
 @end
 @implementation TestRing
 - (BOOL)send:(NSData *)packet {
@@ -54,7 +54,7 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
         if (self.capacityQuery) bytes[42] |= 0x80;
         if (self.missingSetter) bytes[42] &= ~0x04;
     }
-    if (opcode == 0x203b) bytes[6] = self.capacity;
+    if (opcode == 0x203b) bytes[6] = self.setLimit;
     if (opcode == 0x2036) bytes[6] = 8;
     if (opcode == 0x2035) [self.addresses addObject:[packet subdataWithRange:NSMakeRange(3, 7)]];
     if (opcode == 0x2037) [self.payloads addObject:[packet subdataWithRange:NSMakeRange(3, packet.length-3)]];
@@ -77,7 +77,7 @@ static TestRing *peer;
 id NWBTLabTestRing(void) { return peer; }
 static void reset(void) {
     peer = [TestRing new]; peer.writes = [NSMutableArray new]; peer.addresses = [NSMutableArray new]; peer.payloads = [NSMutableArray new];
-    peer.capacity = 6; clockValue = 100; cancelOnSleep = NO; atomic_store(&NWBTCancelled, 0);
+    peer.setLimit = 6; clockValue = 100; cancelOnSleep = NO; atomic_store(&NWBTCancelled, 0);
 }
 static unsigned countOpcode(uint16_t opcode) {
     unsigned count = 0; for (NSData *packet in peer.writes) if (u16(packet.bytes) == opcode) count++; return count;
@@ -101,9 +101,9 @@ int main(void) { @autoreleasepool {
     }
     reset(); peer.capacityQuery = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert(!report[@"error"] && countOpcode(0x203b) == 1 && [report[@"advertising_schedule"] isEqual:@"simultaneous"]); clean(report);
-    reset(); peer.capacityQuery = YES; peer.capacity = 2; report = NWBTAdvertiseCatalogLab(0, models);
+    reset(); peer.capacityQuery = YES; peer.setLimit = 2; report = NWBTAdvertiseCatalogLab(0, models);
     assert(!report[@"error"] && peer.enables == 6 && [report[@"advertising_schedule"] isEqual:@"sequential_single_set"]); clean(report);
-    reset(); peer.capacityQuery = YES; peer.capacity = 0; report = NWBTAdvertiseCatalogLab(0, models);
+    reset(); peer.capacityQuery = YES; peer.setLimit = 0; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && !peer.enables && !countOpcode(0x2036) && peer.closed);
     reset(); cancelOnSleep = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && peer.enables == 1 && !countOpcode(0x203b)); clean(report);
