@@ -62,7 +62,7 @@ xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
 for language in en es; do
 rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
-xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}"
+xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}" --traits "${NW_UI_TRAITS:-native}"
 for attempt in $(seq 1 30); do
   if [ -f "$container/Documents/resume-ready-0.json" ]; then break; fi
   sleep 2

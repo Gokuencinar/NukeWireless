@@ -31,6 +31,19 @@
 - (void)safeAreaInsetsDidChange { [super safeAreaInsetsDidChange]; [self.tabs layoutBar]; }
 @end
 static char mainTabsKey;
+#ifdef NW_UI_TESTING
+static BOOL forceLegacyPadTraits;
+void NWMainTabsUIRegressionUseLegacyTraits(void) { forceLegacyPadTraits = YES; }
+#endif
+static void legacyPadTraits(UITabBarController *tab) {
+    UITraitCollection *traits = [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact];
+    if (tab.parentViewController) {
+        [tab.parentViewController setOverrideTraitCollection:traits forChildViewController:tab];
+    } else {
+        for (UIViewController *host in tab.viewControllers)
+            [tab setOverrideTraitCollection:traits forChildViewController:host];
+    }
+}
 NSString *const NWMainTabReselected = @"NWMainTabReselected";
 @implementation NWMainTabs
 - (instancetype)init {
@@ -192,18 +205,18 @@ void NWPrepareMainTabs(UITabBarController *tab) {
     // iPad's adaptive container in that presentation too, rather than exposing
     // an additional three-item floating bar or an empty NavigationView detail.
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        BOOL legacy = YES;
         if (@available(iOS 17.0, *)) {
+#ifdef NW_UI_TESTING
+            if (!forceLegacyPadTraits) {
+#endif
             tab.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
-        } else if (tab.parentViewController) {
-            [tab.parentViewController setOverrideTraitCollection:
-                [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact]
-                forChildViewController:tab];
-        } else {
-            for (UIViewController *host in tab.viewControllers)
-                [tab setOverrideTraitCollection:
-                    [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact]
-                    forChildViewController:host];
+            legacy = NO;
+#ifdef NW_UI_TESTING
+            }
+#endif
         }
+        if (legacy) legacyPadTraits(tab);
     }
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs) {

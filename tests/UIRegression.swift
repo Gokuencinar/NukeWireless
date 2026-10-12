@@ -36,6 +36,8 @@ func presentSingleEmission() -> Int32
 
 @_silgen_name("NWBLEUIRegressionCheck")
 func checkBLEUI() -> Int32
+@_silgen_name("NWMainTabsUIRegressionUseLegacyTraits")
+func useLegacyPadTraits()
 
 @_silgen_name("NWUIRegressionCheck")
 func checkUI(_ phase: Int32) -> Int32
@@ -50,7 +52,10 @@ func checkDiagnosticNavigation(_ phase: Int32) -> Int32
 
 @main
 struct UIRegressionApp: App {
-    init() { setFixtureLanguage(ProcessInfo.processInfo.arguments.contains("es") ? 1 : 0) }
+    init() {
+        setFixtureLanguage(ProcessInfo.processInfo.arguments.contains("es") ? 1 : 0)
+        if ProcessInfo.processInfo.arguments.contains("legacy-traits") { useLegacyPadTraits() }
+    }
     var body: some Scene {
         WindowGroup { RegressionTabs() }
     }
