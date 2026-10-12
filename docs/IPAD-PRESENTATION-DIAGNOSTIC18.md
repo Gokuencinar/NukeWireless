@@ -32,6 +32,13 @@ restricciones entre jerarquías separadas. Recalcula al cambiar layout/área seg
 y en la recuperación de primer plano. Bluetooth termina encima de la barra
 visible incluso cuando UIKit no aporta una barra inferior nativa.
 
+La revisión de las primeras capturas detectó además la barra flotante nativa
+de tres opciones y una columna de detalle vacía. En iPad se aplica el tamaño
+horizontal compacto mediante traits públicos al contenedor, manteniendo una
+sola navegación inferior y contenido de una columna. En iOS 15/16 se usa la
+sobrescritura del padre; desde iOS 17, `traitOverrides`. La barra de presentación
+también declara un ancho de ítem para evitar títulos recortados en traits regulares.
+
 Conserva los tres hosts de SwiftUI, su delegado, la selección sincronizada,
 las cuatro opciones visibles y Detener. No reemplaza el controlador raíz,
 no usa clases privadas de UIKit ni cambia el transporte Bluetooth.

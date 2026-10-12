@@ -188,6 +188,23 @@ BOOL NWBluetoothTabSelected(UITabBarController *tab) {
 }
 void NWPrepareMainTabs(UITabBarController *tab) {
     if (!tab || tab.viewControllers.count != 3) return;
+    // This legacy UI has one content pane and our four-item bottom bar. Keep
+    // iPad's adaptive container in that presentation too, rather than exposing
+    // an additional three-item floating bar or an empty NavigationView detail.
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        if (@available(iOS 17.0, *)) {
+            tab.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
+        } else if (tab.parentViewController) {
+            [tab.parentViewController setOverrideTraitCollection:
+                [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact]
+                forChildViewController:tab];
+        } else {
+            for (UIViewController *host in tab.viewControllers)
+                [tab setOverrideTraitCollection:
+                    [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact]
+                    forChildViewController:host];
+        }
+    }
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
     if (!tabs) {
         tabs = [NWMainTabs new]; tabs.owner = tab;
@@ -203,6 +220,7 @@ void NWPrepareMainTabs(UITabBarController *tab) {
             item.accessibilityIdentifier = [NSString stringWithFormat:@"nw.tab.%@", tags[i]]; [items addObject:item];
         }
         bar.items = items; bar.itemPositioning = UITabBarItemPositioningFill;
+        bar.itemWidth = 150; bar.itemSpacing = 20;
         bar.translatesAutoresizingMaskIntoConstraints = NO; [tab.view addSubview:bar];
         tabs.barConstraints = @[
             [bar.leadingAnchor constraintEqualToAnchor:tab.view.leadingAnchor],
@@ -303,6 +321,8 @@ int NWMainTabsResumePrepare(UITabBarController *tab, NSInteger tag) {
 }
 int NWMainTabsResumeCheck(UITabBarController *tab) {
     NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad &&
+        tab.parentViewController && tab.traitCollection.horizontalSizeClass != UIUserInterfaceSizeClassCompact) return 42;
     if (!tabs || tabs.foregroundRestorations <= resumeRestorations || tabs.bar.superview != tab.view ||
         tabs.bar.items.count != 4 || tabs.bar.selectedItem.tag != resumeTag ||
         tabs.bluetoothSelected != (resumeTag == 3) || tab.selectedIndex != (NSUInteger)(resumeTag == 3 ? 0 : resumeTag)) return 31;

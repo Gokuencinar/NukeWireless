@@ -2,7 +2,11 @@ name: iPad presentation regression
 on:
   push:
     branches: [audit-rh25.5]
-    paths: ['.github/workflows/ipad-ui.yml']
+    paths:
+      - '.github/workflows/ipad-ui.yml'
+      - 'src/NWMainTabs.*'
+      - 'tests/UIRegression.swift'
+      - 'scripts/test_ui_simulator.sh'
   workflow_dispatch:
 permissions:
   contents: read
