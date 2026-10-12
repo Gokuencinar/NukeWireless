@@ -70,6 +70,7 @@ struct RegressionTabs: View {
     @State private var resumePhase = -1
     @State private var didBackground = false
     @State private var checkingResume = false
+    @State private var rotationError = ""
     private let resumeTags: [Int32] = [0, 1, 3, 2]
 
     var body: some View {
@@ -278,19 +279,39 @@ struct RegressionTabs: View {
         results.append(result)
         let rotate = UIDevice.current.userInterfaceIdiom == .pad && ProcessInfo.processInfo.arguments.contains("rotate")
         let landscape = phase % 2 == 1
-        if rotate, #available(iOS 16.0, *) {
-            for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
-                scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait))
+        rotationError = ""
+        // Finish the selected-host transition before requesting geometry.
+        // UIKit may decline a rotation during an unfinished containment change.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+            if rotate, #available(iOS 16.0, *) {
+                for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+                    for window in scene.windows where window.isKeyWindow {
+                        window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                    }
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { error in
+                        let failure = error as NSError
+                        rotationError = "\(failure.domain):\(failure.code)"
+                    }
+                }
             }
+            recordResumeReady(phase, rotate, landscape, result, 0)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
-                .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })
-            let size = window?.bounds.size ?? .zero
-            writeReport(["phase": phase, "tag": resumeTags[phase], "prepared": result == 0,
-                         "rotation_requested": rotate, "orientation_correct": !rotate || ((size.width > size.height) == landscape),
-                         "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
+    }
+    private func recordResumeReady(_ phase: Int, _ rotate: Bool, _ landscape: Bool, _ result: Int32, _ attempt: Int) {
+        let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })
+        let size = window?.bounds.size ?? .zero
+        let correct = !rotate || ((size.width > size.height) == landscape)
+        if !correct && attempt < 10 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                recordResumeReady(phase, rotate, landscape, result, attempt + 1)
+            }
+            return
         }
+        writeReport(["phase": phase, "tag": resumeTags[phase], "prepared": result == 0,
+                     "rotation_requested": rotate, "orientation_correct": correct, "geometry_error": rotationError,
+                     "window_width": size.width, "window_height": size.height,
+                     "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
     }
     private func writeReport(_ report: [String: Any], _ name: String) {
         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(name)
