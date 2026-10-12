@@ -1,0 +1,329 @@
+{
+  "package_version": "2.0.0~diagnostic19+bundle1",
+  "worker_version": "2.0.0~diagnostic7",
+  "source_commit": "f5d6337b3d628056ce9135b960497501ba714865",
+  "ci": [
+    {
+      "id": 38251277710,
+      "name": "Unified installer packaging",
+      "head_sha": "f5d6337b3d628056ce9135b960497501ba714865",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38251277710",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38251259015,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "f5d6337b3d628056ce9135b960497501ba714865",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38251259015",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38251258994,
+      "name": "Development build",
+      "head_sha": "f5d6337b3d628056ce9135b960497501ba714865",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38251258994",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38251273954,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "f5d6337b3d628056ce9135b960497501ba714865",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38251273954",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38251259032,
+      "name": "iPad presentation regression",
+      "head_sha": "f5d6337b3d628056ce9135b960497501ba714865",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38251259032",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic19+bundle1_iphoneos-arm64e.deb",
+      "sha256": "435f1a3cd9061f504bbcbe9016dba58b4a7ea8cfd9b723bcd77f7e8f03c187d2"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic19+bundle1_iphoneos-arm64.deb",
+      "sha256": "f674e30d8fb9719236041eee6118efa146528eee5987ed9355a20284b80d5a69"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic19+bundle1_iphoneos-arm.deb",
+      "sha256": "adbe876a9d600977bb7ed84861140206fdffe4964f6ec8f2ab0b9d30e95c5180"
+    }
+  ],
+  "checks": [
+    "core-package-tests.txt",
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 47,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 47,
+      "real_background_cycles": 4
+    }
+  },
+  "ipad": {
+    "portrait": {
+      "en": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          834,
+          1210
+        ],
+        "recovered_transient_rotation_rejections": 0
+      },
+      "es": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          834,
+          1210
+        ],
+        "recovered_transient_rotation_rejections": 0
+      }
+    },
+    "landscape": {
+      "en": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          1210,
+          834
+        ],
+        "recovered_transient_rotation_rejections": 0
+      },
+      "es": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          1210,
+          834
+        ],
+        "recovered_transient_rotation_rejections": 0
+      }
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "presentation_review": "ipad-presentation-v1",
+  "physical_ipados16_acceptance": "pending",
+  "simulator_artifacts": {
+    "ui": {
+      "runtime": {
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "device": "iPhone 16 Pro",
+        "deployment_target": "15.0",
+        "physical_device": false
+      },
+      "sha256": {
+        "browser-actions-state.json": "3a7281b3fc9a5df7c4a5b69b40dea2fd39185724b81f6384c2c0640feb0398cd",
+        "en-catalog-dark.png": "8e43ec5098a170b578948d277892ac5f3a02ca01693635113fd17815fe91ed0f",
+        "en-presentation-diagnostics.json": "170bcf43f136912036a554c8261ac1eab70d7cf8918eba6de8f30a18478a612b",
+        "en-regression.json": "2e457e1bbedc62e9806b6f4fa0f4e9f59d06f8cb813fd0faf856c790dec1dd42",
+        "en-resume-3.png": "c9bc157aecc422f0c17e84f70a438edfeed9d151a2f705288fdda807cab6d26a",
+        "en-resume-done-0.json": "d0ddc1e941f114fb2e9cb289ae4d62beab8386ef7f13b00bf33f621efd471265",
+        "en-resume-done-1.json": "d5eb3141a627edc4d3edb5d1a6215c0ae5226a43cf32dffe750b82a3d6b5414c",
+        "en-resume-done-2.json": "ae25965ed9320ee6aa0731dcdfdb7884c65a31374427620e9c2dd86e53444acf",
+        "en-resume-done-3.json": "d96eda6ed217e506dcd3f66c6ec51b96a33dbf3feff810a29cf478395057a33c",
+        "en-resume-ready-0.json": "62ce29fc79bdb36104dc51be24191d4201239fdd485c39fdae9f7b4aa9cefbea",
+        "en-resume-ready-1.json": "7f1ce1288bf0631c86234eb5743b946c0d07f2392738db66a223d89ffe021b03",
+        "en-resume-ready-2.json": "04585c08c1d6e17683b94c3a9026ccf4272a2b0f856af2af4979bc5b26f34420",
+        "en-resume-ready-3.json": "0496bbe2d636433a4d1e17bdb85f0ba4c13b0c97f94ec30ead29bd9823d797a0",
+        "en-startup-hierarchy.json": "c8db07e11064a4d41ca1db589a739491707a824e990b3eaa7b392b6c14bc60c4",
+        "en-wifi.png": "9bf379a52ab00b1087a3789746ecd9ab48ba8421a618a7ba3b5598029cdd1d61",
+        "es-catalog-dark.png": "80d4177adac10b997ddec14f41177dfa8f9316c046e9e46c4ab12c738887756a",
+        "es-presentation-diagnostics.json": "170bcf43f136912036a554c8261ac1eab70d7cf8918eba6de8f30a18478a612b",
+        "es-regression.json": "b21427518d52ddee80e601f579db8a0177b0d84c74baa644620fb57dcd2ead8f",
+        "es-resume-3.png": "3fc6a84cf99a80762ac883b584ef1d413506ecc4a5220f3f2d1cd2bb7ca4cbc7",
+        "es-resume-done-0.json": "d8efef4818fbb4b903ad79123009af21937c2cd6e5382b31da48ca2c07c39532",
+        "es-resume-done-1.json": "68399b580e91dae1cb9c8ed9ba2c2d81e774c96056bccb9654eabd63c63e462f",
+        "es-resume-done-2.json": "0117d4880e443b4ee6f53a3e6f2a5ef7ec276a3e0d106de16d58fb8d07afe581",
+        "es-resume-done-3.json": "6741d29d72e7f6272f476a2e64d1dae25a024854869505dcdfda658cb826be5a",
+        "es-resume-ready-0.json": "202fdae6f60d791b147358d72152102518f4967914e66617a8f7f37dec194b5f",
+        "es-resume-ready-1.json": "30e7d5aba2c43b4a0b9f1fe8ff06dfb6fe8a2d708c7705e23686e59149bc8dcc",
+        "es-resume-ready-2.json": "0f77775d188f0acbe8e44994ebb6c2cfc56e3b030e8d34a4aac460e8ffb58db9",
+        "es-resume-ready-3.json": "78704b7f1e037cdf5c4f556fffcc328be56f96558bc179119e3028d9dbc1dec4",
+        "es-startup-hierarchy.json": "72c4daae9afacb955c76caf85b99aa5faf8d0286b8a4d61d758c9ba770f4e9c1",
+        "es-wifi.png": "dbb074df2d35769d28656e7c0a5411022649f08aadd1461b3ce1c5ce6d03b7ba",
+        "presentation-diagnostics.json": "170bcf43f136912036a554c8261ac1eab70d7cf8918eba6de8f30a18478a612b",
+        "resume-done-0.json": "d8efef4818fbb4b903ad79123009af21937c2cd6e5382b31da48ca2c07c39532",
+        "resume-done-1.json": "68399b580e91dae1cb9c8ed9ba2c2d81e774c96056bccb9654eabd63c63e462f",
+        "resume-done-2.json": "0117d4880e443b4ee6f53a3e6f2a5ef7ec276a3e0d106de16d58fb8d07afe581",
+        "resume-done-3.json": "6741d29d72e7f6272f476a2e64d1dae25a024854869505dcdfda658cb826be5a",
+        "resume-ready-0.json": "202fdae6f60d791b147358d72152102518f4967914e66617a8f7f37dec194b5f",
+        "resume-ready-1.json": "30e7d5aba2c43b4a0b9f1fe8ff06dfb6fe8a2d708c7705e23686e59149bc8dcc",
+        "resume-ready-2.json": "0f77775d188f0acbe8e44994ebb6c2cfc56e3b030e8d34a4aac460e8ffb58db9",
+        "resume-ready-3.json": "78704b7f1e037cdf5c4f556fffcc328be56f96558bc179119e3028d9dbc1dec4",
+        "runtime.json": "5203406af0eadf5b81851d2d6954e22791a064849f9f16cd2e91fb3e8e6c97f7",
+        "startup-hierarchy.json": "72c4daae9afacb955c76caf85b99aa5faf8d0286b8a4d61d758c9ba770f4e9c1",
+        "ui-initial.json": "160aba22cbba23791929e52c04783f33af1f51f2883e2939dc1c0e8407156083",
+        "ui-regression.json": "b21427518d52ddee80e601f579db8a0177b0d84c74baa644620fb57dcd2ead8f"
+      }
+    },
+    "ipad-portrait": {
+      "runtime": {
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "device": "iPad Pro 11-inch (M4)",
+        "deployment_target": "15.0",
+        "physical_device": false
+      },
+      "sha256": {
+        "browser-actions-state.json": "3a7281b3fc9a5df7c4a5b69b40dea2fd39185724b81f6384c2c0640feb0398cd",
+        "en-catalog-dark.png": "65f721a6c8b03599be9993e2fad65d95510ed62dbc8493fb47ec579a922323ed",
+        "en-presentation-diagnostics.json": "b01f9c8f394da21a0f70b95ac45f47ca2c6d56512cf1a639bcf21e93e337571b",
+        "en-regression.json": "fae8f287762a48eca337b065cd0e558f5a0964052687ff939d3c10083cd10e45",
+        "en-resume-3.png": "2168bacf21e4f42f004dcf8ad85784d13263077dfc09615e32ca4a2a1dc3c304",
+        "en-resume-done-0.json": "2cdda1abbbe4e37e5365c7d0a7a0cfab8c7877887a6c48ba6ceda478fbe28514",
+        "en-resume-done-1.json": "a9363eb99c4749d7bd24fc180414d208c29f60a507323f44224c251ce079ef9e",
+        "en-resume-done-2.json": "22f20b82e90d2b8ba178f501a5c8af14789e5ecab7dda42b7461f7f64d2df6d2",
+        "en-resume-done-3.json": "b04ba9dff5f270419961e66d5f329f316c53e7c9b4b45af4b45074fb429443d3",
+        "en-resume-ready-0.json": "4cac97cc40e954080ba2b17586c6a93f24caa7f25dd85327ec7cc3f75632ef21",
+        "en-resume-ready-1.json": "0c014564b6d97e76797c5450ba5e9240b5f07a3343661055f557f768593b1c60",
+        "en-resume-ready-2.json": "741b2f56dfcb5a8d7cbd5854926fbeb1d6a60de5da714e2417ae5518df8714ad",
+        "en-resume-ready-3.json": "f9dfde9017b10b4bac85db73a0bbd4af1bc6f084ee48697a8a0dbf6f75a1f1cd",
+        "en-startup-hierarchy.json": "94b83432b77f723295406675d83432a180d46717b70f6b3e6a028a36cb5c3d73",
+        "en-wifi.png": "224c98696e14e667a2f496a0855844fb0d97ef16147b96007ed8ba6f822d153f",
+        "es-catalog-dark.png": "659efaf2a8ac36e81a1a7dbc0e75054a74d7922cd6b05f3724356455f81cca77",
+        "es-presentation-diagnostics.json": "ec52d2279ffac7409e469f99c42b846301e428e1e0d3e7aaf0a2fa433602a79c",
+        "es-regression.json": "b21427518d52ddee80e601f579db8a0177b0d84c74baa644620fb57dcd2ead8f",
+        "es-resume-3.png": "1cb88f1b60bcf9ec4a8f5f895e98d41ed524e81f2557d2ce202587220f340dde",
+        "es-resume-done-0.json": "7ee7ae843e13ea64861268af6fa1c1c36672dc231a66af1ca905dae5b3414864",
+        "es-resume-done-1.json": "5be523362ffcaaeff521e4b7b58c79f9d403a7fe227b007dd120886988a86503",
+        "es-resume-done-2.json": "c31db94fbde701bb30fb5f29cb158e8f2a34c164fb64f638cb67fd7a67e0a239",
+        "es-resume-done-3.json": "da1e885247658f7f323b4f86fda2d943b1cc1ce00a794b6294c77f1f181388d8",
+        "es-resume-ready-0.json": "6f352714a9d2abcb21949b9195be6edc150b4ba7011c1d7873e2dee7d3522713",
+        "es-resume-ready-1.json": "b5ca26c7d86c5352e94beabfb58bb1cdca5801ba4e08a1add4a09b1c1ac6c493",
+        "es-resume-ready-2.json": "279cae0bee42b8ed1f8fa00a23b5186aa10e2196e80c68ae1782c0fd1cc933b9",
+        "es-resume-ready-3.json": "3b4463939edd2872f4ec203ba51bf52630a46c925c65d468d8f8ebf494295f4e",
+        "es-startup-hierarchy.json": "7b25a0d23a9dd20160a3a58284f1fdf064e71f80800fc19abda2edb3562fac9f",
+        "es-wifi.png": "0bdbf7ae7a389ee965eeb6cad5f8b26a7c517a253901a3a71bda4f4fcbf3501b",
+        "presentation-diagnostics.json": "ec52d2279ffac7409e469f99c42b846301e428e1e0d3e7aaf0a2fa433602a79c",
+        "resume-done-0.json": "7ee7ae843e13ea64861268af6fa1c1c36672dc231a66af1ca905dae5b3414864",
+        "resume-done-1.json": "5be523362ffcaaeff521e4b7b58c79f9d403a7fe227b007dd120886988a86503",
+        "resume-done-2.json": "c31db94fbde701bb30fb5f29cb158e8f2a34c164fb64f638cb67fd7a67e0a239",
+        "resume-done-3.json": "da1e885247658f7f323b4f86fda2d943b1cc1ce00a794b6294c77f1f181388d8",
+        "resume-ready-0.json": "6f352714a9d2abcb21949b9195be6edc150b4ba7011c1d7873e2dee7d3522713",
+        "resume-ready-1.json": "b5ca26c7d86c5352e94beabfb58bb1cdca5801ba4e08a1add4a09b1c1ac6c493",
+        "resume-ready-2.json": "279cae0bee42b8ed1f8fa00a23b5186aa10e2196e80c68ae1782c0fd1cc933b9",
+        "resume-ready-3.json": "3b4463939edd2872f4ec203ba51bf52630a46c925c65d468d8f8ebf494295f4e",
+        "runtime.json": "6159ba2df9cfa7f4a7d2dd6a488ae76f06ccf578873391816b0e31c771a23459",
+        "startup-hierarchy.json": "7b25a0d23a9dd20160a3a58284f1fdf064e71f80800fc19abda2edb3562fac9f",
+        "ui-initial.json": "160aba22cbba23791929e52c04783f33af1f51f2883e2939dc1c0e8407156083",
+        "ui-regression.json": "b21427518d52ddee80e601f579db8a0177b0d84c74baa644620fb57dcd2ead8f"
+      }
+    },
+    "ipad-landscape": {
+      "runtime": {
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "device": "iPad Pro 11-inch (M4)",
+        "deployment_target": "15.0",
+        "physical_device": false
+      },
+      "sha256": {
+        "browser-actions-state.json": "3a7281b3fc9a5df7c4a5b69b40dea2fd39185724b81f6384c2c0640feb0398cd",
+        "en-catalog-dark.png": "6fd3de88e8f77f1034b8a02f9f64576d5b30dcd79ab9c7c7fb21cd36e67d65ac",
+        "en-presentation-diagnostics.json": "68c868ed9ba3d697e53b7991c11ed1198988dcf4921931158aee0a71a07a24da",
+        "en-regression.json": "b58d999f1f54ed64b4faf86a749d48559fe91304616e03fc21d945fd1e6c6a66",
+        "en-resume-3.png": "38c9cc2446f1389e40693bb0aa73fc0b6481b47c586a9ef18080a2467a5ebbf9",
+        "en-resume-done-0.json": "66f44631ba1decbb4b3890d082c62ca0f7096d1cc505a5112e0f38f82dfb1df9",
+        "en-resume-done-1.json": "ddbef0b7a5810ffdd2487a562a7d552a26751db2eaa33678714bd29960918e4c",
+        "en-resume-done-2.json": "2aaab21fd3130298191b18571fb1bbc5b532b4d80b289ce1e40dd855672f8398",
+        "en-resume-done-3.json": "abc8636924444076381e5a4ae071ecdc1830fdc4483280dec782b1b853b8a43e",
+        "en-resume-ready-0.json": "46abc88707150c2d9f83d38f2c45316839582d6ebdc432c66665e1045a5d0af7",
+        "en-resume-ready-1.json": "09a0d1ded8c7cabb03488caeddf212528deb0c693b1850cdbd111b6fda81e445",
+        "en-resume-ready-2.json": "9bbe5b90fb7a00856fc531d8d8cef35b93bdeb72749e813760dc6bdf82e50057",
+        "en-resume-ready-3.json": "7f4891cfb62db99812c90ce46e0923676c94062a9dd706695b042d479779626c",
+        "en-startup-hierarchy.json": "b6fd13a3b7e01fe259db955065e56caf0a6f756f9b00949849610fb9a352b4cf",
+        "en-wifi.png": "66b326f7bdcbf4c89c5ce1c9b40bec6a0cce4d473dfec4d050fe4f3d79e25bfe",
+        "es-catalog-dark.png": "0733e3378c9cff0f468e375a54b2a50e96a0f53ff00a95336d989b87063b226a",
+        "es-presentation-diagnostics.json": "23a56cbe9350d8c3b2336c0d17e91e801949e3b6cfff5cdff2ad86cddcba800c",
+        "es-regression.json": "948d99220e25e81bd87f021c11452acdebe3429b31b42887758a0f7f969e157f",
+        "es-resume-3.png": "7ddc49a692f7ad966116a779f94b24800edf91636ed20888e6d4892046071528",
+        "es-resume-done-0.json": "42582aa6014052ce3079d953cdee55c884be721e598d42889fd14d65eda8c7dc",
+        "es-resume-done-1.json": "1a2d8083d436c050cf39e6554edc82679c7eb3a24308205d3130f202234fb9bf",
+        "es-resume-done-2.json": "5ece4d81ce10325d419e6be7c6b7c03464dd322883e1803cdb075a1a59f86c90",
+        "es-resume-done-3.json": "081b8c597b27121a43aca7cceb782b1dbb116066b2c78a47a239a7b1cde71d7c",
+        "es-resume-ready-0.json": "eb95a94a56fd0c11333aa5d397e5372e484f2753bda81baede89eb51a6af2b2f",
+        "es-resume-ready-1.json": "5637eb7669323816bcc22bddf8d9423012bea997c6a80079c7eb78f60aeed81a",
+        "es-resume-ready-2.json": "bdc56107536c1698e2e0f77d4ce1f97d75616b9e44691d6af1d867c3cd72d0b0",
+        "es-resume-ready-3.json": "75e2ec02bd45b53d345e3e1be6befe2d0bdbf2851eb02cf4a98d384732a00a4d",
+        "es-startup-hierarchy.json": "028fba35d8c22b3bd2f69909b3e1d5893fc252fbb2e5d5faf4d2c374c0bff2db",
+        "es-wifi.png": "65621e14158bbd695abbd58b6adc1324b1d49fa27f5afd4b5ebfaa21e2e47439",
+        "presentation-diagnostics.json": "23a56cbe9350d8c3b2336c0d17e91e801949e3b6cfff5cdff2ad86cddcba800c",
+        "resume-done-0.json": "42582aa6014052ce3079d953cdee55c884be721e598d42889fd14d65eda8c7dc",
+        "resume-done-1.json": "1a2d8083d436c050cf39e6554edc82679c7eb3a24308205d3130f202234fb9bf",
+        "resume-done-2.json": "5ece4d81ce10325d419e6be7c6b7c03464dd322883e1803cdb075a1a59f86c90",
+        "resume-done-3.json": "081b8c597b27121a43aca7cceb782b1dbb116066b2c78a47a239a7b1cde71d7c",
+        "resume-ready-0.json": "eb95a94a56fd0c11333aa5d397e5372e484f2753bda81baede89eb51a6af2b2f",
+        "resume-ready-1.json": "5637eb7669323816bcc22bddf8d9423012bea997c6a80079c7eb78f60aeed81a",
+        "resume-ready-2.json": "bdc56107536c1698e2e0f77d4ce1f97d75616b9e44691d6af1d867c3cd72d0b0",
+        "resume-ready-3.json": "75e2ec02bd45b53d345e3e1be6befe2d0bdbf2851eb02cf4a98d384732a00a4d",
+        "runtime.json": "6159ba2df9cfa7f4a7d2dd6a488ae76f06ccf578873391816b0e31c771a23459",
+        "startup-hierarchy.json": "028fba35d8c22b3bd2f69909b3e1d5893fc252fbb2e5d5faf4d2c374c0bff2db",
+        "ui-initial.json": "160aba22cbba23791929e52c04783f33af1f51f2883e2939dc1c0e8407156083",
+        "ui-regression.json": "948d99220e25e81bd87f021c11452acdebe3429b31b42887758a0f7f969e157f"
+      }
+    }
+  },
+  "backend_sources_unchanged_since": "5e0113c",
+  "physical_ipad_model": "iPad Pro (exact model not supplied)",
+  "physical_ipad_os": "16.0",
+  "physical_ipad_jailbreak": "Dopamine",
+  "physical_ipad_acceptance": "pending",
+  "test_harness": {
+    "initial_orientation_checked_against_actual_bounds": true,
+    "scheduled_orientation_updates_waited": true,
+    "geometry_retries_on_transient_101": 3,
+    "current_catalog_menu_row_exercised": true,
+    "rotation_retry_code_in_production": false
+  },
+  "visual_inspection": "portrait and landscape screenshots reviewed for visible controls and retained four-item bar"
+}

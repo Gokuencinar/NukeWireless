@@ -9,7 +9,10 @@ Encuentra las pestañas contenidas en la raíz SwiftUI, protege la instalación
 durante la adaptación y aplica la política compacta a los hosts de iOS 15/16.
 Incluye la revisión de iPad y registros acotados de ventanas, columnas, tamaños
 y barras, disponibles en el diario incluso si falla la interfaz.
-Conserva Wi-Fi y Bluetooth diagnostic7. Compilación y aceptación física pendientes.
+Conserva Wi-Fi y Bluetooth diagnostic7. Las cinco validaciones CI y los DEB
+unificados de los tres esquemas pasaron. iPhone e iPad simulado completaron
+47 comprobaciones y cuatro ciclos de segundo plano por idioma; en iPad se
+probaron ambos arranques y rotaciones. Aceptación física de iPadOS 16.0 pendiente.
 Véase [cambios y límites](docs/IPAD-PRESENTATION-DIAGNOSTIC19.md).
 
 **2.0.0~diagnostic18: barra de navegación sin anchors a una barra nativa separada.**

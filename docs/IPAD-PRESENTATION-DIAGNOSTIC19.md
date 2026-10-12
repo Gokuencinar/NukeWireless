@@ -25,7 +25,7 @@ Se incluye en los hashes de procedencia y en la inspección del paquete.
 
 El diario existente añade `ui_review` y `ui_presentation`. Las capturas guardan
 ventanas visibles, clases y contención, tamaños, tamaño horizontal efectivo
-de controladores y vistas, overrides del padre, estado del contenedor dividido,
+de controladores y vistas, orientaciones admitidas, overrides del padre, estado del contenedor dividido,
 selección y presencia de las dos barras. Registran el estado resumido de las
 pestañas antes de reconciliar y la jerarquía posterior.
 
@@ -50,6 +50,21 @@ La ruta normal del runtime es obligatoria. El experimento `legacy-traits` queda
 disponible mediante workflow_dispatch con selección explícita; no demuestra
 compatibilidad con un runtime anterior y no sustituye la prueba de iPadOS 16.
 
-Compilación, pruebas, paquetes y aceptación física pendientes al escribir
-este apartado. La versión se entrega como candidata de diagnóstico: no se
-garantiza el resultado en el iPad Pro físico hasta recibir su observación.
+Las cinco validaciones CI pasaron para las fuentes `f5d6337b3d628056ce9135b960497501ba714865`.
+Las pruebas de interfaz completaron 47 comprobaciones y cuatro ciclos reales
+entre segundo plano y primer plano por idioma (español e inglés), tanto en
+el iPhone simulado como en cada orientación inicial del iPad. En el iPad
+se comprobaron además las rotaciones y los registros estructurados.
+Los runtimes exactos, trabajos, hashes y paquetes están en
+[el registro de entrega](evidence/ipad-presentation-diagnostic19-delivery.json).
+
+Se generaron y verificaron los DEB unificados RootHide, Dopamine/rootless y
+rootful, versión `2.0.0~diagnostic19+bundle1`, con Bluetooth diagnostic7 incluido.
+Incluyen el recurso de revisión byte por byte. Pasaron las inspecciones de
+paquete, identidad, procedencia, carga de la biblioteca integrada y disposición
+de archivos. Las pruebas aisladas de dpkg cubren los tres esquemas.
+
+La aceptación física del iPad Pro con iPadOS 16.0 y Dopamine sigue pendiente.
+El simulador de CI no reproduce ese runtime ni verifica las interfaces de radio
+del iPad físico. La versión se entrega como candidata de diagnóstico; no se
+considera resuelto el fallo del tester hasta comprobarla allí.
