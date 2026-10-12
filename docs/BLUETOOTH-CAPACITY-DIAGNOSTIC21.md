@@ -58,4 +58,24 @@ insufficient and zero capacity; total and per-enable duration; stable identity;
 Stop; rejected data; lost enable ACK; cleanup failure; missing setter; fixed
 single-profile route and repetition. It does not emulate physical Bluetooth.
 
-Compilation, package verification and physical tester acceptance are pending.
+Compiled source: `078ce8cc468347fa3874318359d73ed79dd8fc09`. Five CI validations passed:
+
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38272616416)
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38272358943)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38272358866)
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38272358856)
+- [iPad presentation regression](https://github.com/Gokuencinar/NukeWireless/actions/runs/38272619822)
+
+The three unified installers passed core, embedded UI, compatibility, integration
+and layout inspection; isolated Linux dpkg installation/upgrade/removal fixtures
+passed for all three schemes. iPhone and iPad simulator: 47 checks and four
+background cycles per language, with both iPad startup orientations and rotation.
+
+- roothide: SHA-256 `586269aee8065e845adff964bb8b3e4237eba715142a8bf07a8653b2a1cb6bc5`
+- rootless: SHA-256 `b2d17071061a957eed0d23ace25fa660f84e9e8fa2886b51480f036454aabf8d`
+- rootful: SHA-256 `fd89416c63ce3cf0416396ad9173bf0e3ca67c0cc872f4525b670352522062d4`
+
+Physical tester acceptance and external radio reception remain pending. No
+installation or radio operation was performed on a physical iPhone in this
+delivery. See [verification evidence](evidence/bluetooth-capacity-diagnostic21-delivery.json).
