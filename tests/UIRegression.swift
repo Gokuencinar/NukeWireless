@@ -85,8 +85,14 @@ struct RegressionTabs: View {
         }.onAppear {
             guard !started else { return }
             started = true
+            if ProcessInfo.processInfo.arguments.contains("landscape"), #available(iOS 16.0, *) {
+                for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 results.append(checkUI(0))
+                self.recordStartupHierarchy()
                 snapshot("wifi.png")
                 selection = 2
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -142,6 +148,28 @@ struct RegressionTabs: View {
         for window in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }) {
             window.overrideUserInterfaceStyle = dark ? .dark : .light
         }
+    }
+    private func recordStartupHierarchy() {
+        func describe(_ controller: UIViewController, depth: Int) -> [String: Any] {
+            var result: [String: Any] = ["class": String(describing: type(of: controller))]
+            if controller.isViewLoaded {
+                let view = controller.view!
+                result["frame"] = NSStringFromCGRect(view.frame)
+                result["hidden"] = view.isHidden
+                result["alpha"] = view.alpha
+                result["attached"] = view.window != nil
+            }
+            if let split = controller as? UISplitViewController {
+                result["split_display_mode"] = split.displayMode.rawValue
+                result["split_preferred_mode"] = split.preferredDisplayMode.rawValue
+            }
+            if depth < 12 { result["children"] = controller.children.map { describe($0, depth: depth + 1) } }
+            return result
+        }
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
+        let roots = windows.compactMap { $0.rootViewController }.map { describe($0, depth: 0) }
+        writeReport(["roots": roots, "ipad": UIDevice.current.userInterfaceIdiom == .pad,
+                     "window_sizes": windows.map { NSStringFromCGSize($0.bounds.size) }], "startup-hierarchy.json")
     }
     private func captureCatalog(_ platform: Int32) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

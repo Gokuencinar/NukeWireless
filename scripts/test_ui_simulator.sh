@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 minimum_ios="${NW_MIN_IOS:-16.3}"
+device_family="${NW_UI_DEVICE_FAMILY:-iPhone}"
+case "$device_family" in iPhone|iPad) ;; *) echo "Unsupported UI device family" >&2; exit 1 ;; esac
 case "$minimum_ios" in
   15.0|16.3) ;;
   *) echo "Unsupported simulator deployment target: $minimum_ios" >&2; exit 1 ;;
@@ -30,20 +32,21 @@ xcrun --sdk iphonesimulator clang -arch "$arch" "-mios-simulator-version-min=$mi
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios$minimum_ios-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
-python3 - "$out/UIRegression.app/Info.plist" "$minimum_ios" <<'PY'
+python3 - "$out/UIRegression.app/Info.plist" "$minimum_ios" "$device_family" <<'PY'
 import plistlib,sys
 with open(sys.argv[1], 'wb') as f:
     plistlib.dump(dict(CFBundleIdentifier='app.nukewireless.ui-regression', CFBundleName='UIRegression',
         CFBundleExecutable='UIRegression', CFBundlePackageType='APPL', CFBundleVersion='1',
         CFBundleShortVersionString='1', MinimumOSVersion=sys.argv[2], UILaunchScreen={},
-        NukeWirelessUIIntegration='embedded-required-v1',
+        NukeWirelessUIIntegration='embedded-required-v1', UIDeviceFamily=[1,2],
+        UISupportedInterfaceOrientations=['UIInterfaceOrientationPortrait','UIInterfaceOrientationLandscapeLeft','UIInterfaceOrientationLandscapeRight'],
         NSBluetoothAlwaysUsageDescription='Scan nearby BLE devices',
         UIApplicationSceneManifest={'UIApplicationSupportsMultipleScenes': False}), f)
 PY
 python3 scripts/language_catalog.py "$out/UIRegression.app"
 codesign -s - --force "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib"
 codesign -s - --force "$out/UIRegression.app"
-device="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if "iPhone" in x["name"]))')"
+device="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS" in k for x in v if sys.argv[1] in x["name"]))' "$device_family")"
 xcrun simctl boot "$device" || true
 xcrun simctl bootstatus "$device" -b
 python3 - "$out/runtime.json" "$device" "$minimum_ios" <<'PY'
@@ -59,7 +62,7 @@ xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
 for language in en es; do
 rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
-xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language"
+xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}"
 for attempt in $(seq 1 30); do
   if [ -f "$container/Documents/resume-ready-0.json" ]; then break; fi
   sleep 2
@@ -103,6 +106,7 @@ assert result['passed'], result
 PY
 xcrun simctl terminate "$device" app.nukewireless.ui-regression
 cp "$container/Documents/ui-regression.json" "$out/$language-regression.json"
+cp "$container/Documents/startup-hierarchy.json" "$out/$language-startup-hierarchy.json"
 cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
 cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"
