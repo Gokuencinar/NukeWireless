@@ -284,17 +284,29 @@ struct RegressionTabs: View {
         // UIKit may decline a rotation during an unfinished containment change.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
             if rotate, #available(iOS 16.0, *) {
-                for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
-                    for window in scene.windows where window.isKeyWindow {
-                        _ = orientationState(window.rootViewController)
-                    }
-                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { error in
-                        let failure = error as NSError
-                        rotationError = "\(failure.domain):\(failure.code) \(failure.localizedDescription.prefix(600))"
+                requestResumeRotation(landscape, 0)
+            }
+            recordResumeReady(phase, rotate, landscape, result, 0)
+        }
+    }
+    @available(iOS 16.0, *)
+    private func requestResumeRotation(_ landscape: Bool, _ attempt: Int) {
+        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+            for window in scene.windows where window.isKeyWindow { _ = orientationState(window.rootViewController) }
+            // setNeedsUpdate... schedules an update; let UIKit process it before
+            // evaluating geometry. A navigation transition can temporarily lock
+            // the accepted mask to the current orientation despite public masks.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { error in
+                    let failure = error as NSError
+                    rotationError = "\(failure.domain):\(failure.code) \(failure.localizedDescription.prefix(600))"
+                    if failure.domain == "UISceneErrorDomain", failure.code == 101, attempt < 3 {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                            requestResumeRotation(landscape, attempt + 1)
+                        }
                     }
                 }
             }
-            recordResumeReady(phase, rotate, landscape, result, 0)
         }
     }
     private func recordResumeReady(_ phase: Int, _ rotate: Bool, _ landscape: Bool, _ result: Int32, _ attempt: Int) {
@@ -302,7 +314,7 @@ struct RegressionTabs: View {
             .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })
         let size = window?.bounds.size ?? .zero
         let correct = !rotate || ((size.width > size.height) == landscape)
-        if !correct && attempt < 10 {
+        if !correct && attempt < 12 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 recordResumeReady(phase, rotate, landscape, result, attempt + 1)
             }
@@ -312,6 +324,7 @@ struct RegressionTabs: View {
                      "rotation_requested": rotate, "orientation_correct": correct, "geometry_error": rotationError,
                      "window_width": size.width, "window_height": size.height,
                      "orientations": orientationState(window?.rootViewController),
+                     "app_orientation_mask": window.map { UIApplication.shared.supportedInterfaceOrientations(for: $0).rawValue } ?? 0,
                      "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
     }
     private func orientationState(_ root: UIViewController?) -> [[String: Any]] {
@@ -321,7 +334,8 @@ struct RegressionTabs: View {
             if #available(iOS 16.0, *) { controller.setNeedsUpdateOfSupportedInterfaceOrientations() }
             result.append(["class": String(describing: type(of: controller)),
                            "mask": controller.supportedInterfaceOrientations.rawValue,
-                           "attached": controller.viewIfLoaded?.window != nil])
+                           "attached": controller.viewIfLoaded?.window != nil,
+                           "transition_active": controller.transitionCoordinator != nil, "autorotate": controller.shouldAutorotate])
             for child in controller.children { collect(child, depth + 1) }
             collect(controller.presentedViewController, depth + 1)
         }
