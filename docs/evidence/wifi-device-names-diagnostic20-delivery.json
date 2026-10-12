@@ -1,0 +1,179 @@
+{
+  "package_version": "2.0.0~diagnostic20+bundle1",
+  "worker_version": "2.0.0~diagnostic7",
+  "source_commit": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+  "ci": [
+    {
+      "id": 38256266928,
+      "name": "Unified installer packaging",
+      "head_sha": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38256266928",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38256231190,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38256231190",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38256231183,
+      "name": "Development build",
+      "head_sha": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38256231183",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38256270350,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38256270350",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38256272934,
+      "name": "iPad presentation regression",
+      "head_sha": "a66a14094b7f0df52fc198d0d30e70e2e923000b",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38256272934",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic20+bundle1_iphoneos-arm64e.deb",
+      "sha256": "88fc4ca0d5fc991b95444e6c49f63954c14bec1479f0d93fe923a401673e981d"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic20+bundle1_iphoneos-arm64.deb",
+      "sha256": "b0c2432794c6828d5157f57a6432c789dbea9c2bb9215cde4c736df261b1eff5"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic20+bundle1_iphoneos-arm.deb",
+      "sha256": "ca4fcdbe1f4c8f557b923a06265f62c0ad5638a2cb58b2050600715f36c682e1"
+    }
+  ],
+  "checks": [
+    "core-package-tests.txt",
+    "embedded-ui-tests.txt",
+    "compat-package-tests.txt",
+    "package-tests.txt",
+    "install-layout-tests.txt"
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 47,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 47,
+      "real_background_cycles": 4
+    }
+  },
+  "ipad": {
+    "portrait": {
+      "en": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          834,
+          1210
+        ],
+        "recovered_transient_rotation_rejections": 0
+      },
+      "es": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          834,
+          1210
+        ],
+        "recovered_transient_rotation_rejections": 0
+      }
+    },
+    "landscape": {
+      "en": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          1210,
+          834
+        ],
+        "recovered_transient_rotation_rejections": 0
+      },
+      "es": {
+        "passed": true,
+        "checks": 47,
+        "real_background_cycles": 4,
+        "rotation_checked": true,
+        "presentation_diagnostics_valid": true,
+        "initial_bounds": [
+          0,
+          0,
+          1210,
+          834
+        ],
+        "recovered_transient_rotation_rejections": 0
+      }
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_name_discovery": "pending",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "presentation_review": "ipad-presentation-v1",
+  "physical_ipados16_acceptance": "pending",
+  "name_discovery": {
+    "mechanisms": [
+      "Bonjour DNS-SD service resolution",
+      "asynchronous IPv4 PTR lookup"
+    ],
+    "custom_names": "preserved including legacy alias-store precedence",
+    "unit_tests": "passed normalization, malformed PTR, evidence priority, early evidence, MAC reuse, cancellation, bounds and diagnostic privacy",
+    "simulator_integration": "passed native and custom name priority, stale context rejection and live snapshot updates",
+    "physical_acceptance": "pending",
+    "additional_apt_dependencies": [],
+    "reference_repository": "https://github.com/emp0ry/LocalFence",
+    "reference_commit": "d7356ad840b83efb28313e71353e23295e7be23b",
+    "reference_source_vendored": false
+  },
+  "preserved_source_paths": [
+    "src/bluetooth",
+    "src/compat/NWWiFiUnblock.m",
+    "src/NWHotspot.m",
+    "src/NWMainTabs.m"
+  ]
+}

@@ -65,3 +65,26 @@ updates. Package tests check Bonjour declarations for each scheme.
 Build, package and UI results are recorded separately from physical name discovery.
 No additional names on the user's Wi-Fi are confirmed until the new build is tested
 there. Physical iPadOS 16 presentation acceptance remains pending as in diagnostic19.
+
+## Delivery verification
+
+Compiled source: `a66a14094b7f0df52fc198d0d30e70e2e923000b`. Five CI validations passed:
+
+- [Unified installer packaging](https://github.com/Gokuencinar/NukeWireless/actions/runs/38256266928)
+- [iOS 15-18 compatibility candidates](https://github.com/Gokuencinar/NukeWireless/actions/runs/38256231190)
+- [Development build](https://github.com/Gokuencinar/NukeWireless/actions/runs/38256231183)
+- [Bluetooth transport inspector](https://github.com/Gokuencinar/NukeWireless/actions/runs/38256270350)
+- [iPad presentation regression](https://github.com/Gokuencinar/NukeWireless/actions/runs/38256272934)
+
+All three unified installers passed package inspection and isolated Linux dpkg
+install/upgrade/removal fixtures. Simulator: 47 checks and four real background
+cycles per language (English/Spanish); iPad tested both startup orientations
+and rotation. The existing device-actions check includes the new name checks.
+
+- roothide: SHA-256 `88fc4ca0d5fc991b95444e6c49f63954c14bec1479f0d93fe923a401673e981d`
+- rootless: SHA-256 `b0c2432794c6828d5157f57a6432c789dbea9c2bb9215cde4c736df261b1eff5`
+- rootful: SHA-256 `ca4fcdbe1f4c8f557b923a06265f62c0ad5638a2cb58b2050600715f36c682e1`
+
+The installers have not been installed during this delivery. Additional real LAN
+name resolution and physical iPadOS 16 acceptance remain pending. See
+[machine-readable evidence](evidence/wifi-device-names-diagnostic20-delivery.json).
