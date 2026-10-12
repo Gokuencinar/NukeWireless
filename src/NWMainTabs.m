@@ -342,7 +342,7 @@ int NWMainTabsResumePrepare(UITabBarController *tab, NSInteger tag) {
     [tabs selectTag:tag];
     if (tag == 3 && tabs.bluetooth.viewControllers.count == 1) {
         UITableViewController *menu = (UITableViewController *)tabs.bluetooth.topViewController;
-        [menu tableView:menu.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+        [menu tableView:menu.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
     }
     [tab.view layoutIfNeeded];
     resumeTag = tag; resumeRestorations = tabs.foregroundRestorations;

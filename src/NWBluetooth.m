@@ -589,7 +589,7 @@ int NWBluetoothUIRegressionCheck(void) {
             @{@"model": @1, @"name": @"Surface Mouse", @"identity": @"NWLab-23456789"},
             @{@"model": @4, @"name": @"Surface Headphones 2", @"identity": @"NWLab-34567890"}] forKey:@"models"];
         [(UITableViewController *)catalogScreen tableView:((UITableViewController *)catalogScreen).tableView
-            didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2 inSection:0]];
+            didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
         if (navigation.topViewController != catalogScreen || !busy ||
             ![capturedCatalogArguments isEqual:@[@"--le-catalog-test", @"2", @"5,1,4"]] || !labOperation(@"le_catalog_test")) return 46;
         [(UITableViewController *)catalogScreen loadViewIfNeeded];

@@ -286,11 +286,11 @@ struct RegressionTabs: View {
             if rotate, #available(iOS 16.0, *) {
                 for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
                     for window in scene.windows where window.isKeyWindow {
-                        window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                        _ = orientationState(window.rootViewController)
                     }
                     scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { error in
                         let failure = error as NSError
-                        rotationError = "\(failure.domain):\(failure.code)"
+                        rotationError = "\(failure.domain):\(failure.code) \(failure.localizedDescription.prefix(600))"
                     }
                 }
             }
@@ -311,7 +311,22 @@ struct RegressionTabs: View {
         writeReport(["phase": phase, "tag": resumeTags[phase], "prepared": result == 0,
                      "rotation_requested": rotate, "orientation_correct": correct, "geometry_error": rotationError,
                      "window_width": size.width, "window_height": size.height,
+                     "orientations": orientationState(window?.rootViewController),
                      "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
+    }
+    private func orientationState(_ root: UIViewController?) -> [[String: Any]] {
+        var result: [[String: Any]] = []
+        func collect(_ controller: UIViewController?, _ depth: Int) {
+            guard let controller, depth < 8, result.count < 20 else { return }
+            if #available(iOS 16.0, *) { controller.setNeedsUpdateOfSupportedInterfaceOrientations() }
+            result.append(["class": String(describing: type(of: controller)),
+                           "mask": controller.supportedInterfaceOrientations.rawValue,
+                           "attached": controller.viewIfLoaded?.window != nil])
+            for child in controller.children { collect(child, depth + 1) }
+            collect(controller.presentedViewController, depth + 1)
+        }
+        collect(root, 0)
+        return result
     }
     private func writeReport(_ report: [String: Any], _ name: String) {
         let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent(name)
