@@ -1,5 +1,8 @@
 name: iPad presentation investigation
 on:
+  push:
+    branches: [audit-rh25.5]
+    paths: ['.github/workflows/ipad-ui.yml']
   workflow_dispatch:
 permissions:
   contents: read
