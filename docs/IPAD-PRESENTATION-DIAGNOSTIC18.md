@@ -104,3 +104,7 @@ una captura de la jerarquía de ventanas del dispositivo físico.
 
 La compilación con destino iOS 15 no demuestra el funcionamiento en iPadOS
 15/16 ni en otros jailbreaks. La corrección física permanece pendiente.
+
+La [investigación de presentación en iPadOS](IPAD-RENDERING-INVESTIGATION.md)
+contrasta el uso nativo de NavigationView, la herencia de traits antes y después
+de iOS 17 y los puntos de observación pendientes en la integración.

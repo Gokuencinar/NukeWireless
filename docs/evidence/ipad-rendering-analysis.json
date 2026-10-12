@@ -1,0 +1,51 @@
+{
+  "reviewed_on": "2026-10-12",
+  "native_baseline_executable_sha256": "ea2cf47a8d473d83bbb029e211ec78b85bdb75b863f771c0b49bee4c17807d11",
+  "native_undefined_navigation_imports": [
+    "_$s7SwiftUI14NavigationViewV7contentACyxGxyXE_tcfC",
+    "_$s7SwiftUI14NavigationViewVMn",
+    "_$s7SwiftUI14NavigationViewVyxGAA0D0AAMc"
+  ],
+  "native_navigation_style_proven": false,
+  "fixture_ci": {
+    "id": 38236583154,
+    "head_sha": "97ba3afa11d2c192913495557d2432855f53f187",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38236583154"
+  },
+  "hierarchies": {
+    "native": {
+      "artifact": "en-startup-hierarchy.json",
+      "sha256": "91e9c684bf164bb51ffbdef4f76d28255f6892da562e513b452f8de182444f60",
+      "window_sizes": [
+        "(1210.0, 834.0)"
+      ],
+      "split_children_count": 1,
+      "split_child_frames": [
+        "(0.0, 0.0, 1210.0, 834.0)"
+      ],
+      "empty_detail_placeholder_observed": false
+    },
+    "legacy-traits": {
+      "artifact": "startup-hierarchy.json",
+      "sha256": "612765adf4351d3bba98fae351ff0214c2889fb25c01e4492f502b0fbe597e13",
+      "window_sizes": [
+        "(1210.0, 834.0)"
+      ],
+      "split_children_count": 2,
+      "split_child_frames": [
+        "(-100.0, 0.0, 420.0, 834.0)",
+        "(320.0, 0.0, 890.0, 834.0)"
+      ],
+      "empty_detail_placeholder_observed": true
+    }
+  },
+  "physical_ipados16_cause_confirmed": false,
+  "production_behavior_modified": false,
+  "limits": [
+    "Undefined NavigationView imports establish native use, not the style or layout of each native screen.",
+    "Existing artifacts execute a SwiftUI fixture on iPadOS 18.5, not the original app on iPadOS 16.",
+    "Private class names are observations only; no private selectors or class-name hooks are proposed."
+  ]
+}
