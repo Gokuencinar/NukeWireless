@@ -241,9 +241,12 @@ static int recover(void) {
     // advertising handles. Do not reset the initialized controller afterwards.
     // Worker death/EOF or uncertain cleanup still has independent recovery.
     if (action == NWBTRecoveryRetireAndRestore) control("bootout", service, NULL);
-    BOOL restored = action == NWBTRecoveryObserve ? running() : restoreService();
+    BOOL preserved = action == NWBTRecoveryObserve && running();
+    BOOL restored = preserved || restoreService();
     close(3); close(4);
-    return restored ? 0 : 1;
+    // A service that disappeared after the parent's snapshot still gets
+    // recovered. Exit 2 distinguishes this repair from true preservation.
+    return !restored ? 1 : action == NWBTRecoveryObserve && !preserved ? 2 : 0;
 }
 
 static pid_t startRecovery(const char *ownPath, int lock, int *writer) {
@@ -398,9 +401,15 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
                 usleep(50000);
             }
             if (armed && report) {
-                BOOL restored = exited && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+                int recoveryStatus = exited && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+                BOOL restored = recoveryStatus == 0 || (uart && recoveryStatus == 2);
                 report[@"service_restored"] = @(restored);
-                if (uart) report[@"service_preserved"] = @(preserveService && restored);
+                if (uart) {
+                    NSString *state = nil;
+                    BOOL samePID = preserveService && recoveryStatus == 0 && !control("print", service, &state) &&
+                        [state containsString:@"\n\tstate = running\n"] && NWBTServicePID(state.UTF8String) == initialServicePID;
+                    report[@"service_preserved"] = @(samePID);
+                }
                 if (restored) {
                     NSUInteger attempts = 0; double started = uptime();
                     NSDictionary *readiness = waitForInterface(YES, &attempts);
