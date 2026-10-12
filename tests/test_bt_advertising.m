@@ -87,7 +87,7 @@ static void clean(NSDictionary *report) {
     assert(NWBTUARTCanPreserveService(report));
 }
 int main(void) { @autoreleasepool {
-    NSArray *models = @[@0, @1, @2, @3, @4, @6]; // AirPods 4 (index 5) has no verified profile.
+    NSArray<NSNumber *> *models = @[@0, @1, @2, @3, @4, @6]; // AirPods 4 (index 5) has no verified profile.
     reset(); NSDictionary *report = NWBTAdvertiseCatalogLab(0, @[@0]);
     assert(!report[@"error"] && peer.enables == 1 && !countOpcode(0x203b)); clean(report);
     reset(); report = NWBTAdvertiseCatalogLab(0, models);
