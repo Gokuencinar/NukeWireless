@@ -146,6 +146,13 @@ int NWPresentationDiagnosticsUIRegressionCheck(void) {
         if ([window[@"tabs"][@"found"] boolValue] && [window[@"tabs"][@"presentation_items"] integerValue] == 4) found = YES;
     }
     if (!found) return 113;
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        BOOL landscape = [NSProcessInfo.processInfo.arguments containsObject:@"landscape"];
+        for (NSDictionary *window in snapshot[@"windows"]) if ([window[@"key"] boolValue]) {
+            NSArray *bounds = window[@"bounds"];
+            if (([bounds[2] doubleValue] > [bounds[3] doubleValue]) != landscape) return 117;
+        }
+    }
     BOOL reviewFound = NO;
     for (NSDictionary *event in NWDiagnosticSnapshot()[@"events"])
         if ([event[@"test"] isEqual:@"ui_review"] && [event[@"details"][@"review_id"] isEqual:@"ipad-presentation-v1"]) reviewFound = YES;

@@ -93,9 +93,9 @@ struct RegressionTabs: View {
         }.onAppear {
             guard !started else { return }
             started = true
-            if ProcessInfo.processInfo.arguments.contains("landscape"), #available(iOS 16.0, *) {
+            if UIDevice.current.userInterfaceIdiom == .pad, #available(iOS 16.0, *) {
                 for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
-                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+                    scene.requestGeometryUpdate(.iOS(interfaceOrientations: ProcessInfo.processInfo.arguments.contains("landscape") ? .landscapeRight : .portrait))
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
