@@ -38,6 +38,8 @@ func presentSingleEmission() -> Int32
 func checkBLEUI() -> Int32
 @_silgen_name("NWMainTabsUIRegressionUseLegacyTraits")
 func useLegacyPadTraits()
+@_silgen_name("NWPresentationDiagnosticsUIRegressionCheck")
+func checkPresentationDiagnostics() -> Int32
 
 @_silgen_name("NWUIRegressionCheck")
 func checkUI(_ phase: Int32) -> Int32
@@ -97,6 +99,7 @@ struct RegressionTabs: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 results.append(checkUI(0))
+                results.append(checkPresentationDiagnostics())
                 self.recordStartupHierarchy()
                 snapshot("wifi.png")
                 selection = 2
@@ -143,7 +146,7 @@ struct RegressionTabs: View {
                 if phase < 3 { prepareResume(phase + 1) }
                 else {
                     resumePhase = -1
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 46,
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 47,
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
@@ -157,12 +160,17 @@ struct RegressionTabs: View {
     private func recordStartupHierarchy() {
         func describe(_ controller: UIViewController, depth: Int) -> [String: Any] {
             var result: [String: Any] = ["class": String(describing: type(of: controller))]
+            result["horizontal_size_class"] = controller.traitCollection.horizontalSizeClass.rawValue
+            if let parent = controller.parent, let traits = parent.overrideTraitCollection(forChild: controller) {
+                result["parent_override_horizontal_size_class"] = traits.horizontalSizeClass.rawValue
+            }
             if controller.isViewLoaded {
                 let view = controller.view!
                 result["frame"] = String(describing: view.frame)
                 result["hidden"] = view.isHidden
                 result["alpha"] = view.alpha
                 result["attached"] = view.window != nil
+                result["view_horizontal_size_class"] = view.traitCollection.horizontalSizeClass.rawValue
             }
             if let split = controller as? UISplitViewController {
                 result["split_display_mode"] = split.displayMode.rawValue
@@ -202,7 +210,7 @@ struct RegressionTabs: View {
                 setDark(true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                     snapshot("catalog-dark.png")
-                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 20], "ui-initial.json")
+                    writeReport(["results": results, "passed": results.allSatisfy { $0 == 0 } && results.count == 21], "ui-initial.json")
                     guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
                         .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else { return }
                     root.dismiss(animated: false) {
@@ -268,8 +276,19 @@ struct RegressionTabs: View {
         setDark(phase < 2)
         let result = prepareResumeTest(resumeTags[phase])
         results.append(result)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        let rotate = UIDevice.current.userInterfaceIdiom == .pad && ProcessInfo.processInfo.arguments.contains("rotate")
+        let landscape = phase % 2 == 1
+        if rotate, #available(iOS 16.0, *) {
+            for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait))
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })
+            let size = window?.bounds.size ?? .zero
             writeReport(["phase": phase, "tag": resumeTags[phase], "prepared": result == 0,
+                         "rotation_requested": rotate, "orientation_correct": !rotate || ((size.width > size.height) == landscape),
                          "pid": ProcessInfo.processInfo.processIdentifier], "resume-ready-\(phase).json")
         }
     }

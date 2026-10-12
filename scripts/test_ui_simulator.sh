@@ -28,7 +28,7 @@ xcrun --sdk iphonesimulator clang -arch "$arch" "-mios-simulator-version-min=$mi
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios$minimum_ios-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
@@ -62,7 +62,7 @@ xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
 for language in en es; do
 rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
-xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}" --traits "${NW_UI_TRAITS:-native}"
+xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}" --traits "${NW_UI_TRAITS:-native}" --rotation "${NW_UI_ROTATION:-fixed}"
 for attempt in $(seq 1 30); do
   if [ -f "$container/Documents/resume-ready-0.json" ]; then break; fi
   sleep 2
@@ -93,6 +93,7 @@ with open(sys.argv[2]) as f: after=json.load(f)
 print('Real background/foreground regression:', before, after)
 assert before['prepared'] and after['result'] == 0 and after['background_seen']
 assert before['pid'] == after['pid'] and before['phase'] == after['phase']
+assert before['orientation_correct'], before
 PY
   cp "$container/Documents/resume-ready-$phase.json" "$out/$language-resume-ready-$phase.json"
   cp "$container/Documents/resume-done-$phase.json" "$out/$language-resume-done-$phase.json"
@@ -107,6 +108,7 @@ PY
 xcrun simctl terminate "$device" app.nukewireless.ui-regression
 cp "$container/Documents/ui-regression.json" "$out/$language-regression.json"
 cp "$container/Documents/startup-hierarchy.json" "$out/$language-startup-hierarchy.json"
+cp "$container/Documents/presentation-diagnostics.json" "$out/$language-presentation-diagnostics.json"
 cp "$container/Documents/wifi.png" "$out/$language-wifi.png"
 cp "$container/Documents/info.png" "$out/$language-info.png"
 cp "$container/Documents/bluetooth.png" "$out/$language-bluetooth.png"

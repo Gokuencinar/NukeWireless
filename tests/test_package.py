@@ -49,7 +49,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless Dev')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
-        self.assertEqual(info['CFBundleVersion'], '20018')
+        self.assertEqual(info['CFBundleVersion'], '20019')
         self.assertTrue(info['UIFileSharingEnabled'])
         self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
         self.assertEqual(info['NukeWirelessWorkerVersion'], package.WORKER_VERSION)
@@ -57,6 +57,9 @@ class PackageTests(unittest.TestCase):
         self.assertTrue(info['NSBluetoothAlwaysUsageDescription'])
         self.assertFalse(any('LocationUsage' in key for key in info))
         bundle = package.APP+'NukeWirelessResources.bundle/'
+        review = self.after[bundle+'Diagnostics/iPadPresentationReview.json'][1]
+        self.assertEqual(review, (ROOT/'resources/Diagnostics/iPadPresentationReview.json').read_bytes())
+        self.assertEqual(json.loads(review)['review_id'], 'ipad-presentation-v1')
         vendors = plistlib.loads(self.after[bundle+'oui_vendors.plist'][1])
         self.assertTrue(self.after[bundle+'CreditsAvatar.png'][1].startswith(b'\x89PNG\r\n\x1a\n'))
         for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:

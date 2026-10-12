@@ -13,6 +13,7 @@
 #import "NWBuild.h"
 #import "NWLegacyABI.h"
 #import "NWMainTabs.h"
+#import "NWPresentationDiagnostics.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <mach-o/dyld.h>
@@ -459,8 +460,7 @@ static void normalizeNavigationTitles(UIView *view) {
     for (UIView *child in view.subviews) normalizeNavigationTitles(child);
 }
 static UITabBarController *tabForController(UIViewController *controller) {
-    if ([controller isKindOfClass:UITabBarController.class]) return (UITabBarController *)controller;
-    return controller.tabBarController;
+    return NWFindMainTabs(controller);
 }
 static void prepareInfoTab(UITabBarController *tab) {
     if (!tab || installingUI || NWBluetoothTabSelected(tab) || tab.selectedIndex != 2 || !tab.selectedViewController) return;
@@ -646,8 +646,9 @@ static void updateWiFi(void) {
 static void installUI(UIViewController *controller) {
     UITabBarController *tab = tabForController(controller);
     if (!tab || installingUI) return;
-    NWPrepareMainTabs(tab); prepareInfoTab(tab); prepareHotspotTab(tab);
-    activeTab = tab; installingUI = YES;
+    installingUI = YES;
+    NWPrepareMainTabs(tab);
+    activeTab = tab;
     if (!objc_getAssociatedObject(tab.tabBar, &themedTabKey)) {
         UITabBarAppearance *appearance = [UITabBarAppearance new];
         [appearance configureWithDefaultBackground];
@@ -658,6 +659,7 @@ static void installUI(UIViewController *controller) {
         objc_setAssociatedObject(tab.tabBar, &themedTabKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     installingUI = NO;
+    prepareInfoTab(tab); prepareHotspotTab(tab);
     updateWiFi();
 }
 static void applyAppearance(void) {
@@ -696,7 +698,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic18 embedded UI loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic19 embedded UI loaded");
     // Both are mandatory app dependencies. Initialize our adapter exactly once
     // before wrapping its methods, regardless of dyld constructor order.
     void (*initializeAdapter)(void) = dlsym(RTLD_DEFAULT, "NWBootstrapInitialize");
@@ -730,6 +732,7 @@ __attribute__((constructor)) static void installExtension(void) {
                 installUI(window.rootViewController);
             }
         }
+        NWPresentationDiagnosticsInstall(^(UIViewController *root) { installUI(root); });
     });
 }
 

@@ -39,10 +39,27 @@ static void legacyPadTraits(UITabBarController *tab) {
     UITraitCollection *traits = [UITraitCollection traitCollectionWithHorizontalSizeClass:UIUserInterfaceSizeClassCompact];
     if (tab.parentViewController) {
         [tab.parentViewController setOverrideTraitCollection:traits forChildViewController:tab];
-    } else {
-        for (UIViewController *host in tab.viewControllers)
-            [tab setOverrideTraitCollection:traits forChildViewController:host];
     }
+    // Each original SwiftUI host is a separate containment boundary before
+    // iOS 17. Apply the content policy explicitly without replacing its host.
+    for (UIViewController *host in tab.viewControllers)
+        [tab setOverrideTraitCollection:traits forChildViewController:host];
+}
+static UITabBarController *findTabs(UIViewController *controller, NSUInteger depth, NSUInteger *remaining) {
+    if (!controller || depth > 12 || !*remaining) return nil;
+    --*remaining;
+    UITabBarController *tab = [controller isKindOfClass:UITabBarController.class] ?
+        (UITabBarController *)controller : controller.tabBarController;
+    if (tab.viewControllers.count == 3) return tab;
+    for (UIViewController *child in controller.children) {
+        UITabBarController *found = findTabs(child, depth + 1, remaining);
+        if (found) return found;
+    }
+    return nil;
+}
+UITabBarController *NWFindMainTabs(UIViewController *controller) {
+    NSUInteger remaining = 64;
+    return findTabs(controller, 0, &remaining);
 }
 NSString *const NWMainTabReselected = @"NWMainTabReselected";
 @implementation NWMainTabs
@@ -198,6 +215,16 @@ NSString *const NWMainTabReselected = @"NWMainTabReselected";
 @end
 BOOL NWBluetoothTabSelected(UITabBarController *tab) {
     return [(NWMainTabs *)objc_getAssociatedObject(tab, &mainTabsKey) bluetoothSelected];
+}
+NSDictionary *NWMainTabsPresentationSnapshot(UITabBarController *tab) {
+    if (!tab) return @{@"found": @NO};
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    BOOL attached = tabs.bar.window != nil;
+    return @{@"found": @YES, @"native_hosts": @(tab.viewControllers.count),
+        @"selected_index": @(tab.selectedIndex), @"bluetooth_selected": @(tabs.bluetoothSelected),
+        @"presentation_items": @(tabs.bar.items.count), @"presentation_attached": @(attached),
+        @"presentation_hidden": @(tabs.bar.hidden), @"native_bar_attached": @(tab.tabBar.window != nil),
+        @"native_bar_hidden": @(tab.tabBar.hidden), @"horizontal_size_class": @(tab.traitCollection.horizontalSizeClass)};
 }
 void NWPrepareMainTabs(UITabBarController *tab) {
     if (!tab || tab.viewControllers.count != 3) return;

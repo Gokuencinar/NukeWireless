@@ -8,6 +8,12 @@ on:
       - 'tests/UIRegression.swift'
       - 'scripts/test_ui_simulator.sh'
   workflow_dispatch:
+    inputs:
+      traits:
+        description: 'native runs the supported runtime path; legacy-traits is an old-API experiment on the installed runtime'
+        type: choice
+        default: native
+        options: [native, legacy-traits]
 permissions:
   contents: read
 jobs:
@@ -16,18 +22,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [diagnostic18]
-        traits: [native, legacy-traits]
+        source: [diagnostic19]
+        traits: ["${{ inputs.traits || 'native' }}"]
+        orientation: [portrait, landscape]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run iPad navigation and background checks in landscape
-        run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=landscape NW_UI_TRAITS=${{ matrix.traits }} bash scripts/test_ui_simulator.sh
+      - name: Run iPad navigation, rotation and background checks
+        run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=${{ matrix.orientation }} NW_UI_ROTATION=rotate NW_UI_TRAITS=${{ matrix.traits }} bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ipad-ui-${{ matrix.source }}-${{ matrix.traits }}
+          name: ipad-ui-${{ matrix.source }}-${{ matrix.traits }}-${{ matrix.orientation }}
           path: |
             build/ui/*.png
             build/ui/*.json

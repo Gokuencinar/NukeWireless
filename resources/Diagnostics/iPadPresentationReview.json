@@ -1,0 +1,15 @@
+{
+  "review_id": "ipad-presentation-v1",
+  "review_date": "2026-10-12",
+  "native_app": "SwiftUI NavigationView imports verified in pinned executable",
+  "traits_before_ios17": "View controllers inherit traits from their parent view controller",
+  "traits_from_ios17": "View controllers inherit traits through their view's superview",
+  "fixture_observation": "One navigation child with modern traits; two with an empty detail when the old API is forced on iPadOS 18.5",
+  "physical_ipados16_cause_confirmed": false,
+  "instrumentation": "ui_presentation events in the existing diagnostic JSON",
+  "sources": [
+    "https://developer.apple.com/documentation/swiftui/userinterfacesizeclass",
+    "https://developer.apple.com/videos/play/wwdc2023/10057/",
+    "https://developer.apple.com/videos/play/wwdc2023/10055/"
+  ]
+}

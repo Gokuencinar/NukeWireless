@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic19: presentación y diagnóstico automático de iPad.**
+Encuentra las pestañas contenidas en la raíz SwiftUI, protege la instalación
+durante la adaptación y aplica la política compacta a los hosts de iOS 15/16.
+Incluye la revisión de iPad y registros acotados de ventanas, columnas, tamaños
+y barras, disponibles en el diario incluso si falla la interfaz.
+Conserva Wi-Fi y Bluetooth diagnostic7. Compilación y aceptación física pendientes.
+Véase [cambios y límites](docs/IPAD-PRESENTATION-DIAGNOSTIC19.md).
+
 **2.0.0~diagnostic18: barra de navegación sin anchors a una barra nativa separada.**
 Parte de diagnostic17; conserva Bluetooth diagnostic7 y el desbloqueo Wi-Fi.
 La comparación de diagnostic10 y diagnostic17 en iPad simulado reprodujo una
