@@ -19,7 +19,7 @@ static void describeController(UIViewController *controller, NSInteger parent, N
     NSString *name = NSStringFromClass(controller.class);
     NSMutableDictionary *node = [@{@"id": @(identifier), @"parent": @(parent),
         @"class": [name substringToIndex:MIN(name.length, (NSUInteger)96)],
-        @"loaded": @(controller.isViewLoaded), @"children": @(controller.children.count),
+        @"loaded": @(controller.isViewLoaded), @"children": @(controller.childViewControllers.count),
         @"horizontal_size_class": @(controller.traitCollection.horizontalSizeClass)} mutableCopy];
     UITraitCollection *override = [controller.parentViewController overrideTraitCollectionForChildViewController:controller];
     if (override) node[@"parent_override_horizontal_size_class"] = @(override.horizontalSizeClass);
@@ -37,7 +37,7 @@ static void describeController(UIViewController *controller, NSInteger parent, N
         node[@"split_preferred_mode"] = @(split.preferredDisplayMode);
     }
     [nodes addObject:node];
-    NSMutableArray *children = [controller.children mutableCopy];
+    NSMutableArray *children = [controller.childViewControllers mutableCopy];
     UIViewController *selected = nil;
     if ([controller isKindOfClass:UITabBarController.class]) selected = ((UITabBarController *)controller).selectedViewController;
     if ([controller isKindOfClass:UINavigationController.class]) selected = ((UINavigationController *)controller).topViewController;

@@ -51,7 +51,7 @@ static UITabBarController *findTabs(UIViewController *controller, NSUInteger dep
     UITabBarController *tab = [controller isKindOfClass:UITabBarController.class] ?
         (UITabBarController *)controller : controller.tabBarController;
     if (tab.viewControllers.count == 3) return tab;
-    for (UIViewController *child in controller.children) {
+    for (UIViewController *child in controller.childViewControllers) {
         UITabBarController *found = findTabs(child, depth + 1, remaining);
         if (found) return found;
     }
