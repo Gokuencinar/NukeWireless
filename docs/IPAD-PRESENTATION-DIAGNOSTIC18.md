@@ -49,5 +49,19 @@ al volver de segundo plano. La fixture de iPad comparte las pruebas de
 navegación, catálogo, menús, aspecto oscuro y cuatro ciclos reales de segundo
 plano por idioma con la de iPhone.
 
-Compilación, pruebas y paquetes de diagnostic18 pendientes al escribir este
-apartado. La aceptación del iPad físico permanece pendiente.
+Las cinco validaciones CI pasaron para `cee5d77f3946184795a46cc35a7ded8e824d0456`: compilación principal,
+candidatos con destino iOS 15, trabajador Bluetooth, migración del instalador
+y presentación en iPad horizontal. Las fixtures iPhone e iPad completaron
+46 comprobaciones y cuatro ciclos reales de segundo plano por idioma
+(español e inglés). Se revisaron las capturas de Wi-Fi, Bluetooth, catálogo
+oscuro y retorno a Información: una sola barra inferior, títulos completos
+y contenido visible. El runtime de iPad fue iPadOS 18.5; no se ejecutó
+una prueba de rotación durante esta regresión.
+
+Los DEB completos RootHide, rootless y rootful incluyen Bluetooth diagnostic7.
+Pasaron integración, procedencia, firma, dependencias y rutas; el CI ejecutó
+las pruebas dpkg/Linux y la revisión local cubrió los payloads finales.
+Hashes, trabajos y resultados: [verificación](evidence/diagnostic18-verification.json).
+
+La aceptación del iPad físico permanece pendiente. La compilación con destino
+iOS 15 no demuestra el funcionamiento en iPadOS 15/16 ni en otros jailbreaks.

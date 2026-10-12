@@ -9,7 +9,10 @@ Parte de diagnostic17; conserva Bluetooth diagnostic7 y el desbloqueo Wi-Fi.
 La comparación de diagnostic10 y diagnostic17 en iPad simulado reprodujo una
 excepción de Auto Layout en `NWPrepareMainTabs` durante el arranque. La barra
 visible se ancla ahora a su padre estable. Añade regresión de iPad horizontal
-y de barra nativa separada. Compilación y aceptación física pendientes.
+y de barra nativa separada. Las cinco validaciones CI y los DEB completos
+RootHide/rootless/rootful pasaron; iPhone e iPad simulado completaron 46
+comprobaciones y cuatro ciclos de segundo plano por idioma. El iPad usa una
+sola columna y barra inferior. La aceptación del iPad físico sigue pendiente.
 Véase [investigación y cambio](docs/IPAD-PRESENTATION-DIAGNOSTIC18.md).
 
 **2.0.0~diagnostic17: sesión UART sin retirar bluetoothd.**

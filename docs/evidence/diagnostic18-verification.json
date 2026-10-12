@@ -1,0 +1,163 @@
+{
+  "package_version": "2.0.0~diagnostic18+bundle1",
+  "worker_version": "2.0.0~diagnostic7",
+  "source_commit": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+  "ci": [
+    {
+      "id": 38197463495,
+      "name": "Unified installer packaging",
+      "head_sha": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38197463495",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38197446810,
+      "name": "iOS 15-18 compatibility candidates",
+      "head_sha": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38197446810",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38197446788,
+      "name": "Development build",
+      "head_sha": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38197446788",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38197465160,
+      "name": "Bluetooth transport inspector",
+      "head_sha": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38197465160",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 38197446891,
+      "name": "iPad presentation regression",
+      "head_sha": "cee5d77f3946184795a46cc35a7ded8e824d0456",
+      "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38197446891",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "variants": [
+    {
+      "scheme": "roothide",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic18+bundle1_iphoneos-arm64e.deb",
+      "sha256": "a1b8a24dd982e07e6314c8c3e17033523b66b36a62e6770b674bc8f8deeeb13c"
+    },
+    {
+      "scheme": "rootless",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic18+bundle1_iphoneos-arm64.deb",
+      "sha256": "d0731b304707a92025e3a451eee7cd58858f729f740f58360bc6f68e16da7115"
+    },
+    {
+      "scheme": "rootful",
+      "filename": "com.gokuencinar.nukewireless_2.0.0~diagnostic18+bundle1_iphoneos-arm.deb",
+      "sha256": "a264059705b04091935596ab6f1596ae60c7aed627f6ce72f0fb2425515263df"
+    }
+  ],
+  "ui": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "ipad": {
+    "en": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    },
+    "es": {
+      "passed": true,
+      "checks": 46,
+      "real_background_cycles": 4
+    }
+  },
+  "installed_layout": {
+    "app": "Applications/NukeWireless.app/",
+    "executable": "NukeWireless",
+    "helpers": "usr/libexec/nukewireless/"
+  },
+  "legacy_installed_paths": false,
+  "linux_dpkg_old_split_and_unified_layout_upgrade_removal": "passed_all_three_schemes",
+  "ui_integration": "embedded-required-v1",
+  "physical_installation": "pending",
+  "physical_functional_acceptance": "pending",
+  "release_published": false,
+  "catalog_rendering": "cg-bitmap-original-v1",
+  "physical_crash_fix_confirmed": false,
+  "diagnostics": {
+    "important_events_limit": 32,
+    "recent_events_limit": 64,
+    "per_peer_process_results": true,
+    "stderr_raw_output_exported": false,
+    "external_connectivity_verified": false,
+    "xr_wifi_block_fix_confirmed": false
+  },
+  "uart": {
+    "implementation": "experimental-h4",
+    "admitted_machine": "iPhone10,2",
+    "admitted_build": "20H240",
+    "physical_uart_test": "pending",
+    "configuration_policy": "h4-stream-effective-v2",
+    "prior_failure_stage": "le_capabilities_hci_completion_timeout",
+    "service_strategy": "uart-preserve-v1",
+    "wake_ownership": "btwake_fd_session_v1",
+    "physical_uart_advertising_confirmed": false
+  },
+  "ipad_presentation": {
+    "baseline_reproduction_run": 38196065043,
+    "baseline_startup_exception_reproduced": true,
+    "baseline_source_versions": [
+      "diagnostic10",
+      "diagnostic17"
+    ],
+    "corrected_startup_and_navigation": "passed_simulator",
+    "runtime": {
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+      "device": "iPad Pro 11-inch (M4)",
+      "deployment_target": "15.0",
+      "physical_device": false
+    },
+    "orientation": "landscape",
+    "native_bar_detached_case": "passed",
+    "bottom_bar_receives_events_after_background": "passed",
+    "compact_presentation_after_background": "passed",
+    "visual_review": [
+      {
+        "file": "en-wifi.png",
+        "sha256": "66b326f7bdcbf4c89c5ce1c9b40bec6a0cce4d473dfec4d050fe4f3d79e25bfe"
+      },
+      {
+        "file": "en-bluetooth.png",
+        "sha256": "10a7fbb08fd44b1e63323165bb2922a476907e172dad7f68ee17c84480c4534b"
+      },
+      {
+        "file": "es-catalog-dark.png",
+        "sha256": "59f33d335ca348bb4ebd6675ba7b9f84477f4ef0228905666dc6640852d97c1e"
+      },
+      {
+        "file": "en-resume-3.png",
+        "sha256": "0f1ab0e08c98bc75898487982432c4240702b1865b603947218f477ebc4571d8"
+      }
+    ],
+    "physical_tester_acceptance": "pending",
+    "physical_ipados16_compatibility_confirmed": false
+  },
+  "unchanged_from_diagnostic17": [
+    "src/bluetooth",
+    "src/compat"
+  ]
+}
