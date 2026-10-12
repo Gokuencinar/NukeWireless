@@ -26,7 +26,7 @@ clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_DIAGNOSTIC_TESTING -framewo
 build/audit/test_task_diagnostics
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/compat/NWWiFiUnblock.m tests/test_wifi_unblock.m -o build/audit/test_wifi_unblock
 build/audit/test_wifi_unblock
-clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_NAME_TESTING -framework Foundation -ldns_sd src/NWDeviceNames.m tests/test_device_names.m -o build/audit/test_device_names
+clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_NAME_TESTING -framework Foundation src/NWDeviceNames.m tests/test_device_names.m -o build/audit/test_device_names
 build/audit/test_device_names
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -isysroot "$sdk" \
@@ -36,7 +36,7 @@ build/audit/test_hotspot_filter
 xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -fPIC -O2 -dynamiclib \
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration -ldns_sd \
+  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
   src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib

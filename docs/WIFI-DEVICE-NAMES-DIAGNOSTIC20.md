@@ -34,7 +34,8 @@ memory, not a new persistent history. Old saved names and user aliases are retai
 
 The obsolete adapter lookup queue is removed; its block/unblock implementation is
 unchanged. All installers declare `NSBonjourServices` and a Local Network usage
-description. The system `libdns_sd` is linked; no additional APT dependency is added.
+description. DNS-SD uses the system library already linked by the Apple toolchain; no
+additional APT dependency is added.
 If prompted, local network access must be allowed. Routers and devices that do not
 publish names, or isolate clients, can still yield fallback labels.
 
