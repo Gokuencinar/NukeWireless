@@ -1,0 +1,123 @@
+{
+  "ci": {
+    "id": 38196065043,
+    "head_sha": "8cabbede83238bdafe5f692918fe04788885948d",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38196065043"
+  },
+  "variants": [
+    {
+      "sources": "diagnostic10",
+      "runtime": {
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "device": "iPad Pro 11-inch (M4)",
+        "deployment_target": "15.0",
+        "physical_device": false
+      },
+      "result": "startup_exception_before_initial_regression",
+      "reports": [
+        {
+          "sha256": "adc8b6a5c9cae9ad9e1b52a8cba5699a41bb0bafd320694cbfacee97551255b8",
+          "exception": {
+            "codes": "0x0000000000000000, 0x0000000000000000",
+            "rawCodes": [
+              0,
+              0
+            ],
+            "type": "EXC_CRASH",
+            "signal": "SIGABRT"
+          },
+          "backtrace": [
+            "__exceptionPreprocess",
+            "objc_exception_throw",
+            "-[NSLayoutConstraint setActive:]",
+            "+[NSLayoutConstraint _addOrRemoveConstraints:activate:]",
+            "NWPrepareMainTabs",
+            "installUI",
+            "_dispatch_call_block_and_release"
+          ]
+        },
+        {
+          "sha256": "923667f73804e85310b26b2f8c3af984c36c9b1472ea222074d00537d2bbcee7",
+          "exception": {
+            "codes": "0x0000000000000000, 0x0000000000000000",
+            "rawCodes": [
+              0,
+              0
+            ],
+            "type": "EXC_CRASH",
+            "signal": "SIGABRT"
+          },
+          "backtrace": [
+            "__exceptionPreprocess",
+            "objc_exception_throw",
+            "-[NSLayoutConstraint setActive:]",
+            "+[NSLayoutConstraint _addOrRemoveConstraints:activate:]",
+            "NWPrepareMainTabs",
+            "installUI",
+            "_dispatch_call_block_and_release"
+          ]
+        }
+      ]
+    },
+    {
+      "sources": "diagnostic17",
+      "runtime": {
+        "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+        "device": "iPad Pro 11-inch (M4)",
+        "deployment_target": "15.0",
+        "physical_device": false
+      },
+      "result": "startup_exception_before_initial_regression",
+      "reports": [
+        {
+          "sha256": "73ec744a453d957587d48e727f3f332db735ee3af7a01b44880f63acd33f2184",
+          "exception": {
+            "codes": "0x0000000000000000, 0x0000000000000000",
+            "rawCodes": [
+              0,
+              0
+            ],
+            "type": "EXC_CRASH",
+            "signal": "SIGABRT"
+          },
+          "backtrace": [
+            "__exceptionPreprocess",
+            "objc_exception_throw",
+            "-[NSLayoutConstraint setActive:]",
+            "+[NSLayoutConstraint _addOrRemoveConstraints:activate:]",
+            "NWPrepareMainTabs",
+            "installUI",
+            "_dispatch_call_block_and_release"
+          ]
+        },
+        {
+          "sha256": "9604768bc2df7918af057090eb83a0262ed13d93b76e1122c5f1a120074dfbe5",
+          "exception": {
+            "codes": "0x0000000000000000, 0x0000000000000000",
+            "rawCodes": [
+              0,
+              0
+            ],
+            "type": "EXC_CRASH",
+            "signal": "SIGABRT"
+          },
+          "backtrace": [
+            "__exceptionPreprocess",
+            "objc_exception_throw",
+            "-[NSLayoutConstraint setActive:]",
+            "+[NSLayoutConstraint _addOrRemoveConstraints:activate:]",
+            "NWPrepareMainTabs",
+            "installUI",
+            "_dispatch_call_block_and_release"
+          ]
+        }
+      ]
+    }
+  ],
+  "physical_tester_build": "diagnostic10 or earlier, not confirmed",
+  "physical_tester_bootstrap": "Dopamine, user report",
+  "physical_cause_confirmed": false,
+  "production_radio_changes": false
+}

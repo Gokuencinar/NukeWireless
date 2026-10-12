@@ -4,6 +4,14 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic18: barra de navegación sin anchors a una barra nativa separada.**
+Parte de diagnostic17; conserva Bluetooth diagnostic7 y el desbloqueo Wi-Fi.
+La comparación de diagnostic10 y diagnostic17 en iPad simulado reprodujo una
+excepción de Auto Layout en `NWPrepareMainTabs` durante el arranque. La barra
+visible se ancla ahora a su padre estable. Añade regresión de iPad horizontal
+y de barra nativa separada. Compilación y aceptación física pendientes.
+Véase [investigación y cambio](docs/IPAD-PRESENTATION-DIAGNOSTIC18.md).
+
 **2.0.0~diagnostic17: sesión UART sin retirar bluetoothd.**
 Parte de diagnostic16 y conserva su corrección Wi-Fi. Bluetooth diagnostic7
 usa la exclusividad del socket UART, mantiene el servicio y verifica su PID

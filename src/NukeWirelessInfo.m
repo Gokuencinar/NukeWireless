@@ -696,7 +696,7 @@ static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareHotspotTab(tabForController(controller));
 }
 __attribute__((constructor)) static void installExtension(void) {
-    syslog(LOG_NOTICE, "NukeWireless: diagnostic17 embedded UI loaded");
+    syslog(LOG_NOTICE, "NukeWireless: diagnostic18 embedded UI loaded");
     // Both are mandatory app dependencies. Initialize our adapter exactly once
     // before wrapping its methods, regardless of dyld constructor order.
     void (*initializeAdapter)(void) = dlsym(RTLD_DEFAULT, "NWBootstrapInitialize");
@@ -795,6 +795,8 @@ int NWUIRegressionCheck(int phase) {
     UITabBarController *tab = activeTab;
     if (!tab || tab.viewControllers.count != 3) return 1;
     if (phase == 0) {
+        int detached = NWMainTabsDetachedBarCheck();
+        if (detached) return detached;
         extern int NWEmbeddedStartupUIRegression(void);
         if (NWEmbeddedStartupUIRegression() || ![NSBundle.mainBundle.infoDictionary[@"NukeWirelessUIIntegration"] isEqual:@"embedded-required-v1"]) return 19;
         unsigned copies = 0;

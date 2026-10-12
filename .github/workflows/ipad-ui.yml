@@ -1,4 +1,4 @@
-name: iPad presentation investigation
+name: iPad presentation regression
 on:
   push:
     branches: [audit-rh25.5]
@@ -12,18 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [diagnostic10, diagnostic17]
+        source: [diagnostic18]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Select app sources with the same tablet fixture
-        env:
-          SOURCE: ${{ matrix.source }}
-        run: |
-          if [ "$SOURCE" = diagnostic10 ]; then
-            git restore --source=9210fb0 --worktree -- src
-          fi
       - name: Run iPad navigation and background checks in landscape
         run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=landscape bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4

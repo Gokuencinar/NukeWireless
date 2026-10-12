@@ -13,12 +13,22 @@
 @interface NWMainTabs : NSObject <UITabBarDelegate>
 @property(nonatomic, weak) UITabBarController *owner;
 @property(nonatomic, strong) UITabBar *bar;
+@property(nonatomic, strong) NSArray<NSLayoutConstraint *> *barConstraints;
 @property(nonatomic, strong) UINavigationController *bluetooth;
+@property(nonatomic, strong) NSLayoutConstraint *bluetoothBottom;
 @property(nonatomic) BOOL bluetoothSelected;
 @property(nonatomic) NSUInteger foregroundRestorations;
 - (void)selectTag:(NSInteger)tag;
 - (void)style;
 - (void)restoreBar;
+- (void)layoutBar;
+@end
+@interface NWPresentationTabBar : UITabBar
+@property(nonatomic, weak) NWMainTabs *tabs;
+@end
+@implementation NWPresentationTabBar
+- (void)layoutSubviews { [super layoutSubviews]; [self.tabs layoutBar]; }
+- (void)safeAreaInsetsDidChange { [super safeAreaInsetsDidChange]; [self.tabs layoutBar]; }
 @end
 static char mainTabsKey;
 NSString *const NWMainTabReselected = @"NWMainTabReselected";
@@ -33,6 +43,30 @@ NSString *const NWMainTabReselected = @"NWMainTabReselected";
     return self;
 }
 - (void)dealloc { [NSNotificationCenter.defaultCenter removeObserver:self]; }
+- (void)layoutBar {
+    UITabBarController *tab = self.owner;
+    if (!tab.isViewLoaded || self.barConstraints.count != 4) return;
+    CGRect bounds = tab.view.bounds;
+    CGFloat height = 49 + tab.view.safeAreaInsets.bottom;
+    CGRect frame = CGRectMake(CGRectGetMinX(bounds), CGRectGetMaxY(bounds) - height, bounds.size.width, height);
+    // iPad can detach/reparent its native bar during startup or adaptation.
+    // Copy geometry only while it belongs to this hierarchy. Every constraint
+    // remains between our bar and its permanent parent, never the native bar.
+    if ([tab.tabBar isDescendantOfView:tab.view] && !tab.tabBar.hidden) {
+        CGRect native = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
+        if (native.size.width > 0 && native.size.height >= 40 &&
+            fabs(CGRectGetMaxY(native) - CGRectGetMaxY(bounds)) <= 1) frame = native;
+    }
+    self.barConstraints[0].constant = CGRectGetMinX(frame) - CGRectGetMinX(bounds);
+    self.barConstraints[1].constant = CGRectGetMaxX(frame) - CGRectGetMaxX(bounds);
+    self.barConstraints[2].constant = CGRectGetMaxY(frame) - CGRectGetMaxY(bounds);
+    self.barConstraints[3].constant = frame.size.height;
+    UIView *host = self.bluetooth.view.superview;
+    if (host && [host isDescendantOfView:tab.view]) {
+        CGRect safe = [host convertRect:host.safeAreaLayoutGuide.layoutFrame toView:tab.view];
+        self.bluetoothBottom.constant = MIN(0, CGRectGetMinY(frame) - CGRectGetMaxY(safe));
+    }
+}
 - (void)restoreBar {
     UITabBarController *tab = self.owner;
     if (!tab.isViewLoaded || !self.bar) return;
@@ -42,8 +76,9 @@ NSString *const NWMainTabReselected = @"NWMainTabReselected";
     tab.tabBar.userInteractionEnabled = NO;
     tab.tabBar.accessibilityElements = nil;
     tab.tabBar.accessibilityElementsHidden = YES;
+    [self layoutBar];
     self.bar.layer.zPosition = MAX(1, tab.tabBar.layer.zPosition + 1);
-    [tab.view bringSubviewToFront:tab.tabBar];
+    if (tab.tabBar.superview == tab.view) [tab.view bringSubviewToFront:tab.tabBar];
     [tab.view bringSubviewToFront:self.bar];
 }
 - (void)foreground:(NSNotification *)notification {
@@ -109,13 +144,14 @@ NSString *const NWMainTabReselected = @"NWMainTabReselected";
         [host addChildViewController:nav];
         nav.view.hidden = YES; nav.view.translatesAutoresizingMaskIntoConstraints = NO;
         nav.view.backgroundColor = NWCanvasColor(); [host.view addSubview:nav.view];
+        self.bluetoothBottom = [nav.view.bottomAnchor constraintEqualToAnchor:host.view.safeAreaLayoutGuide.bottomAnchor];
         [NSLayoutConstraint activateConstraints:@[
             [nav.view.topAnchor constraintEqualToAnchor:host.view.topAnchor],
             [nav.view.leadingAnchor constraintEqualToAnchor:host.view.leadingAnchor],
             [nav.view.trailingAnchor constraintEqualToAnchor:host.view.trailingAnchor],
             // The native selection may not have attached the host to tab.view
             // yet. Keep constraints inside the host's hierarchy.
-            [nav.view.bottomAnchor constraintEqualToAnchor:host.view.safeAreaLayoutGuide.bottomAnchor]
+            self.bluetoothBottom
         ]];
         [nav didMoveToParentViewController:host]; [self style];
     }
@@ -156,7 +192,8 @@ void NWPrepareMainTabs(UITabBarController *tab) {
     if (!tabs) {
         tabs = [NWMainTabs new]; tabs.owner = tab;
         objc_setAssociatedObject(tab, &mainTabsKey, tabs, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        UITabBar *bar = [UITabBar new]; tabs.bar = bar; bar.delegate = tabs;
+        NWPresentationTabBar *bar = [NWPresentationTabBar new];
+        tabs.bar = bar; bar.tabs = tabs; bar.delegate = tabs;
         bar.accessibilityIdentifier = @"nw.main.tabs";
         NSArray *titles = @[NWText(@"tabs.wifi"), NWText(@"tabs.hotspot"), NWText(@"bt.title"), NWText(@"info.title")];
         NSArray *symbols = @[@"wifi", @"link", @"antenna.radiowaves.left.and.right", @"info.circle"];
@@ -167,12 +204,13 @@ void NWPrepareMainTabs(UITabBarController *tab) {
         }
         bar.items = items; bar.itemPositioning = UITabBarItemPositioningFill;
         bar.translatesAutoresizingMaskIntoConstraints = NO; [tab.view addSubview:bar];
-        [NSLayoutConstraint activateConstraints:@[
-            [bar.topAnchor constraintEqualToAnchor:tab.tabBar.topAnchor],
-            [bar.bottomAnchor constraintEqualToAnchor:tab.tabBar.bottomAnchor],
-            [bar.leadingAnchor constraintEqualToAnchor:tab.tabBar.leadingAnchor],
-            [bar.trailingAnchor constraintEqualToAnchor:tab.tabBar.trailingAnchor]
-        ]];
+        tabs.barConstraints = @[
+            [bar.leadingAnchor constraintEqualToAnchor:tab.view.leadingAnchor],
+            [bar.trailingAnchor constraintEqualToAnchor:tab.view.trailingAnchor],
+            [bar.bottomAnchor constraintEqualToAnchor:tab.view.bottomAnchor],
+            [bar.heightAnchor constraintEqualToConstant:49]
+        ];
+        [tabs layoutBar]; [NSLayoutConstraint activateConstraints:tabs.barConstraints];
         [tabs style];
     }
     if (!tabs.bluetoothSelected) {
@@ -221,7 +259,8 @@ int NWMainTabsStabilityCheck(UITabBarController *tab) {
         ![tab.view viewWithTag:90122].hidden) return 25;
     if (![tabs.bluetooth.topViewController.title isEqual:NWText(@"bt.title")]) return 26;
     CGRect frame = [tabs.bluetooth.view.superview convertRect:tabs.bluetooth.view.frame toView:tab.view];
-    return CGRectGetMaxY(frame) > CGRectGetMinY(tab.tabBar.frame) + 1 ? 23 : 0;
+    CGRect bar = [tabs.bar convertRect:tabs.bar.bounds toView:tab.view];
+    return CGRectGetMaxY(frame) > CGRectGetMinY(bar) + 1 ? 23 : 0;
 }
 static NSInteger resumeTag;
 static NSUInteger resumeRestorations;
@@ -271,11 +310,14 @@ int NWMainTabsResumeCheck(UITabBarController *tab) {
         tab.tabBar.userInteractionEnabled || !tab.tabBar.accessibilityElementsHidden ||
         tabs.bar.accessibilityElementsHidden || !tabs.bar.userInteractionEnabled) return 32;
     if (tabs.bar.layer.zPosition <= tab.tabBar.layer.zPosition ||
-        [tab.view.subviews indexOfObject:tabs.bar] <= [tab.view.subviews indexOfObject:tab.tabBar]) return 33;
-    CGRect native = [tab.tabBar convertRect:tab.tabBar.bounds toView:tab.view];
+        (tab.tabBar.superview == tab.view &&
+         [tab.view.subviews indexOfObject:tabs.bar] <= [tab.view.subviews indexOfObject:tab.tabBar])) return 33;
     CGRect presentation = [tabs.bar convertRect:tabs.bar.bounds toView:tab.view];
-    if (fabs(native.origin.x - presentation.origin.x) > 1 || fabs(native.origin.y - presentation.origin.y) > 1 ||
-        fabs(native.size.width - presentation.size.width) > 1 || fabs(native.size.height - presentation.size.height) > 1) return 34;
+    if (presentation.size.height < 49 || presentation.size.width < 200 ||
+        fabs(CGRectGetMaxY(presentation) - CGRectGetMaxY(tab.view.bounds)) > 1) return 34;
+    CGPoint point = CGPointMake(CGRectGetMidX(presentation), CGRectGetMidY(presentation));
+    UIView *hit = [tab.view hitTest:point withEvent:nil];
+    if (hit != tabs.bar && ![hit isDescendantOfView:tabs.bar]) return 38;
     UIColor *background = [tabs.bar.standardAppearance.backgroundColor resolvedColorWithTraitCollection:tabs.bar.traitCollection];
     if (!background || CGColorGetAlpha(background.CGColor) < 1) return 35;
     if (resumeTag == 3 && (tabs.bluetooth.topViewController != resumeTop || tabs.bluetooth.view.hidden ||
@@ -288,6 +330,21 @@ int NWMainTabsResumeCheck(UITabBarController *tab) {
         if (!bar || ![title isEqual:expected] || ![large isEqual:expected]) return 37;
     }
     [resumeNativeContent removeFromSuperview]; resumeNativeContent = nil;
+    return 0;
+}
+int NWMainTabsDetachedBarCheck(void) {
+    UITabBarController *tab = [UITabBarController new];
+    NSArray *hosts = @[[UIViewController new], [UIViewController new], [UIViewController new]];
+    tab.viewControllers = hosts;
+    (void)tab.view;
+    [tab.tabBar removeFromSuperview];
+    @try { NWPrepareMainTabs(tab); } @catch (NSException *exception) { (void)exception; return 39; }
+    [tab.view layoutIfNeeded];
+    NWMainTabs *tabs = objc_getAssociatedObject(tab, &mainTabsKey);
+    if (!tabs || tabs.bar.superview != tab.view || tabs.bar.bounds.size.height < 49 ||
+        ![tab.viewControllers isEqual:hosts] || tabs.bar.items.count != 4) return 40;
+    for (NSLayoutConstraint *constraint in tabs.barConstraints)
+        if (!constraint.active || constraint.firstItem == tab.tabBar || constraint.secondItem == tab.tabBar) return 41;
     return 0;
 }
 #endif
