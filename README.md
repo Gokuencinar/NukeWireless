@@ -4,6 +4,13 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic20: nombres Wi-Fi mediante Bonjour y DNS asíncrono.**
+Actualiza los nombres en el escaneo actual, conserva los nombres personalizados
+y limita/cancela las consultas. Mantiene las correcciones de Wi-Fi e iPad de
+diagnostic19 y Bluetooth diagnostic7. Compilación y validación en curso;
+recepción de nombres en la red física pendiente.
+Véase [implementación y límites](docs/WIFI-DEVICE-NAMES-DIAGNOSTIC20.md).
+
 **2.0.0~diagnostic19: presentación y diagnóstico automático de iPad.**
 Encuentra las pestañas contenidas en la raíz SwiftUI, protege la instalación
 durante la adaptación y aplica la política compacta a los hosts de iOS 15/16.

@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [diagnostic19]
+        source: [diagnostic20]
         traits: ["${{ inputs.traits || 'native' }}"]
         orientation: [portrait, landscape]
     steps:

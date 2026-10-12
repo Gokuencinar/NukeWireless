@@ -6,6 +6,7 @@
 #import "NWInstallLayout.h"
 #import "NWPolicy.h"
 #import "NWResources.h"
+#import "NWDeviceNames.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <mach-o/dyld.h>
@@ -57,6 +58,8 @@ static void deviceOutcome(NSString *status, NSString *error) {
     NWTaskDiagnosticContext(nil);
 }
 static NSString *scanNetwork;
+static NWDeviceNames *deviceNames;
+static NSMutableSet<NSString *> *resolvedNameIPs;
 static __weak NWLegacyScanner *activeScanner;
 static NSString *recoveryNetwork;
 static unsigned recoveryRetries;
@@ -124,6 +127,40 @@ static NSString *networkIdentity(void) {
     // The interface tuple is sufficient to reject stale scan and bulk results.
     return [NSString stringWithFormat:@"%u/%u", local, mask];
 }
+static BOOL hasCustomName(id device) {
+    if ([readObject(device, @"nickName") length]) return YES;
+    NSString *mac = readObject(device, @"macAddress");
+    for (NSString *key in @[@"NukeWirelessDeviceAliases", @NWLegacyAliasesKey]) {
+        NSDictionary *aliases = [NSUserDefaults.standardUserDefaults dictionaryForKey:key];
+        for (NSString *stored in aliases)
+            if ([stored caseInsensitiveCompare:mac ?: @""] == NSOrderedSame &&
+                [aliases[stored] isKindOfClass:NSString.class] && [aliases[stored] length]) return YES;
+    }
+    return NO;
+}
+static void applyResolvedName(NSString *ip, NSString *mac, NSString *name, uint64_t generation, NSString *network) {
+    id device = devices[ip];
+    if (state.generation != generation || !device || ![network isEqualToString:scanNetwork] ||
+        ![network isEqualToString:networkIdentity()] || ![mac isEqual:readObject(device, @"macAddress")] ||
+        hasCustomName(device)) return;
+    if (!NWDeviceNameIsPlaceholder(readObject(device, @"hostname")) && ![resolvedNameIPs containsObject:ip]) return;
+    if (![name isEqual:readObject(device, @"hostname")]) {
+        setObject(device, @"setHostname:", name); [resolvedNameIPs addObject:ip]; notify();
+    }
+}
+static void beginDeviceNames(void) {
+    [deviceNames stop]; resolvedNameIPs = [NSMutableSet new];
+    uint64_t generation = state.generation; NSString *network = [scanNetwork copy];
+    deviceNames = [[NWDeviceNames alloc] initWithUpdate:^(NSString *ip, NSString *mac, NSString *name) {
+        applyResolvedName(ip, mac, name, generation, network);
+    }];
+    uint32_t local, mask; localNetwork(&local, &mask, NULL);
+    if (NWScanInterfaceReady(local, mask)) [deviceNames start];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 31 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        if (state.generation == generation && [network isEqualToString:scanNetwork])
+            NWDiagnosticRecord(@"wifi_names", @"completed", [deviceNames diagnostics]);
+    });
+}
 static BOOL isBlocked(NSString *ip) {
     Class cls = commands(); SEL sel = NSSelectorFromString(@"runningBlocksForIpWithIp:");
     if (![cls respondsToSelector:sel]) return NO;
@@ -152,6 +189,7 @@ static void (*oldFailed)(id, SEL);
 static void (*oldProgress)(id, SEL, float, NSInteger);
 static void finish(uint64_t generation, BOOL success, int status, NSString *origin) {
     BOOL networkChanged = success && ![scanNetwork isEqualToString:networkIdentity()];
+    if (networkChanged) [deviceNames stop];
     if (networkChanged) success = NO;
     if (!NWStateFinish(&state, generation, success)) return;
     state.progress = CACurrentMediaTime();
@@ -191,7 +229,7 @@ static void foundDevice(id adapter, SEL sel, id device) {
         if (vendor.length) setObject(device, @"setBrand:", vendor);
         NSString *suffix = ip.pathExtension;
         NSString *nickname = readObject(device, @"nickName");
-        if (!nickname.length && [name isEqualToString:[@"Equipo ." stringByAppendingString:suffix]])
+        if (!nickname.length && NWDeviceNameIsPlaceholder(name))
             setObject(device, @"setHostname:", [NSString stringWithFormat:NWText(@"device.fallback"), suffix]);
         NSString *brand = readObject(device, @"brand");
         if ([brand isEqualToString:@"Unknown"] || [brand isEqualToString:@"Unknown Brand"])
@@ -208,12 +246,16 @@ static void foundDevice(id adapter, SEL sel, id device) {
                 NSString *value = readObject(device, property);
                 if (![value isKindOfClass:NSString.class] || !value.length || [value hasPrefix:@"Unknown"] ||
                     [value isEqualToString:NWText(@"device.unknownVendor")]) continue;
+                if ([property isEqualToString:@"hostname"] &&
+                    (hasCustomName(existing) || (NWDeviceNameIsPlaceholder(value) &&
+                        !NWDeviceNameIsPlaceholder(readObject(existing, @"hostname"))))) continue;
                 NSString *setter = [NSString stringWithFormat:@"set%@%@:", [[property substringToIndex:1] uppercaseString], [property substringFromIndex:1]];
                 setObject(existing, setter, value);
             }
         } else {
             devices[ip] = device;
         }
+        if (ipv4(ip) != local) [deviceNames trackIP:ip mac:readObject(devices[ip], @"macAddress")];
         updateDeviceState(ip); notify();
     });
 }
@@ -257,6 +299,7 @@ static void scannerStarted(NWLegacyScanner *scanner, SEL sel) {
         state.phase = NWScanning; state.progress = CACurrentMediaTime();
         NWDiagnosticRecord(@"wifi_scan", @"running", @{@"generation": @(state.generation)});
         devices = [NSMutableDictionary new]; scanNetwork = networkIdentity();
+        beginDeviceNames();
         armWatchdog(state.generation); notify();
     });
     // The caller may wait for start to return while the main thread is loading.
@@ -407,6 +450,7 @@ static BOOL refreshScan(BOOL manual) {
     if (!base || memcmp(base + 0xc5a8, prologue, sizeof(prologue))) return NO;
     if (manual) recoveryRetries = 0;
     uint64_t generation = NWStateBegin(&state, CACurrentMediaTime());
+    [deviceNames stop];
     [devices removeAllObjects]; scanNetwork = nil; armWatchdog(generation); notify();
     // The pinned Swift refresh clears Published.devices and schedules its scanner.
     // The start and callback hooks track that native scan without moving start
@@ -438,6 +482,7 @@ NSDictionary *NWScanDiagnosticSnapshot(void) {
             @"blocking_scope": @"ARP IPv4; no IPv6 filtering", @"internet_cut_confirmed": @NO},
         @"elapsed_seconds": @(state.started ? MAX(0, CACurrentMediaTime() - state.started) : 0),
         @"device_count": @(devices.count), @"adapter_present": @(wifiAdapter != nil),
+        @"name_resolution": [deviceNames diagnostics] ?: @{},
         @"native_queue_count": @(activeScanner.queue.operationCount), @"native_start_returned": @(nativeStartReturned),
         @"automatic_retries": @(recoveryRetries), @"ipv4_subnet_ready": @(NWScanInterfaceReady(local, mask)),
         @"hooks": @{@"native_unblock": nativeUnblock ? @(nativeUnblock() != 0) : NSNull.null,
@@ -599,6 +644,10 @@ void NWConfirmBulk(UIViewController *presenter) {
 }
 void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
+    [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil
+        queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+            (void)note; [deviceNames stop];
+        }];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
     if (method && !oldStart) oldStart = (void *)method_setImplementation(method, (IMP)scannerStarted);
     Class delegate = NSClassFromString(@NWLegacyScannerClass);
@@ -620,12 +669,14 @@ extern NSArray *NWDeviceCommandFixtureCalls(void);
 static NWScanState browserSavedState;
 static NSMutableDictionary *browserSavedDevices;
 static NSMutableSet *browserSavedOwned;
+static NSMutableSet *browserSavedResolved;
 static NSString *browserSavedNetwork;
 static BOOL browserSavedBusy;
 static NSObject *browserSavedActionToken;
 void NWBeginDeviceActionsUITest(void) {
     browserSavedState = state; browserSavedDevices = devices; browserSavedOwned = bulkOwned;
     browserSavedNetwork = scanNetwork; browserSavedBusy = bulkBusy; browserSavedActionToken = deviceActionToken;
+    browserSavedResolved = resolvedNameIPs; resolvedNameIPs = [NSMutableSet new];
     state.phase = NWComplete; ++state.generation; bulkBusy = NO; deviceActionToken = nil;
     scanNetwork = networkIdentity(); devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     NWResetDeviceCommandFixture();
@@ -641,6 +692,7 @@ void NWBeginDeviceActionsUITest(void) {
 void NWEndDeviceActionsUITest(void) {
     state = browserSavedState; devices = browserSavedDevices; bulkOwned = browserSavedOwned;
     scanNetwork = browserSavedNetwork; bulkBusy = browserSavedBusy; deviceActionToken = browserSavedActionToken;
+    resolvedNameIPs = browserSavedResolved;
     NWResetDeviceCommandFixture();
 }
 int NWDeviceActionsUIRegressionCheck(void) {
@@ -667,6 +719,24 @@ int NWDeviceActionsUIRegressionCheck(void) {
         if (NWDeviceCanSetBlocked(row, YES)) return 9;
         state.phase = NWComplete; scanNetwork = @"different-network";
         if (NWDeviceSetNickname(row, @"Incorrecto") || NWDeviceSetBlocked(row, YES, nil)) return 10;
+        scanNetwork = networkIdentity();
+        id peer = devices[row[@"ip"]];
+        // A good native name and a custom nickname remain authoritative.
+        applyResolvedName(row[@"ip"], row[@"mac"], @"DNS", state.generation, scanNetwork);
+        if (![readObject(peer, @"hostname") isEqual:@"Mesa"]) return 12;
+        setObject(peer, @"setHostname:", @"Device .42");
+        NWDeviceSetNickname(row, @"Personalizado");
+        applyResolvedName(row[@"ip"], row[@"mac"], @"Bonjour", state.generation, scanNetwork);
+        if (![readObject(peer, @"hostname") isEqual:@"Device .42"]) return 13;
+        NWDeviceSetNickname(row, nil);
+        applyResolvedName(row[@"ip"], row[@"mac"], @"Old", state.generation + 1, scanNetwork);
+        applyResolvedName(row[@"ip"], @"00:11:22:33:44:99", @"Old", state.generation, scanNetwork);
+        applyResolvedName(row[@"ip"], row[@"mac"], @"Old", state.generation, @"old-network");
+        if (![readObject(peer, @"hostname") isEqual:@"Device .42"]) return 14;
+        applyResolvedName(row[@"ip"], row[@"mac"], @"TV Salón", state.generation, scanNetwork);
+        if (![NWDeviceSnapshot().firstObject[@"name"] isEqual:@"TV Salón"]) return 15;
+        applyResolvedName(row[@"ip"], row[@"mac"], @"Televisión", state.generation, scanNetwork);
+        if (![NWDeviceSnapshot().firstObject[@"name"] isEqual:@"Televisión"]) return 16;
         return 0;
     } @finally { NWEndDeviceActionsUITest(); }
 }

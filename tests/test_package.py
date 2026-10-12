@@ -49,12 +49,17 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless Dev')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
-        self.assertEqual(info['CFBundleVersion'], '20019')
+        self.assertEqual(info['CFBundleVersion'], '20020')
         self.assertTrue(info['UIFileSharingEnabled'])
         self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
         self.assertEqual(info['NukeWirelessWorkerVersion'], package.WORKER_VERSION)
         self.assertEqual(info['CFBundleLocalizations'],['en','es'])
         self.assertTrue(info['NSBluetoothAlwaysUsageDescription'])
+        from device_name_metadata import SERVICES
+        self.assertEqual(info['NSBonjourServices'], SERVICES)
+        self.assertTrue(info['NSLocalNetworkUsageDescription'])
+        discovery = (ROOT/'src/NWDeviceNames.m').read_text(encoding='utf-8').split('BOOL NWDeviceNameIsPlaceholder')[0]
+        self.assertEqual(re.findall(r'@"(_[^"]+)"', discovery), SERVICES)
         self.assertFalse(any('LocationUsage' in key for key in info))
         bundle = package.APP+'NukeWirelessResources.bundle/'
         review = self.after[bundle+'Diagnostics/iPadPresentationReview.json'][1]

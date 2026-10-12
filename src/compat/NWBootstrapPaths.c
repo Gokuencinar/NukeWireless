@@ -31,7 +31,6 @@ _Static_assert(offsetof(struct rt_msghdr, rtm_addrs) == 12, "Darwin route addres
 #include <errno.h>
 #include <sys/stat.h>
 #include <mach-o/loader.h>
-#include <netdb.h>
 
 // Use the SDK's runtime types and dispatcher declaration, compiled as ObjC
 // without ARC to preserve this recovered adapter's explicit retain/release.
@@ -124,9 +123,6 @@ static id presenting_controller;
 static id alias_alert;
 static char alias_selected_mac[32];
 static char alias_selected_ip[32];
-static char name_lookup_attempted[64][32];
-static int name_lookup_attempt_count;
-static void *name_lookup_queue;
 
 static int starts_with(const char *value, const char *prefix) {
     if (!value) return 0;
@@ -239,46 +235,7 @@ static void debug_line(const char *label, const char *value) {
     close(fd);
 }
 
-struct name_lookup_request { char ip[32]; char mac[32]; };
-
-static void resolve_name_in_background(void *context) {
-    struct name_lookup_request *request = context;
-    Class pool_class = objc_getClass("NSAutoreleasePool");
-    id pool = ((id (*)(id, SEL))objc_msgSend)(pool_class,
-        sel_registerName("new"));
-    struct sockaddr_in address;
-    memset(&address, 0, sizeof(address));
-    address.sin_len = sizeof(address);
-    address.sin_family = AF_INET;
-    char name[256] = {0};
-    if (inet_pton(AF_INET, request->ip, &address.sin_addr) == 1 &&
-        getnameinfo((struct sockaddr *)&address, sizeof(address), name,
-            sizeof(name), 0, 0, NI_NAMEREQD) == 0 &&
-        name[0] && !equals(name, request->ip)) {
-        save_name_for_mac("NukeWirelessResolvedNames", request->mac,
-            string_from_utf8(name));
-        debug_line("resolved-name", name);
-    }
-    ((void (*)(id, SEL))objc_msgSend)(pool, sel_registerName("drain"));
-    free(request);
-}
-
-static void schedule_name_lookup(const char *ip, const char *mac) {
-    if (!ip || !mac || !ip[0] || !mac[0] ||
-        stored_name_for_mac("NukeWirelessResolvedNames", mac)) return;
-    for (int i = 0; i < name_lookup_attempt_count; ++i)
-        if (equals(name_lookup_attempted[i], mac)) return;
-    if (name_lookup_attempt_count >= 64) return;
-    snprintf(name_lookup_attempted[name_lookup_attempt_count++], 32, "%s", mac);
-    if (!name_lookup_queue)
-        name_lookup_queue = dispatch_queue_create("nukewireless.name-lookup", 0);
-    if (!name_lookup_queue) return;
-    struct name_lookup_request *request = malloc(sizeof(*request));
-    if (!request) return;
-    snprintf(request->ip, sizeof(request->ip), "%s", ip);
-    snprintf(request->mac, sizeof(request->mac), "%s", mac);
-    dispatch_async_f(name_lookup_queue, request, resolve_name_in_background);
-}
+/* DNS/Bonjour name discovery now belongs to the cancellable NWDeviceNames session. */
 
 static int get_gateway_from_system_configuration(char *ip, unsigned long ip_size) {
     void *library = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", 1);
@@ -856,7 +813,6 @@ static void patched_found_device(id self, SEL cmd, id device) {
         ((void (*)(id, SEL, id))objc_msgSend)(device,
             sel_registerName("setHostname:"), string_from_utf8(label));
         debug_line("scan-device-label", label);
-        schedule_name_lookup(ip, mac);
     }
     if (!brand || !brand[0] || equals(brand, "Unknown Brand")) {
         id vendor = brand_for_mac(mac);
