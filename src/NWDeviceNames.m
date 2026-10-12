@@ -42,6 +42,7 @@ NSString *NWCleanDeviceName(NSString *value) {
 @property(nonatomic, copy) void (^update)(NSString *, NSString *, NSString *);
 @property(nonatomic) BOOL active, networking;
 @property(nonatomic) NSUInteger session, serviceCount, queryCount, failures, updates;
+@property(nonatomic) NSInteger dnsError, bonjourError;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *peers;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSDictionary *> *names;
 @property(nonatomic, strong) NSMutableArray<NSNetServiceBrowser *> *browsers;
@@ -81,7 +82,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     NWDeviceNames *owner = query.owner;
     if (!error && type == kDNSServiceType_PTR && (flags & kDNSServiceFlagsAdd))
         [owner offer:ptrName(data, length) ip:query.ip mac:query.mac rank:20];
-    if (error) owner.failures++;
+    if (error) { owner.failures++; owner.dnsError = error; }
     // Deallocation occurs on the same main queue, after the reply has returned.
     dispatch_async(dispatch_get_main_queue(), ^{ [owner complete:query]; });
 }
@@ -102,6 +103,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     [self stop]; self.active = YES; self.networking = YES;
     [self.peers removeAllObjects]; [self.names removeAllObjects]; [self.seenServices removeAllObjects];
     self.serviceCount = self.queryCount = self.failures = self.updates = 0;
+    self.dnsError = self.bonjourError = 0;
     NSUInteger session = self.session;
     for (NSString *type in NWNameServiceTypes()) {
         NSNetServiceBrowser *browser = [NSNetServiceBrowser new]; browser.delegate = self;
@@ -159,7 +161,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
         if (!error) error = DNSServiceSetDispatchQueue(query.reference, dispatch_get_main_queue());
         if (error) {
             if (query.reference) { DNSServiceRefDeallocate(query.reference); query.reference = NULL; }
-            self.failures++; continue;
+            self.failures++; self.dnsError = error; continue;
         }
         [self.queries addObject:query];
         __weak NWDeviceNames *weak = self;
@@ -218,15 +220,19 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     [self pumpServices];
 }
 - (void)netService:(NSNetService *)service didNotResolve:(NSDictionary *)error {
-    (void)error; self.failures++; service.delegate = nil; [service stop]; [self.services removeObject:service];
+    if (!self.active || ![self.services containsObject:service]) return;
+    self.failures++; self.bonjourError = [error[NSNetServicesErrorCode] integerValue];
+    service.delegate = nil; [service stop]; [self.services removeObject:service];
     [self pumpServices];
 }
 - (void)netServiceBrowser:(NSNetServiceBrowser *)browser didNotSearch:(NSDictionary *)error {
-    (void)browser; (void)error; self.failures++;
+    if (!self.active || ![self.browsers containsObject:browser]) return;
+    self.failures++; self.bonjourError = [error[NSNetServicesErrorCode] integerValue];
 }
 - (NSDictionary *)diagnostics {
     return @{@"peers":@(self.peers.count), @"names":@(self.names.count), @"updates":@(self.updates),
-             @"services":@(self.serviceCount), @"reverse_queries":@(self.queryCount), @"lookup_errors":@(self.failures)};
+             @"services":@(self.serviceCount), @"reverse_queries":@(self.queryCount), @"lookup_errors":@(self.failures),
+             @"last_dns_error":@(self.dnsError), @"last_bonjour_error":@(self.bonjourError), @"active":@(self.active)};
 }
 #ifdef NW_NAME_TESTING
 - (void)testBegin { self.active = YES; }

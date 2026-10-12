@@ -35,6 +35,20 @@ int main(void) { @autoreleasepool {
     assert(updates.count == 2); // Address reuse must reject the old PTR reply.
     [resolver testName:@"New peer" ip:@"192.0.2.5" mac:@"aa:bb:cc:dd:ee:02" rank:20];
     assert(updates.count == 3);
+    NSString *diagnostic = [resolver.diagnostics description];
+    assert(![diagnostic containsString:@"192.0.2"] && ![diagnostic containsString:@"New peer"]);
+    NWDeviceNames *bounded = [[NWDeviceNames alloc] initWithUpdate:^(NSString *ip, NSString *mac, NSString *name) {
+        (void)ip; (void)mac; (void)name;
+    }];
+    [bounded testBegin];
+    for (int i = 1; i <= 200; ++i) {
+        NSString *ip = [NSString stringWithFormat:@"192.0.2.%d", i];
+        [bounded trackIP:ip mac:@"aa:bb:cc:dd:ee:01"];
+        [bounded testName:@"Host" ip:ip mac:nil rank:20];
+    }
+    assert([bounded.diagnostics[@"peers"] unsignedIntegerValue] == 128);
+    assert([bounded.diagnostics[@"names"] unsignedIntegerValue] == 128);
+    [bounded stop];
     [resolver stop];
     [resolver testName:@"Late callback" ip:@"192.0.2.5" mac:nil rank:80];
     assert(updates.count == 3);
