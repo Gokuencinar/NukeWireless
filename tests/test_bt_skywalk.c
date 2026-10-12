@@ -10,7 +10,7 @@ int main(void) {
                    (ios >= 15 && ios <= 18 && darwin == ios + 6));
     uint8_t commands[64] = {0};
     assert(!NWBTExtendedAdvertisingCommands(commands, sizeof commands));
-    const unsigned required[] = {289, 290, 291, 293, 295, 296};
+    const unsigned required[] = {289, 290, 291, 293, 296};
     for (size_t i = 0; i < sizeof required / sizeof *required; ++i)
         commands[required[i] / 8] |= (uint8_t)(1u << (required[i] % 8));
     assert(NWBTExtendedAdvertisingCommands(commands, sizeof commands));
@@ -22,6 +22,11 @@ int main(void) {
     assert(!NWBTExtendedAdvertisingCommands(NULL, 64));
     assert(!NWBTExtendedAdvertisingCommands(commands, 63));
     assert(!NWBTExtendedAdvertisingCommands(commands, 65));
+    assert(!NWBTAdvertisingCapacityQuery(commands, sizeof commands));
+    commands[36] |= 0x80;
+    assert(NWBTExtendedAdvertisingCommands(commands, sizeof commands));
+    assert(NWBTAdvertisingCapacityQuery(commands, sizeof commands));
+    assert(!NWBTAdvertisingCapacityQuery(NULL, 64) && !NWBTAdvertisingCapacityQuery(commands, 63));
     assert(NWBTServiceDomainIndex("user/501") == 0);
     assert(NWBTServiceDomainIndex("system") == 1);
     const char *bad[] = {NULL, "", "user/0", "user/502", "system/other", "system; reboot", "../system"};

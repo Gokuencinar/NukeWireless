@@ -4,6 +4,16 @@ Nuke Wireless is in development. This repository is public; development builds a
 
 ## Desarrollo actual
 
+**2.0.0~diagnostic21: emisión con capacidad de conjuntos no consultable.**
+
+Conserva los cambios de diagnostic20. Bluetooth diagnostic8 separa los comandos
+necesarios para emitir de la consulta opcional del número de conjuntos. Un modelo
+no consulta capacidad; si falta la consulta o no caben todos simultáneamente,
+se emiten por turnos en un único conjunto durante un máximo total de diez segundos.
+Mantiene Detener, ACK de cada comando y recuperación independiente. Validación
+CI y aceptación física pendientes; no se afirma recepción ni avisos en el receptor.
+Detalles en [la revisión](docs/BLUETOOTH-CAPACITY-DIAGNOSTIC21.md).
+
 **2.0.0~diagnostic20: nombres Wi-Fi mediante Bonjour y DNS asíncrono.**
 Actualiza los nombres en el escaneo actual, conserva los nombres personalizados
 y limita/cancela las consultas. Mantiene las correcciones de Wi-Fi e iPad de

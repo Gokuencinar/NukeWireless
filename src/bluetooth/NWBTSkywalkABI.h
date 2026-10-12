@@ -23,13 +23,18 @@ enum {
 static inline int NWBTSkywalkOSAllowed(unsigned ios, unsigned darwin) {
     return ios >= 15 && ios <= 18 && darwin == ios + 6;
 }
-// Extended advertising setters, per-set address, capacity read and removal.
+// Extended advertising setters, per-set address and removal. Capacity querying
+// is optional: the tester's 20H240 controller advertises these setters but not
+// Read Number of Supported Advertising Sets (octet 36, bit 7).
 // Bluetooth Core's Local Supported Commands bitmap, also observed on 20D67.
 static inline int NWBTExtendedAdvertisingCommands(const uint8_t *commands, size_t length) {
     if (!commands || length != 64) return 0;
-    const unsigned bits[] = {289, 290, 291, 293, 295, 296};
+    const unsigned bits[] = {289, 290, 291, 293, 296};
     for (size_t i = 0; i < sizeof(bits) / sizeof(bits[0]); ++i)
         if (!(commands[bits[i] / 8] & (1u << (bits[i] % 8)))) return 0;
     return 1;
+}
+static inline int NWBTAdvertisingCapacityQuery(const uint8_t *commands, size_t length) {
+    return commands && length == 64 && (commands[36] & 0x80) != 0;
 }
 #endif

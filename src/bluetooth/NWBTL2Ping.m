@@ -14,7 +14,13 @@
 #include <unistd.h>
 
 atomic_int NWBTCancelled = 0;
+#ifdef NW_BT_LAB_TESTING
+extern double NWBTLabTestTime(void);
+extern id NWBTLabTestRing(void);
+static double now(void) { return NWBTLabTestTime(); }
+#else
 static double now(void) { return NSProcessInfo.processInfo.systemUptime; }
+#endif
 static uint16_t u16(const uint8_t *p) { return p[0] | (uint16_t)p[1] << 8; }
 static void put16(uint8_t *p, uint16_t value) { p[0] = value; p[1] = value >> 8; }
 
@@ -47,6 +53,10 @@ typedef NWBTSkywalkSlotProperties SlotProperties;
 
 @implementation NWBTRing
 + (instancetype)openHCI:(NSDictionary **)error {
+#ifdef NW_BT_LAB_TESTING
+    (void)error;
+    return NWBTLabTestRing();
+#endif
     if ([NWBTNativeTransport() isEqual:@"uart-h4"]) {
         NWBTRing *ring = [NWBTRing new]; ring->_fd = -1;
         double deadline = now() + 5.0;
@@ -288,6 +298,7 @@ static BOOL verifyAdvertisingController(NWBTLabSession *session, NSMutableDictio
     }
     report[@"controller_contract_verified"] = @YES;
     report[@"controller_hci_version"] = @(((const uint8_t *)version.bytes)[6]);
+    report[@"capacity_query_supported"] = @(NWBTAdvertisingCapacityQuery((const uint8_t *)commands.bytes + 6, commands.length - 6));
     return YES;
 }
 
@@ -411,6 +422,34 @@ NSDictionary *NWBTAdvertiseApplePairingLab(void) { return NWBTAdvertiseLabVarian
 
 NSDictionary *NWBTAdvertiseFastPairLab(void) { return NWBTAdvertiseLabVariant(3); }
 
+static BOOL configureLabModel(NWBTLabSession *session, NSMutableDictionary *report,
+    NSUInteger platform, unsigned catalogPlatform, NSArray<NSNumber *> *models,
+    unsigned index, unsigned slot, NSMutableArray *powers) {
+    uint8_t params[25], data[35], address[7]; NWBTLabFastPairParameters(params);
+    if (models && platform == 1) NWBTLabSwiftPairParameters(params);
+    params[0] = NWBT_LAB_MULTI_HANDLE + slot; params[10] = 1;
+    NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:params length:25]
+        phase:[NSString stringWithFormat:@"parameters_%u", index] cleanup:NO];
+    if (!reply) return NO;
+    int8_t power = ((const uint8_t *)reply.bytes)[6];
+    [powers addObject:@(power)];
+    if (models) NWBTLabCatalogAddress(address, catalogPlatform, models[index].unsignedIntValue, slot);
+    else { NWBTLabDeviceAddress(address, (unsigned)platform, index); address[0] = params[0]; }
+    if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
+        phase:[NSString stringWithFormat:@"address_%u", index] cleanup:NO]) return NO;
+    size_t length = models ? NWBTLabCatalogData(data, catalogPlatform, models[index].unsignedIntValue) :
+        NWBTLabMultiDeviceData(data, (unsigned)platform, index);
+    if (!length) { session.error = @"Catalog advertising data unavailable."; return NO; }
+    if (platform == 3) {
+        length = NWBTLabFastPairPower(data, power);
+        if (!length) { session.error = @"Selected transmit power cannot be encoded."; return NO; }
+        report[@"tx_power_ad_source"] = @"controller_selected_uncalibrated";
+    }
+    data[0] = params[0];
+    return [session command:0x2037 parameters:[NSData dataWithBytes:data length:length]
+        phase:[NSString stringWithFormat:@"data_%u", index] cleanup:NO] != nil;
+}
+
 static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber *> *catalogModels) {
     if (platform<1 || platform>(catalogModels ? 4 : 3)) return @{@"error": @"Unknown fixed lab platform."};
     NSUInteger count = catalogModels ? catalogModels.count : NWBT_LAB_PLATFORM_COUNT;
@@ -455,41 +494,53 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         if (session.ring.error) session.error = session.ring.error;
         if (session.error) { report[@"error"] = session.error; return report; }
         if (!verifyAdvertisingController(session, report)) return report;
-        NSData *limit = session.error ? nil : [session command:0x203b parameters:[NSData data] phase:@"set_capacity" cleanup:NO];
-        if (limit.length != 7) { report[@"error"] = session.error ?: @"Advertising set capacity unavailable."; return report; }
-        unsigned supported = ((const uint8_t *)limit.bytes)[6];
-        report[@"supported_advertising_sets"] = @(supported);
-        if (supported < count) {
-            report[@"error_code"] = @"advertising_sets";
-            report[@"error"] = @"The controller cannot support the requested simultaneous advertising sets.";
-            return report;
+        BOOL capacityKnown = NO; unsigned supported = 0;
+        // One model never needs the capacity query. Do not submit an opcode
+        // which this firmware explicitly omits from its supported bitmap.
+        if (count > 1 && [report[@"capacity_query_supported"] boolValue]) {
+            NSData *limit = [session command:0x203b parameters:[NSData data] phase:@"set_capacity" cleanup:NO];
+            if (limit.length != 7) { report[@"error"] = session.error ?: @"Advertising set capacity unavailable."; return report; }
+            supported = ((const uint8_t *)limit.bytes)[6]; capacityKnown = YES;
+            report[@"supported_advertising_sets"] = @(supported);
+            if (!supported) { report[@"error"] = @"No advertising set is available."; return report; }
+        }
+        BOOL sequential = count > 1 && (!capacityKnown || supported < count);
+        report[@"advertising_schedule"] = sequential ? @"sequential_single_set" : @"simultaneous";
+        report[@"capacity_verified"] = @(capacityKnown);
+        if (sequential) {
+            // Reuse one disabled handle. Never infer a hardware set count from
+            // the absent query. Every setter/enable still requires its own ACK.
+            report[@"schedule_reason"] = capacityKnown ? @"insufficient_simultaneous_sets" : @"capacity_query_unavailable";
+            [handles addObject:@(NWBT_LAB_MULTI_HANDLE)];
+            NSUInteger enabled = 0;
+            for (unsigned index = 0; index < count && !session.error && !NWBTCancelled; ++index) {
+                if (started && now() >= started + 10.0) { session.error = @"Sequential advertising deadline expired."; break; }
+                if (!configureLabModel(session, report, platform, catalogPlatform, catalogModels, index, 0, powers)) break;
+                double remaining = started ? started + 10.0 - now() : 10.0;
+                if (remaining <= 0) { session.error = @"Sequential advertising deadline expired."; break; }
+                double seconds = MIN(10.0 / count, remaining);
+                uint8_t enable[6]; NWBTLabDeviceEnable(enable, 1, 0);
+                // A controller-enforced deadline also bounds a killed worker.
+                unsigned ticks = (unsigned)(seconds * 100.0);
+                if (!ticks) { session.error = @"Sequential advertising deadline expired."; break; }
+                enable[3] = ticks & 0xff; enable[4] = ticks >> 8; enableSubmitted = YES;
+                if (![session command:0x2039 parameters:[NSData dataWithBytes:enable length:6] phase:@"enable" cleanup:NO]) break;
+                if (!started) started = now();
+                enabled++; report[@"models_enabled_count"] = @(enabled);
+                report[@"active_set_count"] = @1;
+                report[@"controller_advertising_acknowledged"] = @(enabled == count);
+                double sliceEnd = MIN(now() + ticks / 100.0, started + 10.0);
+                while (!NWBTCancelled && now() < sliceEnd) usleep(20000);
+                if (NWBTCancelled) break;
+                uint8_t stop[6]; NWBTLabDeviceEnable(stop, 0, 0);
+                if (![session command:0x2039 parameters:[NSData dataWithBytes:stop length:6] phase:@"disable_between_models" cleanup:NO]) break;
+            }
+            return report; // The shared finally disables/removes the owned set.
         }
         for (unsigned i=0;i<count && !session.error && !NWBTCancelled;i++) {
-            uint8_t params[25], data[35]; NWBTLabFastPairParameters(params);
-            if (catalogModels && platform == 1) NWBTLabSwiftPairParameters(params);
-            params[0] = NWBT_LAB_MULTI_HANDLE+i; params[10] = 1; // Per-set static random address.
             // Include the attempted handle in cleanup even after a lost completion.
-            [handles addObject:@(params[0])];
-            NSData *reply = [session command:0x2036 parameters:[NSData dataWithBytes:params length:25]
-                phase:[NSString stringWithFormat:@"parameters_%u",i] cleanup:NO];
-            if (!reply) break;
-            [powers addObject:@((int8_t)((const uint8_t *)reply.bytes)[6])];
-            uint8_t address[7];
-            if (catalogModels) NWBTLabCatalogAddress(address, catalogPlatform, catalogModels[i].unsignedIntValue, i);
-            else NWBTLabDeviceAddress(address, (unsigned)platform, i);
-            if (![session command:0x2035 parameters:[NSData dataWithBytes:address length:7]
-                phase:[NSString stringWithFormat:@"address_%u",i] cleanup:NO]) break;
-            size_t length = catalogModels ? NWBTLabCatalogData(data, catalogPlatform, catalogModels[i].unsignedIntValue) :
-                NWBTLabMultiDeviceData(data,(unsigned)platform,i);
-            if (!length) { session.error = @"Catalog advertising data unavailable."; break; }
-            if (platform==3) {
-                length = NWBTLabFastPairPower(data,(int8_t)((const uint8_t *)reply.bytes)[6]);
-                if (!length) { session.error = @"Selected transmit power cannot be encoded."; break; }
-                report[@"tx_power_ad_source"] = @"controller_selected_uncalibrated";
-            }
-            data[0] = params[0];
-            [session command:0x2037 parameters:[NSData dataWithBytes:data length:length]
-                phase:[NSString stringWithFormat:@"data_%u",i] cleanup:NO];
+            [handles addObject:@(NWBT_LAB_MULTI_HANDLE+i)];
+            if (!configureLabModel(session, report, platform, catalogPlatform, catalogModels, i, i, powers)) break;
         }
         if (handles.count==count && !session.error && !NWBTCancelled) {
             NSUInteger active=0;

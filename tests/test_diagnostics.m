@@ -37,10 +37,15 @@ int main(void) {
         NSMutableDictionary *transportFailure = [@{@"transport": @"uart-h4", @"payload": huge} mutableCopy];
         transportFailure[@"transport_details"] = @{@"configuration_comparison": @{@"matches": @NO, @"mismatches": @[@"control_flags"]},
             @"configuration_readback": @{@"result": @0, @"errno": @0, @"size": @72}};
+        transportFailure[@"capacity_query_supported"] = @NO;
+        transportFailure[@"advertising_schedule"] = @"sequential_single_set";
+        transportFailure[@"models_enabled_count"] = @2;
         NWDiagnosticRecord(@"le_catalog_test", @"failed", transportFailure);
         NSDictionary *bounded = [NWDiagnosticSnapshot()[@"events"] lastObject][@"details"];
         assert(bounded[@"truncated"] && [bounded[@"transport"] isEqual:@"uart-h4"]);
         assert([bounded[@"transport_details"][@"configuration_comparison"][@"mismatches"][0] isEqual:@"control_flags"]);
+        assert([bounded[@"capacity_query_supported"] isEqual:@NO] && [bounded[@"models_enabled_count"] isEqual:@2]);
+        assert([bounded[@"advertising_schedule"] isEqual:@"sequential_single_set"]);
         for (unsigned i = 0; i < 7; ++i) {
             NSError *error = nil; NSURL *file = NWDiagnosticSaveExport(&error); assert(file && !error);
             NSData *data = [NSData dataWithContentsOfURL:file]; assert(data.length < 1024 * 1024);

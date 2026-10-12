@@ -10,6 +10,10 @@ clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_BT_UART_TESTING -framework 
   tests/test_bt_uart.m src/bluetooth/NWBTUART.m -o "$out/test-bt-uart"
 "$out/test-bt-uart"
 rm "$out/test-bt-uart"
+clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_BT_LAB_TESTING -framework Foundation \
+  tests/test_bt_advertising.m src/bluetooth/NWBTUART.m -o "$out/test-bt-advertising"
+"$out/test-bt-advertising"
+rm "$out/test-bt-advertising"
 clang -std=c11 -Wall -Wextra -Werror tests/test_bt_skywalk.c -o "$out/test-bt-skywalk"
 "$out/test-bt-skywalk"
 rm "$out/test-bt-skywalk"

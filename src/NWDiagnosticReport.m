@@ -141,7 +141,10 @@ void NWDiagnosticRecord(NSString *test, NSString *status, NSDictionary *details)
         for (NSString *key in @[@"error", @"error_code", @"stage", @"operation", @"worker_process", @"cleanup_warning",
             @"service_restored", @"service_preserved", @"service_strategy", @"service_retired_before_operation",
             @"controller_interface_ready", @"capabilities_verified", @"controller_advertising_acknowledged",
-            @"advertising_stopped_acknowledged", @"advertising_set_removed", @"transport"]) if (safe[key]) summary[key] = safe[key];
+            @"advertising_stopped_acknowledged", @"advertising_set_removed", @"transport",
+            @"capacity_query_supported", @"capacity_verified", @"supported_advertising_sets",
+            @"advertising_schedule", @"schedule_reason", @"models_enabled_count",
+            @"requested_advertising_sets", @"local_hci_commands_submitted"]) if (safe[key]) summary[key] = safe[key];
         if (safe[@"transport_details"]) {
             NSData *transport = [NSJSONSerialization dataWithJSONObject:safe[@"transport_details"] options:0 error:NULL];
             summary[@"transport_details"] = transport && transport.length <= 4096 ? safe[@"transport_details"] : @{@"truncated": @YES};

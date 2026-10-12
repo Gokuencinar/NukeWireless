@@ -8,7 +8,7 @@ SOURCES = ['src/NWLegacyABI.h', 'src/NWInstallLayout.h', 'src/bluetooth/NWBTBrid
            'tests/test_bt_h4.c', 'tests/test_bt_uart.m', 'src/bluetooth/NWBTInspector.m', 'scripts/build_bluetooth_inspector.sh',
            'src/bluetooth/NWBTRunner.m', 'src/bluetooth/NWBTSkywalkABI.h', 'src/bluetooth/NWBTService.h', 'tests/test_bt_skywalk.c',
            'scripts/bluetooth_manifest.py', 'src/bluetooth/NWBTHCIRead.h', 'tests/test_hci_read.c',
-           'src/bluetooth/NWBTLab.h', 'tests/test_bt_lab.c',
+           'src/bluetooth/NWBTLab.h', 'tests/test_bt_lab.c', 'tests/test_bt_advertising.m',
            'src/bluetooth/NWBTControl.h', 'tests/test_bt_control.c',
            'src/NWDeviceCatalog.h', 'src/NWCatalogProfiles.h', 'tests/test_catalog_profiles.c']
 
@@ -17,7 +17,7 @@ def sources(): return {name: sha((ROOT / name).read_bytes().replace(b'\r\n', b'\
 
 if __name__ == '__main__':
     output = ROOT / 'build/bluetooth'
-    report = {'version': '2.0.0~diagnostic7', 'target': 'arm64-ios15.0', 'sources': sources(),
+    report = {'version': '2.0.0~diagnostic8', 'target': 'arm64-ios15.0', 'sources': sources(),
               'files': {name: sha((output / name).read_bytes()) for name in ['NukeBluetoothBridge.dylib', 'nwbt-inspect', 'nwbt-run']},
               'l2ping_implemented': True, 'runtime_verified': False}
     if f'#define NWBT_VERSION @"{report["version"]}"' not in (ROOT / 'src/bluetooth/NWBTBridge.h').read_text():
