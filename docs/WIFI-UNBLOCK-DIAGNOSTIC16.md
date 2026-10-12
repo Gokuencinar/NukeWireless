@@ -98,3 +98,23 @@ baseline fijado. Las regresiones de limpieza se ejecutaron en macOS CI.
 No se confunden esos resultados con restauración real de Internet: falta
 identificar el cliente de prueba antes de repetir el bloqueo. La causa de la
 caída general continúa sin confirmar y no se publica una release.
+
+## Aceptación manual del desbloqueo (12 de octubre de 2026)
+
+Se contrastaron por SSH la puerta de enlace, la IP local y la entrada ARP del
+cliente seleccionado. Coincidía con la MAC registrada por el escáner y no era
+la puerta de enlace ni el iPhone emisor. El usuario ejecutó manualmente bloquear
+y desbloquear solo ese cliente y confirmó «ya funciona» y «todo funciona ok»
+al preguntarle por mano azul e Internet recuperado sin cerrar la app.
+
+El registro posterior muestra entrada al hook Swift, limpieza del mismo cliente,
+parada privilegiada con salida 0 y lanzamiento de restauración ARP. El diario
+registra el proceso como `stopped`, con terminationStatus 15 (TERM esperado).
+NukeWireless seguía abierta y no había arpoison activo al recoger la evidencia.
+La prueba fue un ciclo manual; no se ejecutaron bloqueos remotos automáticos.
+La recuperación de Internet es aceptación del usuario, distinta de la evidencia
+local de parada. La causa de la caída general anterior sigue sin confirmar.
+Esta aceptación no demuestra compatibilidad en otros iOS/iPhones ni resuelve
+la prueba UART pendiente del tester.
+
+[Evidencia sin IP, MAC ni PID del cliente](evidence/diagnostic16-wifi-unblock-acceptance.json).

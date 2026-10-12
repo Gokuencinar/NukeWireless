@@ -10,8 +10,10 @@ con comprobación de bytes y carga explícita de la API del backend si hace falt
 Las llamadas anidadas limpian una vez el proceso propio de la misma IP.
 El JSON indica si el hook nativo está instalado. Bluetooth sigue en diagnostic6.
 Instalada en el XS de referencia: carga del backend y del hook nativo observadas.
-Aceptación del desbloqueo pendiente; la caída del resto de la red comunicada por
-el usuario sigue sin causa confirmada.
+El usuario confirmó bloqueo y desbloqueo de un cliente sin cerrar la app;
+se observaron entrada al hook, parada privilegiada correcta y proceso detenido.
+La causa de la incidencia general anterior sigue sin confirmar; esta prueba
+no valida otras versiones de iOS ni otros dispositivos.
 Compilación y regresiones aprobadas; DEB unificados validados en los tres esquemas.
 Véase [implementación y límites](docs/WIFI-UNBLOCK-DIAGNOSTIC16.md).
 
