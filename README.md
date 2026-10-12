@@ -12,7 +12,11 @@ visible se ancla ahora a su padre estable. Añade regresión de iPad horizontal
 y de barra nativa separada. Las cinco validaciones CI y los DEB completos
 RootHide/rootless/rootful pasaron; iPhone e iPad simulado completaron 46
 comprobaciones y cuatro ciclos de segundo plano por idioma. El iPad usa una
-sola columna y barra inferior. La aceptación del iPad físico sigue pendiente.
+sola columna y barra inferior en iPadOS 18.5. El tester de iPad Pro / iPadOS
+16.0 comunica el mismo fallo; falta confirmar la build cargada en ese equipo.
+La comparación posterior detecta que la ruta alternativa de traits no conserva
+la presentación compacta al forzarla sobre el simulador 18.5. No se considera
+resuelto el caso físico de iPadOS 16.
 Véase [investigación y cambio](docs/IPAD-PRESENTATION-DIAGNOSTIC18.md).
 
 **2.0.0~diagnostic17: sesión UART sin retirar bluetoothd.**

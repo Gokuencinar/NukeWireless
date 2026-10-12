@@ -63,5 +63,44 @@ Pasaron integración, procedencia, firma, dependencias y rutas; el CI ejecutó
 las pruebas dpkg/Linux y la revisión local cubrió los payloads finales.
 Hashes, trabajos y resultados: [verificación](evidence/diagnostic18-verification.json).
 
-La aceptación del iPad físico permanece pendiente. La compilación con destino
-iOS 15 no demuestra el funcionamiento en iPadOS 15/16 ni en otros jailbreaks.
+## Seguimiento del iPad Pro con iPadOS 16.0
+
+El 12 de octubre el usuario comunica que el tester obtiene el mismo resultado
+en un iPad Pro con iPadOS 16.0 y Dopamine. No aporta todavía el identificador
+exacto del iPad ni confirma mediante el diario qué build carga. Diagnostic18
+no tiene aceptación física en ese equipo.
+
+Se añadió una selección exclusiva de `NW_UI_TESTING` para comparar la ruta
+moderna y la de `setOverrideTraitCollection:forChildViewController:` sobre la
+misma fixture y runtime. La ejecución normal conserva la elección por versión
+de diagnostic18; no se generó ni distribuyó un paquete nuevo con este cambio.
+La API de traits se contrasta con la [documentación de Apple](https://developer.apple.com/documentation/uikit/uiviewcontroller/setoverridetraitcollection(_:forchild:)?language=objc).
+
+La [comparación](https://github.com/Gokuencinar/NukeWireless/actions/runs/38236583154)
+usa fuentes `97ba3afa11d2c192913495557d2432855f53f187` y el mismo iPad Pro
+11-inch (M4) simulado con iPadOS 18.5:
+
+- La ruta moderna pasa las 46 comprobaciones y cuatro ciclos de segundo plano
+  por idioma, inglés y español.
+- La ruta alternativa pasa las 20 comprobaciones iniciales, pero falla con
+  código 42 al verificar el tamaño horizontal compacto tras el primer retorno
+  a Wi-Fi. El PID no cambia: no es un crash en esta reproducción.
+- Las capturas alternativas muestran una columna vacía ya en el arranque;
+  después del retorno también aparece la barra flotante nativa. Las pruebas
+  iniciales existentes no detectaban esa adaptación visual incorrecta.
+
+Forzar la API anterior sobre iPadOS 18.5 no reproduce el runtime de iPadOS 16.0.
+Por tanto, este resultado identifica una limitación de presentación y de la
+validación anterior, pero no demuestra la causa de la pantalla negra física.
+Además, la fixture ejecuta directamente un TabView SwiftUI: no ejecuta la
+transición SplashView del ejecutable original. No se modifica ese arranque
+basándose únicamente en esta comparación.
+
+El siguiente dato útil es el `latest.json` existente en Documents /
+NukeWireless-Diagnostics del iPad, recogido después del fallo. Registra la
+build cargada, el identificador del modelo, iPadOS, esquema y eventos de
+ciclo de vida sin exigir acceso al menú de Diagnósticos. No contiene todavía
+una captura de la jerarquía de ventanas del dispositivo físico.
+
+La compilación con destino iOS 15 no demuestra el funcionamiento en iPadOS
+15/16 ni en otros jailbreaks. La corrección física permanece pendiente.

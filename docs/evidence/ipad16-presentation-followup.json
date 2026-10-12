@@ -1,0 +1,225 @@
+{
+  "recorded_at": "2026-10-12",
+  "ci": {
+    "id": 38236583154,
+    "head_sha": "97ba3afa11d2c192913495557d2432855f53f187",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/Gokuencinar/NukeWireless/actions/runs/38236583154"
+  },
+  "physical_tester_report": {
+    "device": "iPad Pro",
+    "ipados": "16.0",
+    "jailbreak": "Dopamine",
+    "result": "same_issue_user_report",
+    "exact_machine": "not_provided",
+    "loaded_build": "not_confirmed",
+    "physical_fix_confirmed": false
+  },
+  "runtime": {
+    "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-18-5",
+    "device": "iPad Pro 11-inch (M4)",
+    "deployment_target": "15.0",
+    "physical_device": false
+  },
+  "modern_traits": {
+    "en": {
+      "real_background_cycles": 4,
+      "results": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    },
+    "es": {
+      "real_background_cycles": 4,
+      "results": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "passed": true
+    }
+  },
+  "forced_legacy_traits": {
+    "initial": {
+      "passed": true,
+      "results": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "resume_before": {
+      "tag": 0,
+      "phase": 0,
+      "prepared": true,
+      "pid": 11926
+    },
+    "resume_after": {
+      "phase": 0,
+      "tag": 0,
+      "background_seen": true,
+      "result": 42,
+      "pid": 11926
+    },
+    "english_only": true,
+    "visual_review": "split_navigation_and_empty_detail_at_startup; additional_native_floating_bar_after_resume"
+  },
+  "limits": [
+    "Forced old API on iPadOS 18.5 is not an iPadOS 16 runtime test.",
+    "Fixture does not execute the original native SplashView transition.",
+    "No new production package or physical correction was delivered."
+  ],
+  "artifacts": [
+    {
+      "mode": "native",
+      "file": "en-regression.json",
+      "sha256": "b4d672c5e2f7025f726a41cca54f8170a1f730afa036d53fc4b350161d0b49a7"
+    },
+    {
+      "mode": "native",
+      "file": "es-regression.json",
+      "sha256": "b4d672c5e2f7025f726a41cca54f8170a1f730afa036d53fc4b350161d0b49a7"
+    },
+    {
+      "mode": "native",
+      "file": "en-wifi.png",
+      "sha256": "66b326f7bdcbf4c89c5ce1c9b40bec6a0cce4d473dfec4d050fe4f3d79e25bfe"
+    },
+    {
+      "mode": "native",
+      "file": "en-resume-0.png",
+      "sha256": "839dbc9d97e73045238ce10683c2011b01635bd34fa2221588bbfade8e65a6af"
+    },
+    {
+      "mode": "legacy-traits",
+      "file": "ui-initial.json",
+      "sha256": "bc8e5ddf42e54ad1e2f2321566736dd5b89815062db86c51a47de17aed897db4"
+    },
+    {
+      "mode": "legacy-traits",
+      "file": "startup-hierarchy.json",
+      "sha256": "612765adf4351d3bba98fae351ff0214c2889fb25c01e4492f502b0fbe597e13"
+    },
+    {
+      "mode": "legacy-traits",
+      "file": "resume-done-0.json",
+      "sha256": "dad3496d3381d58247eb434e8815beb54acea5951155600e44cf5386eb2f748e"
+    },
+    {
+      "mode": "legacy-traits",
+      "file": "wifi.png",
+      "sha256": "cbd8824ba10b73a309ec86893b6c3b74380fda76bc44fef4d0016f60ab2cdee9"
+    },
+    {
+      "mode": "legacy-traits",
+      "file": "resume-0.png",
+      "sha256": "a10f310195ae169c1d34cec7f6df5db2183fb95b1f7f1e37c9d714db3f95887e"
+    }
+  ]
+}

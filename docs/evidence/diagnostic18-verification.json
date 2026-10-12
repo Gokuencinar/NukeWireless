@@ -153,8 +153,9 @@
         "sha256": "0f1ab0e08c98bc75898487982432c4240702b1865b603947218f477ebc4571d8"
       }
     ],
-    "physical_tester_acceptance": "pending",
-    "physical_ipados16_compatibility_confirmed": false
+    "physical_tester_acceptance": "same_issue_user_report_loaded_build_unconfirmed",
+    "physical_ipados16_compatibility_confirmed": false,
+    "followup_evidence": "ipad16-presentation-followup.json"
   },
   "unchanged_from_diagnostic17": [
     "src/bluetooth",
