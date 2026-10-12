@@ -143,7 +143,7 @@ void NWDiagnosticRecord(NSString *test, NSString *status, NSDictionary *details)
             @"controller_interface_ready", @"capabilities_verified", @"controller_advertising_acknowledged",
             @"advertising_stopped_acknowledged", @"advertising_set_removed", @"transport",
             @"capacity_query_supported", @"capacity_verified", @"supported_advertising_sets",
-            @"advertising_schedule", @"schedule_reason", @"models_enabled_count",
+            @"advertising_schedule", @"schedule_reason", @"models_enabled_count", @"selection_completed",
             @"requested_advertising_sets", @"local_hci_commands_submitted"]) if (safe[key]) summary[key] = safe[key];
         if (safe[@"transport_details"]) {
             NSData *transport = [NSJSONSerialization dataWithJSONObject:safe[@"transport_details"] options:0 error:NULL];

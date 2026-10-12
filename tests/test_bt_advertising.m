@@ -107,6 +107,7 @@ int main(void) { @autoreleasepool {
     assert(report[@"error"] && !peer.enables && !countOpcode(0x2036) && peer.closed);
     reset(); cancelOnSleep = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && peer.enables == 1 && !countOpcode(0x203b)); clean(report);
+    assert([report[@"controller_advertising_acknowledged"] boolValue] && ![report[@"selection_completed"] boolValue]);
     reset(); peer.dropOpcode = 0x2039; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && peer.enables == 1 && countOpcode(0x203c) == 1 && peer.closed);
     assert(!NWBTUARTCanPreserveService(report));

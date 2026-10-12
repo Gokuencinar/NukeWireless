@@ -528,7 +528,8 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
                 if (!started) started = now();
                 enabled++; report[@"models_enabled_count"] = @(enabled);
                 report[@"active_set_count"] = @1;
-                report[@"controller_advertising_acknowledged"] = @(enabled == count);
+                report[@"controller_advertising_acknowledged"] = @YES;
+                report[@"selection_completed"] = @(enabled == count);
                 double sliceEnd = MIN(now() + ticks / 100.0, started + 10.0);
                 while (!NWBTCancelled && now() < sliceEnd) usleep(20000);
                 if (NWBTCancelled) break;
