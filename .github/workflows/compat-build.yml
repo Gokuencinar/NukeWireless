@@ -1,7 +1,7 @@
 name: iOS 15-18 compatibility candidates
 on:
   push:
-    branches: [audit-rh25.5]
+    branches: [audit-rh25.5, ipad-onboarding-diagnostic1]
     paths:
       - 'src/**'
       - 'resources/**'

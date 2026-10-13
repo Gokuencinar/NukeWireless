@@ -52,14 +52,195 @@ func checkResumeTest() -> Int32
 @_silgen_name("NWUIRegressionDiagnosticNavigation")
 func checkDiagnosticNavigation(_ phase: Int32) -> Int32
 
+// This opt-in fixture exercises the presentation transition omitted by the
+// normal regression (which starts with TabView already on screen).  It never
+// changes the original 21/47-check test path or runs its automatic snapshots.
+private enum OnboardingTestMode: String {
+    case disabled, immediate, late
+
+    static func selected() -> OnboardingTestMode {
+        let arguments = ProcessInfo.processInfo.arguments
+        let environment = ProcessInfo.processInfo.environment["NW_UI_ONBOARDING_MODE"] ?? ""
+        if arguments.contains("--ipad-onboarding-late") || environment == "late" { return .late }
+        if arguments.contains("--ipad-onboarding-immediate") ||
+            arguments.contains("--ipad-onboarding") || environment == "immediate" { return .immediate }
+        return .disabled
+    }
+}
+
 @main
 struct UIRegressionApp: App {
+    private let onboardingMode = OnboardingTestMode.selected()
+
     init() {
         setFixtureLanguage(ProcessInfo.processInfo.arguments.contains("es") ? 1 : 0)
         if ProcessInfo.processInfo.arguments.contains("legacy-traits") { useLegacyPadTraits() }
     }
     var body: some Scene {
-        WindowGroup { RegressionTabs() }
+        WindowGroup {
+            if onboardingMode == .disabled {
+                RegressionTabs()
+            } else {
+                OnboardingTransitionRegression(mode: onboardingMode)
+            }
+        }
+    }
+}
+
+private struct OnboardingTransitionRegression: View {
+    let mode: OnboardingTestMode
+    @State private var mainVisible = false
+    @State private var scheduled = false
+    @State private var continued = false
+    @State private var selection = 0
+    @State private var startedAt = Date()
+    @State private var before: [String: Any] = [:]
+    @State private var continueAfterSeconds = 0.0
+
+    private var transitionDelay: TimeInterval { mode == .late ? 16 : 2 }
+
+    var body: some View {
+        Group {
+            if mainVisible {
+                mainTabs
+            } else {
+                VStack(spacing: 24) {
+                    Text("Welcome to NukeWireless").font(.title)
+                    Text("Onboarding navigation regression fixture")
+                    Button("CONTINUAR", action: continueToMain)
+                        .accessibilityIdentifier("nw.fixture.continue")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("nw.fixture.welcome")
+            }
+        }
+        .onAppear {
+            guard !scheduled else { return }
+            scheduled = true
+            startedAt = Date()
+            // Retain a real, tappable button; the automatic test invokes its
+            // same action to make the run unattended and deterministic.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                before = presentationState()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + transitionDelay) {
+                continueToMain()
+            }
+        }
+    }
+
+    private var mainTabs: some View {
+        TabView(selection: $selection) {
+            NavigationView {
+                VStack {
+                    Text("No devices found!")
+                    Text("No WiFi Available")
+                    Text("Unknown MAC Address")
+                }.navigationTitle("Harpy")
+            }.tabItem { Label("WiFi", systemImage: "wifi") }.tag(0)
+            Text("Hotspot fixture")
+                .tabItem { Label("Hotspot", systemImage: "link") }.tag(1)
+            Text("Information fixture")
+                .tabItem { Label("Info", systemImage: "info.circle") }.tag(2)
+        }
+        .accessibilityIdentifier("nw.fixture.main")
+    }
+
+    private func continueToMain() {
+        guard !continued else { return }
+        continued = true
+        if before.isEmpty { before = presentationState() }
+        continueAfterSeconds = Date().timeIntervalSince(startedAt)
+        mainVisible = true
+        // Allow SwiftUI to construct the tab controllers before inspecting
+        // them.  A second sample catches a tab that appears later.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            let early = presentationState()
+            write(["mode": mode.rawValue, "phase": "after-continue-early", "state": early],
+                  "onboarding-\(mode.rawValue)-early.json")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            let after = presentationState()
+            capture("onboarding-\(mode.rawValue)-main.png")
+            let beforeHasTabs = before["tabs_found"] as? Bool ?? false
+            let found = after["tabs_found"] as? Bool ?? false
+            let nativeHosts = after["native_hosts"] as? Int ?? 0
+            let barItems = after["presentation_items"] as? Int ?? 0
+            let barAttached = after["presentation_attached"] as? Bool ?? false
+            let selectedAttached = after["selected_attached"] as? Bool ?? false
+            let selectedNonempty = after["selected_nonempty"] as? Bool ?? false
+            let sizeClass = after["horizontal_size_class"] as? Int ?? 0
+            let compactOnPad = UIDevice.current.userInterfaceIdiom != .pad ||
+                sizeClass == UIUserInterfaceSizeClass.compact.rawValue
+            let lateEnough = mode != .late || continueAfterSeconds > 12
+            let passed = !beforeHasTabs && found && nativeHosts == 3 && barItems == 4 &&
+                barAttached && selectedAttached && selectedNonempty && compactOnPad && lateEnough
+            write(["fixture": "welcome-continue-three-tabs", "mode": mode.rawValue,
+                   "transition_delay_seconds": transitionDelay,
+                   "continue_after_seconds": continueAfterSeconds, "button_action_invoked": continued,
+                   "late_after_diagnostics_window": lateEnough, "before": before, "after": after,
+                   "passed": passed], "onboarding-\(mode.rawValue)-result.json")
+        }
+    }
+
+    private func presentationState() -> [String: Any] {
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }.filter { !$0.isHidden }
+        guard let window = windows.first(where: { $0.isKeyWindow }) ?? windows.first else {
+            return ["window_found": false, "tabs_found": false]
+        }
+        var examined = 0
+        func findTabs(_ controller: UIViewController?, _ depth: Int) -> UITabBarController? {
+            guard let controller, depth <= 12, examined < 64 else { return nil }
+            examined += 1
+            let tabs = (controller as? UITabBarController) ?? controller.tabBarController
+            if let tabs, tabs.viewControllers?.count == 3 { return tabs }
+            for child in controller.children {
+                if let found = findTabs(child, depth + 1) { return found }
+            }
+            return nil
+        }
+        guard let tabs = findTabs(window.rootViewController, 0) else {
+            return ["window_found": true, "tabs_found": false,
+                    "window_width": Double(window.bounds.width),
+                    "window_height": Double(window.bounds.height)]
+        }
+        let presentation = tabs.view.subviews.compactMap { $0 as? UITabBar }
+            .first(where: { $0.accessibilityIdentifier == "nw.main.tabs" })
+        let selected = tabs.selectedViewController?.viewIfLoaded
+        return ["window_found": true, "tabs_found": true,
+                "native_hosts": tabs.viewControllers?.count ?? 0,
+                "selected_index": tabs.selectedIndex,
+                "selected_attached": selected?.window != nil,
+                "selected_nonempty": (selected?.bounds.width ?? 0) > 0 && (selected?.bounds.height ?? 0) > 0,
+                "selected_width": Double(selected?.bounds.width ?? 0),
+                "selected_height": Double(selected?.bounds.height ?? 0),
+                "horizontal_size_class": tabs.traitCollection.horizontalSizeClass.rawValue,
+                "presentation_items": presentation?.items?.count ?? 0,
+                "presentation_attached": presentation?.window != nil,
+                "presentation_hidden": presentation?.isHidden ?? true,
+                "native_bar_attached": tabs.tabBar.window != nil,
+                "window_width": Double(window.bounds.width),
+                "window_height": Double(window.bounds.height)]
+    }
+
+    private func write(_ report: [String: Any], _ name: String) {
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]) {
+            try? data.write(to: file, options: .atomic)
+        }
+    }
+
+    private func capture(_ name: String) {
+        guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) else { return }
+        let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        }
+        let file = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+        try? image.pngData()?.write(to: file)
     }
 }
 

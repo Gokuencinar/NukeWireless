@@ -105,6 +105,16 @@ static void capture(NSString *phase) {
     }
     NWDiagnosticRecord(@"ui_presentation", missing ? @"warning" : @"captured", snapshot);
 }
+void NWPresentationDiagnosticsRecordOnboarding(NSString *phase, NSDictionary *beforeTabs) {
+    NSCAssert(NSThread.isMainThread, @"Onboarding snapshots require the main thread");
+    if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+    // Separate from the twelve startup/foreground captures: a user can spend
+    // longer than twelve seconds reading the original SwiftUI welcome screen.
+    NSMutableDictionary *snapshot = [presentationSnapshot(phase) mutableCopy];
+    if (beforeTabs) snapshot[@"before_reconcile_tabs"] = @[beforeTabs];
+    boundSnapshot(snapshot);
+    NWDiagnosticRecord(@"ui_onboarding", @"captured", snapshot);
+}
 void NWPresentationDiagnosticsInstall(void (^reconcile)(UIViewController *root)) {
     NSCAssert(NSThread.isMainThread, @"Presentation diagnostics require the main thread");
     static dispatch_once_t once;

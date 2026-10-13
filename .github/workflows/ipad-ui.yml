@@ -1,10 +1,12 @@
 name: iPad presentation regression
 on:
   push:
-    branches: [audit-rh25.5]
+    branches: [audit-rh25.5, ipad-onboarding-diagnostic1]
     paths:
       - '.github/workflows/ipad-ui.yml'
       - 'src/NWMainTabs.*'
+      - 'src/NukeWirelessInfo.m'
+      - 'src/NWPresentationDiagnostics.*'
       - 'tests/UIRegression.swift'
       - 'scripts/test_ui_simulator.sh'
   workflow_dispatch:
@@ -22,19 +24,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [diagnostic21]
+        source: [ipadtest1]
         traits: ["${{ inputs.traits || 'native' }}"]
         orientation: [portrait, landscape]
+        # 'off' preserves the existing full regression alongside new onboarding cases.
+        onboarding: [off, immediate, late]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Run iPad navigation, rotation and background checks
-        run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=${{ matrix.orientation }} NW_UI_ROTATION=rotate NW_UI_TRAITS=${{ matrix.traits }} bash scripts/test_ui_simulator.sh
+        run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=${{ matrix.orientation }} NW_UI_ROTATION=rotate NW_UI_TRAITS=${{ matrix.traits }} NW_UI_ONBOARDING=${{ matrix.onboarding }} bash scripts/test_ui_simulator.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ipad-ui-${{ matrix.source }}-${{ matrix.traits }}-${{ matrix.orientation }}
+          name: ipad-ui-${{ matrix.source }}-${{ matrix.traits }}-${{ matrix.orientation }}-${{ matrix.onboarding }}
           path: |
             build/ui/*.png
             build/ui/*.json

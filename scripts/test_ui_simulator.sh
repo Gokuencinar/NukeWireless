@@ -3,6 +3,11 @@ set -euo pipefail
 minimum_ios="${NW_MIN_IOS:-16.3}"
 device_family="${NW_UI_DEVICE_FAMILY:-iPhone}"
 case "$device_family" in iPhone|iPad) ;; *) echo "Unsupported UI device family" >&2; exit 1 ;; esac
+onboarding_mode="${NW_UI_ONBOARDING:-off}"
+case "$onboarding_mode" in
+  off|immediate|late|both) ;;
+  *) echo "Unsupported onboarding regression mode: $onboarding_mode" >&2; exit 1 ;;
+esac
 case "$minimum_ios" in
   15.0|16.3) ;;
   *) echo "Unsupported simulator deployment target: $minimum_ios" >&2; exit 1 ;;
@@ -63,6 +68,44 @@ with open(sys.argv[1], 'w', encoding='utf-8') as stream:
 PY
 xcrun simctl install "$device" "$out/UIRegression.app"
 container="$(xcrun simctl get_app_container "$device" app.nukewireless.ui-regression data)"
+if [ "$onboarding_mode" != off ]; then
+  # A separate opt-in test of Welcome -> Continue -> native SwiftUI tabs.
+  # Do not mix its reports with the standard 21/47-check regression run.
+  modes=("$onboarding_mode")
+  if [ "$onboarding_mode" = both ]; then modes=(immediate late); fi
+  for language in en es; do
+    for mode in "${modes[@]}"; do
+      result="$container/Documents/onboarding-$mode-result.json"
+      early="$container/Documents/onboarding-$mode-early.json"
+      screenshot="$container/Documents/onboarding-$mode-main.png"
+      rm -f "$result" "$early" "$screenshot"
+      xcrun simctl terminate "$device" app.nukewireless.ui-regression >/dev/null 2>&1 || true
+      xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" \
+        --orientation "${NW_UI_ORIENTATION:-portrait}" --ipad-onboarding-"$mode"
+      for attempt in $(seq 1 40); do
+        if [ -f "$result" ]; then break; fi
+        sleep 1
+      done
+      python3 - "$result" "$mode" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as f:
+    report = json.load(f)
+print('Onboarding transition regression:', report)
+assert report['mode'] == sys.argv[2], report
+assert report['button_action_invoked'] and report['passed'], report
+assert not report['before']['tabs_found'], report
+assert report['after']['native_hosts'] == 3 and report['after']['presentation_items'] == 4, report
+if sys.argv[2] == 'late':
+    assert report['continue_after_seconds'] > 12, report
+PY
+      cp "$result" "$out/$language-onboarding-$mode-result.json"
+      cp "$early" "$out/$language-onboarding-$mode-early.json"
+      cp "$screenshot" "$out/$language-onboarding-$mode-main.png"
+      xcrun simctl terminate "$device" app.nukewireless.ui-regression
+    done
+  done
+  exit 0
+fi
 for language in en es; do
 rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
 xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}" --traits "${NW_UI_TRAITS:-native}" --rotation "${NW_UI_ROTATION:-fixed}"

@@ -43,5 +43,5 @@ if __name__ == '__main__':
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic21', 'target': args.target,
+        'diagnostic_schema': 1, 'version': '2.0.0~ipadtest1', 'target': args.target,
     }, indent=2) + '\n', encoding='utf-8')

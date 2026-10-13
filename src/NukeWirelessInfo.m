@@ -691,6 +691,41 @@ static void appeared(UIViewController *controller, SEL sel, BOOL animated) {
     originalViewDidAppear(controller,sel,animated);
     dispatch_async(dispatch_get_main_queue(), ^{ installUI(controller); });
 }
+static void reconcileLateIPadTabs(void) {
+    // The pinned SwiftUI app can switch from SplashView to its TabView without
+    // another UIKit viewDidAppear: callback. Unlike the startup snapshots, this
+    // check remains effective when Continue is pressed after twelve seconds.
+    if (UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPad ||
+        UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+    static NSUInteger waitingChecks;
+    static __weak UITabBarController *lastAttached;
+    ++waitingChecks;
+    BOOL found = NO;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class] ||
+            scene.activationState != UISceneActivationStateForegroundActive) continue;
+        for (UIWindow *window in ((UIWindowScene *)scene).windows) {
+            if (!window.isKeyWindow || window.hidden || !window.rootViewController) continue;
+            UITabBarController *tabs = NWFindMainTabs(window.rootViewController);
+            if (!tabs || !tabs.isViewLoaded || tabs.view.window != window) continue;
+            found = YES;
+            NSDictionary *before = NWMainTabsPresentationSnapshot(tabs);
+            if (lastAttached != tabs || activeTab != tabs || ![before[@"presentation_attached"] boolValue]) {
+                // Preserve the three original hosts and the SwiftUI delegate;
+                // reuse the existing idempotent installer, never replace root.
+                installUI(window.rootViewController);
+                lastAttached = tabs;
+                NWPresentationDiagnosticsRecordOnboarding(@"tabs-after-welcome", before);
+            }
+            break;
+        }
+        if (found) break;
+    }
+    // 'No tabs yet' is normal while Welcome is visible. These limited samples
+    // distinguish a persistent splash/empty root from a hidden split detail.
+    if (!found && (waitingChecks == 8 || waitingChecks == 30 || waitingChecks == 60 || waitingChecks == 120))
+        NWPresentationDiagnosticsRecordOnboarding(@"awaiting-main-tabs", nil);
+}
 static void willAppear(UIViewController *controller, SEL sel, BOOL animated) {
     prepareInfoTab(tabForController(controller));
     originalViewWillAppear(controller, sel, animated);
@@ -722,6 +757,7 @@ __attribute__((constructor)) static void installExtension(void) {
         // Reconcile actions from the unchanged individual Swift controls too.
         [NSTimer scheduledTimerWithTimeInterval:2 repeats:YES block:^(NSTimer *timer) {
             (void)timer;
+            reconcileLateIPadTabs();
             if (activeTab.selectedIndex == 0 && !NWBluetoothTabSelected(activeTab) && activeTab.view.window) {
                 NWMaintainWiFiScan(); NWReconcileDeviceStates(); updateWiFi(); NWRefreshVisibleDeviceBrowser();
             }
