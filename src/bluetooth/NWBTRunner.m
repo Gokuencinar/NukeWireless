@@ -30,6 +30,7 @@ static pid_t invokingParent;
 static atomic_bool restoringService;
 static char *const cleanEnvironment[] = {"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", NULL};
 static double uptime(void) { return NSProcessInfo.processInfo.systemUptime; }
+extern BOOL NWBTForceLegacyAdvertisingStop(void);
 static void cancelRun(int number) {
     if (NWBTCancelled) _exit(128 + number);
     NWBTCancelled = 1; alarm(4);
@@ -231,15 +232,30 @@ static int recover(void) {
     close(5);
     // Before arming, EOF or timeout means no service mutation was authorized.
     struct pollfd descriptor = {3, POLLIN | POLLHUP, 0}; char byte = 0;
-    if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 || (byte != 'a' && byte != 'u')) return 0;
+    if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 ||
+        (byte != 'a' && byte != 'u' && byte != 'l')) return 0;
     char arm = byte; byte = 0;
     // This child survives app/worker exit and owns the inherited flock until
     // restoration finishes. EOF, completion or process termination restores.
-    int received = poll(&descriptor, 1, -1) > 0 ? (int)read(3, &byte, 1) : -1;
-    enum NWBTRecoveryAction action = NWBTRecoveryDecision(arm, received, byte);
+    pid_t worker = getppid();
+    // LE legacy advertising lacks extended advertising's controller-side
+    // duration. The recovery process is independent of the app and worker.
+    // If a worker stalls, kill its UART owner so the port can be acquired for
+    // an explicit disable, then reset the daemon regardless of the outcome.
+    int polled = poll(&descriptor, 1, arm == 'l' ? 22000 : -1);
+    BOOL timedOut = arm == 'l' && polled == 0;
+    if (timedOut && worker > 1 && getppid() == worker) {
+        kill(worker, SIGKILL);
+        poll(&descriptor, 1, 1500);
+    }
+    int received = polled > 0 ? (int)read(3, &byte, 1) : -1;
+    enum NWBTRecoveryAction action = timedOut ? NWBTRecoveryRetireAndRestore :
+        NWBTRecoveryDecision(arm == 'l' ? 'u' : arm, received, byte);
     // A normal UART session closed/restored its own socket and stopped its
     // advertising handles. Do not reset the initialized controller afterwards.
     // Worker death/EOF or uncertain cleanup still has independent recovery.
+    if (arm == 'l' && action == NWBTRecoveryRetireAndRestore)
+        (void)NWBTForceLegacyAdvertisingStop();
     if (action == NWBTRecoveryRetireAndRestore) control("bootout", service, NULL);
     BOOL preserved = action == NWBTRecoveryObserve && running();
     BOOL restored = preserved || restoreService();
@@ -354,7 +370,10 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
         }
         recovery = startRecovery(ownPath, lock, &writer);
         if (recovery <= 0) return errorReport(@"recovery");
-        if (write(writer, uart ? "u" : "a", 1) != 1) return errorReport(@"recovery");
+        // Legacy lab commands get a separate fail-closed guardian. Read-only
+        // capability checks preserve the historical UART recovery contract.
+        if (write(writer, uart ? (lab ? "l" : "u") : "a", 1) != 1)
+            return errorReport(@"recovery");
         armed = YES;
         if (uart) {
             // InternalBlue's UART path leaves bluetoothd running with Bluetooth

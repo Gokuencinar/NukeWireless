@@ -7,6 +7,7 @@
 #import "../src/bluetooth/NWBTNative.h"
 static double clockValue;
 static BOOL cancelOnSleep;
+static BOOL legacyTransport;
 double NWBTLabTestTime(void) { return clockValue; }
 static int testSleep(useconds_t microseconds) {
     clockValue += microseconds / 1000000.0;
@@ -24,7 +25,7 @@ static int testPoll(struct pollfd *fds, nfds_t count, int timeout) {
 
 NSDictionary *NWBTNativeGuard(void) { return nil; }
 NSDictionary *NWBTLegacyGuard(void) { return nil; }
-NSString *NWBTNativeTransport(void) { return @"skywalk"; }
+NSString *NWBTNativeTransport(void) { return legacyTransport ? @"uart-h4" : @"skywalk"; }
 void *NWBTOpenExclusiveNativeChannel(NSString *protocol, uint64_t *capacity, NSDictionary **error) {
     (void)protocol; (void)capacity; (void)error; return NULL;
 }
@@ -54,6 +55,7 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
         if (self.capacityQuery) bytes[42] |= 0x80;
         if (self.missingSetter) bytes[42] &= ~0x04;
     }
+    if (opcode == 0x2003) { bytes[6] = 0xff; bytes[7] = 0x03; }
     if (opcode == 0x203b) bytes[6] = self.setLimit;
     if (opcode == 0x2036) bytes[6] = 8;
     if (opcode == 0x2035) [self.addresses addObject:[packet subdataWithRange:NSMakeRange(3, 7)]];
@@ -61,6 +63,7 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
     if (opcode == 0x2039 && p[3]) {
         self.enables++; unsigned ticks = u16(p+6); assert(ticks > 0 && ticks <= 1000);
     }
+    if (opcode == 0x200a && p[3]) self.enables++;
     if (opcode == self.failOpcode || (self.failCleanup && (opcode == 0x203c || (opcode == 0x2039 && !p[3])))) bytes[5] = 0x0c;
     self.reply = opcode == self.dropOpcode ? nil : [NSData dataWithBytes:bytes length:size+5];
     return YES;
@@ -77,7 +80,8 @@ static TestRing *peer;
 id NWBTLabTestRing(void) { return peer; }
 static void reset(void) {
     peer = [TestRing new]; peer.writes = [NSMutableArray new]; peer.addresses = [NSMutableArray new]; peer.payloads = [NSMutableArray new];
-    peer.setLimit = 6; clockValue = 100; cancelOnSleep = NO; atomic_store(&NWBTCancelled, 0);
+    peer.setLimit = 6; clockValue = 100; cancelOnSleep = NO; legacyTransport = NO;
+    atomic_store(&NWBTCancelled, 0);
 }
 static unsigned countOpcode(uint16_t opcode) {
     unsigned count = 0; for (NSData *packet in peer.writes) if (u16(packet.bytes) == opcode) count++; return count;
@@ -123,5 +127,25 @@ int main(void) { @autoreleasepool {
     reset(); report = NWBTAdvertiseApplePairingLab(); assert(!report[@"error"] && !countOpcode(0x203b)); clean(report);
     // Repeated operations never retain handles or cancellation from the last run.
     reset(); report = NWBTAdvertiseCatalogLab(1, @[@0]); assert(!report[@"error"]); clean(report);
+    reset(); legacyTransport = YES; report = NWBTAdvertiseCatalogLab(0, @[@1]);
+    assert(!report[@"error"] && peer.enables == 1 &&
+           [report[@"advertising_mode"] isEqual:@"legacy"] &&
+           [report[@"advertising_stopped_acknowledged"] boolValue] &&
+           countOpcode(0x2006) == 1 && countOpcode(0x2008) == 1 &&
+           countOpcode(0x200a) >= 2 && !countOpcode(0x2036) && !countOpcode(0x203c));
+    assert(peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport = YES; report = NWBTAdvertiseCatalogLab(0, models);
+    assert(!report[@"error"] && peer.enables == 6 &&
+           [report[@"selection_completed"] boolValue] && countOpcode(0x2006) == 6 &&
+           countOpcode(0x2008) == 6 && countOpcode(0x200a) >= 12 && !countOpcode(0x2036));
+    assert(peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport = YES; peer.failOpcode = 0x2008;
+    report = NWBTAdvertiseCatalogLab(0, @[@1]);
+    assert(report[@"error"] && !peer.enables && peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport = YES; peer.failOpcode = 0x200a;
+    report = NWBTAdvertiseCatalogLab(0, @[@1]);
+    assert(report[@"error"] && peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport = YES; assert(NWBTForceLegacyAdvertisingStop());
+    assert(peer.closed && countOpcode(0x200a) == 1 && !peer.enables);
     puts("PASS: tester bitmap, single/sequential/simultaneous advertising, deadlines, Stop, rejection, lost ACK and cleanup");
 } }

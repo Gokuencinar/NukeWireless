@@ -7,10 +7,34 @@
 #define NWBT_LAB_HANDLE 0xee
 static inline size_t NWBTLabReplySize(uint16_t opcode) {
     switch (opcode) {
+        case 0x2005: case 0x2006: case 0x2008: case 0x200a: return 1;
         case 0x2036: case 0x203b: return 2;
         case 0x2035: case 0x2037: case 0x2039: case 0x203c: return 1;
         default: return 0;
     }
+}
+// Legacy random address, parameters, data: octet 25 bits 4,5,7;
+// advertise enable: octet 26 bit 1.
+// Select this family before touching any advertising state, never as an
+// immediate retry of a rejected extended command (Core Vol 4 Part E 3.1.1).
+static inline int NWBTLegacyAdvertisingCommands(const uint8_t *commands, size_t length) {
+    return commands && length == 64 && (commands[25] & 0xb0) == 0xb0 &&
+        (commands[26] & 0x02) != 0;
+}
+static inline void NWBTLegacyAdvertisingParameters(uint8_t p[15], int swiftPair) {
+    memset(p, 0, 15);
+    uint16_t interval = swiftPair ? 244 : 160; // 152.5 or 100 ms
+    p[0] = p[2] = (uint8_t)interval;
+    p[1] = p[3] = (uint8_t)(interval >> 8);
+    p[4] = 3; // ADV_NONCONN_IND, no scan response or connection.
+    p[5] = 1; // Temporary static-random address, never expose phone public MAC.
+    p[13] = 7; // All three primary LE channels.
+}
+static inline size_t NWBTLegacyAdvertisingData(uint8_t p[32], const uint8_t ext[35]) {
+    if (!p || !ext || ext[3] > 31) return 0;
+    memset(p, 0, 32); p[0] = ext[3];
+    memcpy(p + 1, ext + 4, ext[3]);
+    return 32;
 }
 static inline void NWBTLabParameters(uint8_t p[25]) {
     memset(p, 0, 25); p[0] = NWBT_LAB_HANDLE;

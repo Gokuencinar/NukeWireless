@@ -89,7 +89,7 @@ int main(void) {
     assert(NWBTLabReplySize(0x203b)==2 && NWBTLabReplySize(0x203a)==0);
     NWBTLabEnable(enable,1);assert(enable[0]==1 && enable[1]==1 && enable[2]==NWBT_LAB_HANDLE && (enable[3] | enable[4]<<8)==1000);
     NWBTLabEnable(enable,0);assert(enable[0]==0 && enable[3]==0 && enable[4]==0);
-    assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==0 && NWBTLabReplySize(0xfc00)==0);
+    assert(NWBTLabReplySize(0x0405)==0 && NWBTLabReplySize(0x2008)==1 && NWBTLabReplySize(0xfc00)==0);
     uint8_t credits=0,status=0, reply[]={0x0e,5,1,0x36,0x20,0,0};
     assert(NWBTMatchSizedReply(reply,7,0x2036,NWBTLabReplySize(0x2036),&credits,&status)==1);
     assert(NWBTMatchSizedReply(reply,7,0x2039,NWBTLabReplySize(0x2039),&credits,&status)==0);

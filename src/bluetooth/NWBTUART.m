@@ -35,8 +35,13 @@ BOOL NWBTUARTCanPreserveService(NSDictionary *report) {
     }
     // Even a write with a lost completion may have changed controller state.
     // Never infer successful cleanup just from cancellation or an error string.
-    return !changedController || ([report[@"advertising_stopped_acknowledged"] boolValue] &&
-        [report[@"advertising_set_removed"] boolValue]);
+    if (!changedController) return YES;
+    if ([report[@"advertising_mode"] isEqual:@"legacy"])
+        // Legacy 0x2005 changes the controller's global random address;
+        // never preserve the initialized daemon after this experiment.
+        return NO;
+    return [report[@"advertising_stopped_acknowledged"] boolValue] &&
+        [report[@"advertising_set_removed"] boolValue];
 }
 void NWBTRecordTransportClosure(NSMutableDictionary *report, NSDictionary *details) {
     report[@"transport_details"] = details;

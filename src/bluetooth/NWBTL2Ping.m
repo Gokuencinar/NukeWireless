@@ -288,18 +288,67 @@ NSDictionary *NWBTReadLECapabilities(void) {
 static BOOL verifyAdvertisingController(NWBTLabSession *session, NSMutableDictionary *report) {
     NSData *version = [session command:0x1001 parameters:[NSData data] phase:@"transport_version" cleanup:NO];
     NSData *commands = version ? [session command:0x1002 parameters:[NSData data] phase:@"transport_commands" cleanup:NO] : nil;
-    if (version.length != 14 || commands.length != 70 ||
-        !NWBTExtendedAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6)) {
-        if (!session.error) session.error = @"The controller lacks the required extended advertising commands.";
+    BOOL uart = [NWBTNativeTransport() isEqual:@"uart-h4"];
+    NSData *features = uart && commands.length == 70 ?
+        [session command:0x2003 parameters:[NSData data] phase:@"transport_le_features" cleanup:NO] : nil;
+    BOOL legacy = uart && features.length == 14 &&
+        !(((const uint8_t *)features.bytes)[7] & 0x10);
+    BOOL supported = legacy ?
+        NWBTLegacyAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6) :
+        NWBTExtendedAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6);
+    if (version.length != 14 || commands.length != 70 || (uart && features.length != 14) || !supported) {
+        if (!session.error) session.error = @"No verified HCI advertising command family on this controller.";
         report[@"error_code"] = @"unsupported";
         report[@"error"] = session.error;
         report[@"controller_contract_verified"] = @NO;
         return NO;
     }
+    report[@"advertising_mode"] = legacy ? @"legacy" : @"extended";
+    if (uart) report[@"le_extended_advertising_feature"] = @(!legacy);
     report[@"controller_contract_verified"] = @YES;
     report[@"controller_hci_version"] = @(((const uint8_t *)version.bytes)[6]);
     report[@"capacity_query_supported"] = @(NWBTAdvertisingCapacityQuery((const uint8_t *)commands.bytes + 6, commands.length - 6));
     return YES;
+}
+
+// Independent recovery process calls this only after the owning worker has
+// exited or been killed. This may fail closed and must never be treated as
+// proof of radio shutdown without the HCI Command Complete ACK.
+BOOL NWBTForceLegacyAdvertisingStop(void) {
+    if (![NWBTNativeTransport() isEqual:@"uart-h4"] || NWBTNativeGuard()) return NO;
+    NSDictionary *error = nil;
+    NWBTRing *ring = [NWBTRing openHCI:&error];
+    if (!ring) return NO;
+    NWBTLabSession *session = [NWBTLabSession new];
+    session.ring = ring; session.stream = [NSMutableData new];
+    session.queries = [NSMutableArray new]; session.credits = 1;
+    BOOL stopped = NO;
+    @try {
+        uint8_t off = 0;
+        stopped = [session command:0x200a parameters:[NSData dataWithBytes:&off length:1]
+            phase:@"recovery_legacy_disable" cleanup:YES] != nil;
+    } @finally { [ring close]; }
+    return stopped;
+}
+
+static BOOL configureLegacyModel(NWBTLabSession *session, unsigned platform,
+    unsigned catalogPlatform, NSArray<NSNumber *> *models, unsigned index) {
+    uint8_t ext[35], payload[32], params[15], address[7];
+    NSUInteger length = models ? NWBTLabCatalogData(ext, catalogPlatform, models[index].unsignedIntValue) :
+        NWBTLabMultiDeviceData(ext, platform, index);
+    if (!length || !NWBTLegacyAdvertisingData(payload, ext)) {
+        session.error = @"The selected legacy advertising data exceeds 31 bytes."; return NO;
+    }
+    NWBTLegacyAdvertisingParameters(params, platform == 1);
+    if (models) NWBTLabCatalogAddress(address, catalogPlatform, models[index].unsignedIntValue, 0);
+    else NWBTLabDeviceAddress(address, platform, index);
+    // Last byte 0xc2 has the required static-random two high bits set.
+    return [session command:0x2005 parameters:[NSData dataWithBytes:address + 1 length:6]
+        phase:[NSString stringWithFormat:@"legacy_random_address_%u", index] cleanup:NO] &&
+        [session command:0x2006 parameters:[NSData dataWithBytes:params length:15]
+        phase:[NSString stringWithFormat:@"legacy_parameters_%u", index] cleanup:NO] &&
+        [session command:0x2008 parameters:[NSData dataWithBytes:payload length:32]
+        phase:[NSString stringWithFormat:@"legacy_data_%u", index] cleanup:NO];
 }
 
 static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
@@ -358,6 +407,11 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
         if (session.ring.error) session.error = session.ring.error;
         if (session.error) { report[@"error"] = session.error; return report; }
         if (!verifyAdvertisingController(session, report)) return report;
+        if ([report[@"advertising_mode"] isEqual:@"legacy"]) {
+            report[@"error_code"] = @"unsupported";
+            report[@"error"] = @"Legacy controller supports catalog discovery only in this experimental build.";
+            return report;
+        }
         uint8_t parameters[25], data[35], enable[6];
         if (fastPair || applePairing) NWBTLabFastPairParameters(parameters); else NWBTLabSwiftPairParameters(parameters);
         if (fastPair || applePairing) parameters[10] = 1;
@@ -484,7 +538,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         report[@"requested_advertising_sets"] = @(count);
         report[@"interval_ms"] = platform == 1 ? @152.5 : @100;
     }
-    BOOL enableSubmitted = NO; double started = 0;
+    BOOL enableSubmitted = NO, legacy = NO; double started = 0;
     @try {
         session.ring = ring;
         for (unsigned i=0;i<32;i++) {
@@ -494,6 +548,40 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         if (session.ring.error) session.error = session.ring.error;
         if (session.error) { report[@"error"] = session.error; return report; }
         if (!verifyAdvertisingController(session, report)) return report;
+        legacy = [report[@"advertising_mode"] isEqual:@"legacy"];
+        if (legacy) {
+            // The iPhone10,2/20H240 reports LE Extended Advertising feature
+            // bit 12 as absent, even though its command bitmap lists 0x2036.
+            // Choose legacy BEFORE the first advertising command; never mix.
+            report[@"advertising_schedule"] = @"sequential_single_set";
+            report[@"schedule_reason"] = @"controller_only_supports_legacy";
+            report[@"address_identity"] = @"test_static_random_per_model";
+            report[@"capacity_verified"] = @NO;
+            report[@"requested_tx_power_dbm"] = [NSNull null];
+            report[@"advertising_set_removed"] = @YES; // No extended set exists.
+            NSUInteger enabled = 0;
+            for (unsigned index=0; index<count && !session.error && !NWBTCancelled; ++index) {
+                if (started && now() >= started + 10.0) break;
+                if (!configureLegacyModel(session, platform, catalogPlatform, catalogModels, index)) break;
+                uint8_t on = 1;
+                enableSubmitted = YES; // Even a lost ACK could have enabled it.
+                if (![session command:0x200a parameters:[NSData dataWithBytes:&on length:1]
+                    phase:@"legacy_enable" cleanup:NO]) break;
+                if (!started) started = now();
+                ++enabled;
+                report[@"controller_advertising_acknowledged"] = @YES;
+                report[@"models_enabled_count"] = @(enabled);
+                report[@"active_set_count"] = @1;
+                double sliceEnd = MIN(now() + 10.0 / count, started + 10.0);
+                while (!NWBTCancelled && now() < sliceEnd) usleep(20000);
+                uint8_t off = 0;
+                if (![session command:0x200a parameters:[NSData dataWithBytes:&off length:1]
+                    phase:@"legacy_disable_between_models" cleanup:YES]) break;
+                if (NWBTCancelled) break;
+            }
+            report[@"selection_completed"] = @(enabled == count && !session.error && !NWBTCancelled);
+            return report; // An additional disable ACK is required in finally.
+        }
         BOOL capacityKnown = NO; unsigned supported = 0;
         // One model never needs the capacity query. Do not submit an opcode
         // which this firmware explicitly omits from its supported bitmap.
@@ -562,20 +650,32 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         if (started) report[@"advertising_elapsed_seconds"] = @(now()-started);
         NSString *original = session.error; session.error = nil;
         BOOL clean = YES;
-        if (enableSubmitted) {
+        if (legacy) {
+            // This is the only final safe state for legacy advertising, which
+            // has NO controller-enforced duration. A missing ACK forces the
+            // independent recovery process to retire/restart bluetoothd.
+            uint8_t off = 0;
+            if (enableSubmitted) clean = [session command:0x200a
+                parameters:[NSData dataWithBytes:&off length:1]
+                phase:@"legacy_final_disable" cleanup:YES] != nil;
+            report[@"advertising_stopped_acknowledged"] = @(enableSubmitted && clean);
+            report[@"advertising_set_removed"] = @YES;
+        } else if (enableSubmitted) {
             for(unsigned i=0;i<handles.count;i++) {
                 uint8_t stop[6];NWBTLabDeviceEnable(stop,0,i);session.error=nil;
                 if(![session command:0x2039 parameters:[NSData dataWithBytes:stop length:6] phase:@"disable" cleanup:YES]) clean=NO;
             }
             report[@"advertising_stopped_acknowledged"] = @(clean);
         }
-        BOOL removed = handles.count>0;
-        for (NSNumber *value in handles) {
-            uint8_t handle=value.unsignedCharValue; session.error=nil;
-            if (![session command:0x203c parameters:[NSData dataWithBytes:&handle length:1]
-                phase:[NSString stringWithFormat:@"remove_%u",handle] cleanup:YES]) removed=NO;
+        BOOL removed = legacy || handles.count>0;
+        if (!legacy) {
+            for (NSNumber *value in handles) {
+                uint8_t handle=value.unsignedCharValue; session.error=nil;
+                if (![session command:0x203c parameters:[NSData dataWithBytes:&handle length:1]
+                    phase:[NSString stringWithFormat:@"remove_%u",handle] cleanup:YES]) removed=NO;
+            }
+            report[@"advertising_set_removed"] = @(removed);
         }
-        report[@"advertising_set_removed"] = @(removed);
         report[@"local_hci_commands_submitted"] = @(session.commands);
         if (NWBTCancelled) report[@"error"] = @"Diagnostic cancelled.";
         else if (original || !clean || (handles.count && !removed)) report[@"error"] = original ?: @"Advertising cleanup incomplete.";
