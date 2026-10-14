@@ -88,6 +88,34 @@ class FixtureTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_current_help_and_unknown_help_guard(self):
+        import ast
+        app_path=fixture(self.folder,"rootless",False)
+        worker_path=fixture(self.folder,"rootless",True)
+        values=[item.value for item in ast.walk(ast.parse((ROOT/"scripts/build_bluetooth_deb.py").read_text(encoding="utf-8")))
+                if isinstance(item,ast.Constant) and isinstance(item.value,bytes) and b"Candidate admission includes" in item.value]
+        self.assertEqual(len(values),1)
+        current=values[0]; self.assertEqual(unified.sha(current),unified.CURRENT_WORKER_README_SHA256)
+        def replace_help(value):
+            archives=unified.read_ar(worker_path.read_bytes())
+            files=unified.members(worker_path.read_bytes(),"data.tar")
+            name="var/jb/usr/share/nukewireless-bluetooth/README.txt"
+            member,_=files[name]; files[name]=(member,value)
+            archives["data.tar.gz"]=tar_bytes(list(files.values()))
+            worker_path.write_bytes(pack_ar(list(archives.items())))
+            manifest_path=worker_path.with_suffix(".manifest.json")
+            report=json.loads(manifest_path.read_text(encoding="utf-8")); report["package_sha256"]=unified.sha(worker_path.read_bytes())
+            manifest_path.write_text(json.dumps(report),encoding="utf-8")
+        replace_help(current)
+        destination=self.folder/"modern.deb"
+        unified.build(app_path,worker_path,destination,"rootless")
+        text=unified.members(destination.read_bytes(),"data.tar")["var/jb/usr/share/nukewireless-bluetooth/README.txt"][1]
+        self.assertIn(f"dpkg -r {unified.PACKAGE}.\n".encode(),text)
+        self.assertNotIn(f"dpkg -r {unified.WORKER_PACKAGE}".encode(),text)
+        replace_help(current+b"unexpected instruction\n")
+        with self.assertRaisesRegex(ValueError,"unexpected worker removal instruction"):
+            unified.build(app_path,worker_path,self.folder/"rejected.deb","rootless")
+
     def test_archive_paths_are_canonical_and_traversal_is_rejected(self):
         entries = unified.ordered_entries([
             directory("."), directory("var/jb/."), directory("var/jb"),

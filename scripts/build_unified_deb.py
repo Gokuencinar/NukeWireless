@@ -26,6 +26,7 @@ VERSION = APP_VERSION + "+bundle1"
 INSTALLATION_POLICY = {"minimum_ios": None, "maximum_ios_exclusive": None, "binary_minimum_ios": "15.0",
                        "scope": "installer-only", "runtime_checks_unchanged": True}
 PACKAGING_SOURCES = ["scripts/build_unified_deb.py", "scripts/package_utils.py", "scripts/compat_layout.py", "scripts/install_layout.py", "scripts/embedded_ui.py", "src/NWInstallLayout.h"]
+CURRENT_WORKER_README_SHA256 = "a745fc657809aa4c95be7159c15092f7d61e2f78d7e7ddb7bf5c6b4aae8bf410"
 
 
 def members(raw, archive):
@@ -127,10 +128,16 @@ def build(app_path, worker_path, output, scheme):
     readme = prefix + "usr/share/nukewireless-bluetooth/README.txt"
     previous = worker_data[readme][1]
     old = f"dpkg -r {WORKER_PACKAGE}".encode()
-    if previous.count(old) != 1:
+    if previous.count(old) == 1:
+        bundled_help = previous.replace(old, f"dpkg -r {PACKAGE}".encode())
+    elif sha(previous) == CURRENT_WORKER_README_SHA256:
+        # The current verified worker help has no standalone removal command.
+        # Accept only that exact source-defined text, then add the bundle owner.
+        bundled_help = previous + f"Remove the complete package with dpkg -r {PACKAGE}.\n".encode()
+    else:
         raise ValueError("unexpected worker removal instruction")
     merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != readme]
-    merged.append(regular(readme, previous.replace(old, f"dpkg -r {PACKAGE}".encode())))
+    merged.append(regular(readme, bundled_help))
     info_path = prefix + APP + "Info.plist"
     info.pop("MinimumOSVersion")
     merged = [(m, data) for m, data in merged if m.name.removeprefix("./").rstrip("/") != info_path]
