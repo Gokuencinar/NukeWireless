@@ -7,6 +7,7 @@
 #import "NWPolicy.h"
 #include "NWARPBinding.h"
 #include <net/if_dl.h>
+#include <net/if.h>
 #import "NWResources.h"
 #import "NWDeviceNames.h"
 #import <objc/runtime.h>

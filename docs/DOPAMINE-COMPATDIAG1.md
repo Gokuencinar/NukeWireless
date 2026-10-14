@@ -1,6 +1,6 @@
 # Dopamine compatibility test candidate — 14 October 2026
 
-App: `2.0.0~diagnostic22+compat1`, build marker `NWBuild-compatdiag1`, CFBundleVersion `20025`.
+App: `2.0.0~diagnostic22+compat1`, build marker `NWBuild-diagnostic22+compat1`, CFBundleVersion `20025`.
 Bluetooth component: `2.0.0~diagnostic11`. Unified package: app version plus `+bundle1`.
 Branch: `dopamine-compat-audit1`, based on BTLegacy2 `70ee2e6`.
 This candidate preserves the diagnostic16 Wi-Fi unblock path and the subsequent

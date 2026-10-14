@@ -83,7 +83,7 @@ def build(source, artifact, output):
     manifest = json.loads((artifact / "build-manifest.json").read_text(encoding="utf-8"))
     if manifest["sources"] != source_hashes() or manifest["binary_sha256"] != sha(library):
         raise ValueError("stale or mismatched compiled artifact; rebuild current sources")
-    if manifest["version"] != VERSION or b"NWBuild-compatdiag1" not in library:
+    if manifest["version"] != VERSION or b"NWBuild-diagnostic22+compat1" not in library:
         raise ValueError("wrong development library version")
     helper = (artifact / "nw-hotspot").read_bytes()
     if manifest.get("hotspot_helper_sha256") != sha(helper):

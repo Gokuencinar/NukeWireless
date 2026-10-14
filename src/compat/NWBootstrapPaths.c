@@ -5,6 +5,9 @@
 #include "../NWARPBinding.h"
 #import <Foundation/Foundation.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <dlfcn.h>
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
  * Recompiled for iOS 15; bootstrap paths and native-entry guards adapted here.
@@ -42,16 +45,6 @@ _Static_assert(offsetof(struct rt_msghdr, rtm_addrs) == 12, "Darwin route addres
 #include <dispatch/dispatch.h>
 typedef unsigned long NSUInteger;
 
-extern void *popen(const char *, const char *);
-extern char *fgets(char *, int, void *);
-extern int pclose(void *);
-extern int snprintf(char *, unsigned long, const char *, ...);
-extern int open(const char *, int, ...);
-extern long write(int, const void *, unsigned long);
-extern int close(int);
-extern void *dlopen(const char *, int);
-extern void *dlsym(void *, const char *);
-extern char *dlerror(void);
 
 static BOOL (*original_exists)(id, SEL, id);
 static void (*original_launch_path)(id, SEL, id);

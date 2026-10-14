@@ -120,7 +120,7 @@ class CandidateTests(unittest.TestCase):
                 self.assertFalse(report['runtime_verified'])
                 self.assertIn('src/NWMainTabs.m', report['core']['sources'])
                 self.assertIn('src/NWBluetoothCatalog.m', report['core']['sources'])
-                self.assertIn(b'NWBuild-compatdiag1', files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1])
+                self.assertIn(b'NWBuild-diagnostic22+compat1', files[prefix + app.APP + 'Frameworks/NukeWirelessInfo.dylib'][1])
                 bundle = prefix + app.APP + 'NukeWirelessResources.bundle/'
                 for brand in ['apple', 'google', 'microsoft', 'samsung', 'android']:
                     self.assertEqual(files[bundle + 'brands/' + brand + '.pdf'][1],

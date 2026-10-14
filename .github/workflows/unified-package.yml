@@ -2,7 +2,7 @@
 name: Unified installer packaging
 on:
   push:
-    branches: [audit-rh25.5]
+    branches: [audit-rh25.5, dopamine-compat-audit1]
     paths:
       - 'scripts/build_unified_deb.py'
       - 'scripts/compat_layout.py'
