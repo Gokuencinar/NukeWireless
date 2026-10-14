@@ -9,7 +9,7 @@ from compat_macho import inspect
 from compat_layout import SCHEMES, ordered_entries
 from package_utils import directory, regular, pack_ar, tar_bytes
 
-VERSION = '2.0.0~diagnostic10'
+VERSION = '2.0.0~diagnostic11'
 PACKAGE_VERSION = VERSION
 ROOTHIDE_ENTITLEMENTS = {
     'platform-application': True,
@@ -93,7 +93,7 @@ exit 0
                 regular('usr/lib/NukeBluetoothBridge.dylib', library, 0o755),
                 regular('usr/share/nukewireless-bluetooth/inspector.entitlements', plistlib.dumps(ROOTHIDE_ENTITLEMENTS)),
                 regular('usr/share/nukewireless-bluetooth/build-manifest.json', json.dumps(report, indent=2).encode()),
-                regular('usr/share/nukewireless-bluetooth/README.txt', b'Bluetooth > Random catalog supports individual or selected-model lab advertisements for 10 seconds, with cooperative Stop and independent service recovery. Advertising on iOS 15-18 requires a matching Darwin ABI, method signatures, HCI Skywalk nexus and controller command contract. Devices using another transport are refused. Local HCI replies do not prove external reception. The legacy ACT and ACL diagnostic retains the iPhone XS / iOS 16.3.1 guard. Only the reference RootHide device has physical evidence; other versions and bootstraps require device validation. The runner validates the complete installed app caller path under the same bootstrap. Recovery inherits only the inspected fixed user/501 or system domain. No pairing keys, address rotation or link disconnection. Remove with dpkg -r com.gokuencinar.nukewireless.bluetooth.\n')]
+                regular('usr/share/nukewireless-bluetooth/README.txt', b'Bluetooth > Random devices supports individual or selected-model discovery advertisements for 10 seconds, with Stop and independent recovery. Candidate admission includes iOS 15-18 / Darwin 21-24 and iOS 26 / Darwin 25. Runtime method signatures, channel exports, nexus properties and HCI feature/command replies must still pass. Exact UART admission remains iPhone10,2 / iOS 16.7.4 / 20H240. iOS 26 physical advertising is unverified. Local HCI replies do not prove external reception or pairing. Export diagnostics after a failure. The runner checks the installed app caller and bootstrap. The legacy ACT/ACL diagnostic retains its exact iPhone XS / iOS 16.3.1 guard.\n')]
     for member, _ in entries:
         member.name = './' + prefix + member.name.removeprefix('./')
     output.parent.mkdir(parents=True, exist_ok=True)

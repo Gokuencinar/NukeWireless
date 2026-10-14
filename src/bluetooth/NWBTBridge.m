@@ -1,4 +1,5 @@
 #import "NWBTBridge.h"
+#import "NWBTNative.h"
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <sys/sysctl.h>
@@ -144,6 +145,7 @@ NSDictionary<NSString *, id> *NWBTInspectTransport(void) {
         return @{@"module": @"NukeWireless Bluetooth Bridge", @"version": NWBT_VERSION,
             @"ios": [NSString stringWithFormat:@"%ld.%ld.%ld", (long)os.majorVersion, (long)os.minorVersion, (long)os.patchVersion],
             @"machine": machine(), @"libraries": libraries, @"method_metadata": metadata,
+            @"compatibility_contract": NWBTCompatibilityDiagnostics(),
             @"l2ping_implemented": @YES, @"l2ping_verified": @NO, @"bluetooth_packets_sent": @0};
     }
 }

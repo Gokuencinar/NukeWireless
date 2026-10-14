@@ -4,10 +4,10 @@
 #include <stdio.h>
 
 int main(void) {
-    for (unsigned ios = 0; ios < 22; ++ios)
+    for (unsigned ios = 0; ios < 30; ++ios)
         for (unsigned darwin = 0; darwin < 30; ++darwin)
             assert(NWBTSkywalkOSAllowed(ios, darwin) ==
-                   (ios >= 15 && ios <= 18 && darwin == ios + 6));
+                   ((ios >= 15 && ios <= 18 && darwin == ios + 6) || (ios == 26 && darwin == 25)));
     uint8_t commands[64] = {0};
     assert(!NWBTExtendedAdvertisingCommands(commands, sizeof commands));
     const unsigned required[] = {289, 290, 291, 293, 296};

@@ -147,11 +147,11 @@ static BOOL isDeviceMenu(UIAlertController *menu) {
 - (void)invoke:(UIAlertAction *)action {
     if (self.invoked) return; self.invoked = YES;
     // The native Swift closure can bypass Objective-C dispatch. Route Wi-Fi
-    // unblock through the verified bridge, including the native row menu.
+    // block and unblock through the verified bridge, including the native row menu.
     // Hotspot keeps its own filter handler. A stale Wi-Fi row must fail the
     // bridge validation, never fall back to a Swift closure that skips cleanup.
-    if (titleMatches(action, @"Unblock Device") && self.device && !self.hotspotMenu) {
-        if (!NWDeviceSetBlocked(self.device, NO, ^(BOOL success) {
+    if ((titleMatches(action, @"Block Device") || titleMatches(action, @"Unblock Device")) && !self.hotspotMenu) {
+        if (!self.device || !NWDeviceSetBlocked(self.device, titleMatches(action,@"Block Device"), ^(BOOL success) {
             if (!success) [self showUnblockFailure];
         })) [self showUnblockFailure];
         return;

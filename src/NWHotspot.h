@@ -6,6 +6,7 @@ void NWHotspotFound(id adapter, id device);
 void NWHotspotFinished(id adapter, BOOL success);
 void NWHotspotProgress(id adapter);
 BOOL NWHotspotBusy(void);
+void NWHotspotReadDiagnostics(void (^completion)(NSDictionary *report));
 #ifdef NW_UI_TESTING
 int NWHotspotUIRegressionCheck(void);
 int NWHotspotUIRegressionPresent(int phase);

@@ -607,7 +607,8 @@ int main(int argc, char **argv) {
             NSDictionary *compatibility = NWBTNativeAvailability();
             BOOL supported = !compatibility;
             return printReport(@{@"version": NWBT_VERSION, @"supported": @(supported), @"available": @YES,
-                @"native_admission_policy": @"skywalk-or-exact-uart-v2",
+                @"native_admission_policy": @"ios26-guarded-skywalk-or-exact-uart-v3",
+                @"runtime_contract": information[@"compatibility_contract"] ?: @{},
                 @"selected_transport": NWBTNativeTransport(),
                 @"reference_device": @(reference),
                 @"compatibility": compatibility ?: @{@"stage": @"runtime_admitted"},

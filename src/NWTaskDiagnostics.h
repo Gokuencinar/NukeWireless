@@ -1,7 +1,9 @@
 #import <Foundation/Foundation.h>
 // Source-defined bridge, resolved optionally by the preserved bootstrap adapter.
 void NWTaskDiagnosticContext(NSDictionary *context);
+NSDictionary *NWTaskDiagnosticCurrentContext(void);
 void NWTaskDiagnosticPrepare(id task);
+void NWTaskDiagnosticPrepareWithDetails(id task, NSDictionary *details);
 void NWTaskDiagnosticLaunched(id task);
 void NWTaskDiagnosticLaunchFailed(id task, id exception);
 void NWTaskDiagnosticWillStop(id task);

@@ -6,6 +6,7 @@
 #import "NWResources.h"
 #import "NWAppearance.h"
 #import "NWScanBridge.h"
+#import "NWHotspot.h"
 #import "NWBluetooth.h"
 #import "NWBLE.h"
 #import <CoreBluetooth/CoreBluetooth.h>
@@ -78,6 +79,9 @@ static void collectEnvironment(void) {
         dispatch_async(dispatch_get_main_queue(), ^{
             NWDiagnosticRecord(@"environment", @"captured", details);
             NWDiagnosticRecord(@"wifi_state", @"captured", NWScanDiagnosticSnapshot());
+            NWHotspotReadDiagnostics(^(NSDictionary *report) {
+                NWDiagnosticRecord(@"hotspot_contract",[report[@"ok"] boolValue] ? @"captured" : @"failed",report);
+            });
             NWDiagnosticRecord(@"ble_permission", @"captured", @{@"authorization": @(CBManager.authorization), @"manager_created": @NO});
             NWBluetoothReadDiagnostics(^(NSDictionary *report) {
                 collecting = NO;

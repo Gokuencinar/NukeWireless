@@ -1,5 +1,8 @@
 #import "NWDiagnosticReport.h"
 #import "NWBuild.h"
+#include <sys/utsname.h>
+#include <sys/sysctl.h>
+#include <errno.h>
 
 NSString *const NWDiagnosticChanged = @"NukeWirelessDiagnosticChanged";
 static NSMutableArray *events;
@@ -71,9 +74,28 @@ static NSURL *directory(void) {
     NSURL *documents = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     return [documents URLByAppendingPathComponent:@"NukeWireless-Diagnostics" isDirectory:YES];
 }
+static NSDictionary *runtimeContext(void) {
+    static NSDictionary *context; static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        struct utsname kernel = {0}; int kernelError = uname(&kernel) ? errno : 0;
+        char build[64] = {0}; size_t length = sizeof build;
+        int buildError = sysctlbyname("kern.osversion", build, &length, NULL, 0) ? errno : 0;
+        NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
+        NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+        context = @{ @"machine": [NSString stringWithUTF8String:kernel.machine],
+            @"ios_major": @(os.majorVersion), @"ios_minor": @(os.minorVersion), @"ios_patch": @(os.patchVersion),
+            @"ios_build": [NSString stringWithUTF8String:build], @"kernel_release": [NSString stringWithUTF8String:kernel.release],
+            @"kernel_read_errno": @(kernelError), @"build_read_errno": @(buildError),
+            @"package_scheme": info[@"NukeWirelessPackageScheme"] ?: @"unknown",
+            @"source_commit": info[@"NukeWirelessSourceCommit"] ?: @"unknown",
+            @"expected_worker": info[@"NukeWirelessWorkerVersion"] ?: @"unknown",
+            @"physical_compatibility_verified": @NO };
+    });
+    return context;
+}
 static NSDictionary *snapshot(void) {
     return @{@"schema_version": @1, @"product": NW_BUILD_NAME, @"build": NW_BUILD_VERSION,
-        @"build_marker": @NW_BUILD_MARKER, @"session_id": session, @"generated_at": @(NSDate.date.timeIntervalSince1970),
+        @"build_marker": @NW_BUILD_MARKER, @"runtime": runtimeContext(), @"session_id": session, @"generated_at": @(NSDate.date.timeIntervalSince1970),
         @"privacy": @"No serial, UDID, network names, peer names or addresses. User observations are included after redaction.",
         @"pending_tests": [pending copy], @"events": [events copy], @"important_events": [importantEvents copy],
         @"journal_storage_error": storageError ?: @"none",

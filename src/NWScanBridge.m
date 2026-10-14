@@ -5,6 +5,8 @@
 #import "NWLegacyABI.h"
 #import "NWInstallLayout.h"
 #import "NWPolicy.h"
+#include "NWARPBinding.h"
+#include <net/if_dl.h>
 #import "NWResources.h"
 #import "NWDeviceNames.h"
 #import <objc/runtime.h>
@@ -58,6 +60,10 @@ static void deviceOutcome(NSString *status, NSString *error) {
     NWTaskDiagnosticContext(nil);
 }
 static NSString *scanNetwork;
+static uint64_t networkEpoch;
+#ifdef NW_UI_TESTING
+static BOOL fixtureNetwork;
+#endif
 static NWDeviceNames *deviceNames;
 static NSMutableSet<NSString *> *resolvedNameIPs;
 static __weak NWLegacyScanner *activeScanner;
@@ -85,6 +91,9 @@ static uint32_t ipv4(NSString *text) {
     struct in_addr a; return text && inet_pton(AF_INET, text.UTF8String, &a) == 1 ? ntohl(a.s_addr) : 0;
 }
 static void localNetwork(uint32_t *local, uint32_t *mask, uint32_t *gateway) {
+#ifdef NW_UI_TESTING
+    if (fixtureNetwork) { *local=0xc000022b; *mask=0xffffff00; if(gateway) *gateway=0xc0000201; return; }
+#endif
     *local = *mask = 0;
     if (gateway) *gateway = ipv4(readObject(commands(), @"gatewayIP"));
     struct ifaddrs *first = NULL;
@@ -103,6 +112,9 @@ static unsigned peerDeviceCount(uint32_t local) {
     return count;
 }
 static uint32_t configurationGateway(void) {
+#ifdef NW_UI_TESTING
+    if (fixtureNetwork) return 0xc0000201;
+#endif
     static void *framework;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -122,10 +134,12 @@ static uint32_t configurationGateway(void) {
 }
 static NSString *networkIdentity(void) {
     uint32_t local, mask; localNetwork(&local, &mask, NULL);
-    // The scanner invokes this on the main thread during launch. Querying
-    // MobileWiFi here can wait on wifid and stall the initial view transition.
-    // The interface tuple is sufficient to reject stale scan and bulk results.
-    return [NSString stringWithFormat:@"%u/%u", local, mask];
+    // Public interface data only: no synchronous MobileWiFi/wifid query.
+    // A background transition invalidates scan admission even if a different
+    // AP happens to reuse the same subnet and router. This is not a BSSID probe.
+    unsigned index = if_nametoindex("en0");
+    return [NSString stringWithFormat:@"%u/%u/%u/%u/%llu", local, mask,
+        configurationGateway(), index, (unsigned long long)networkEpoch];
 }
 static BOOL hasCustomName(id device) {
     if ([readObject(device, @"nickName") length]) return YES;
@@ -350,16 +364,17 @@ NSArray<NSDictionary<NSString *, id> *> *NWDeviceSnapshot(void) {
     return [snapshot copy];
 }
 uint64_t NWDeviceGeneration(void) { return state.generation; }
-static id currentDevice(NSDictionary *row) {
+static id deviceIdentity(NSDictionary *row, BOOL requireNetwork) {
     if (!NSThread.isMainThread || ![row[@"ip"] isKindOfClass:NSString.class] ||
         ![row[@"mac"] isKindOfClass:NSString.class] || ![row[@"generation"] isKindOfClass:NSNumber.class] ||
         [row[@"generation"] unsignedLongLongValue] != state.generation ||
-        ![scanNetwork isEqualToString:networkIdentity()]) return nil;
+        (requireNetwork && ![scanNetwork isEqualToString:networkIdentity()])) return nil;
     id device = devices[row[@"ip"]];
     if (!device || ![readObject(device, @"ipAddress") isEqual:row[@"ip"]] ||
         ![(readObject(device, @"macAddress") ?: @"") isEqual:row[@"mac"]]) return nil;
     return device;
 }
+static id currentDevice(NSDictionary *row) { return deviceIdentity(row, YES); }
 static BOOL validMethod(Class cls, SEL selector, BOOL classMethod, const char *encoding) {
     Method method = classMethod ? class_getClassMethod(cls, selector) : class_getInstanceMethod(cls, selector);
     return method && strcmp(method_getTypeEncoding(method), encoding) == 0;
@@ -379,14 +394,26 @@ BOOL NWDeviceSetNickname(NSDictionary *row, NSString *nickname) {
     notify(); return YES;
 }
 BOOL NWDeviceCanSetBlocked(NSDictionary *row, BOOL blocked) {
-    id device = currentDevice(row);
-    if (!device || NWScanBusy() || bulkBusy || NWHotspotBusy()) return NO;
+    // Releasing an owned block remains available when network admission has
+    // expired; starting a new block always needs the current scan epoch.
+    id device = deviceIdentity(row, blocked);
+    if (!device || (blocked && NWScanBusy()) || bulkBusy || NWHotspotBusy()) return NO;
     SEL local = NSSelectorFromString(@"isLocalDevice");
     if (![device respondsToSelector:local] || ((BOOL (*)(id, SEL))objc_msgSend)(device, local)) return NO;
     if (blocked) {
+#ifndef NW_UI_TESTING
+        int (*bindingAvailable)(void)=dlsym(RTLD_DEFAULT,"NWNativeBlockBindingAvailable");
+        if (!bindingAvailable || !bindingAvailable()) return NO;
+#endif
         NSString *mac = readObject(device, @"macAddress");
-        NSRegularExpression *format = [NSRegularExpression regularExpressionWithPattern:@"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$" options:0 error:NULL];
-        if (![format firstMatchInString:mac ?: @"" options:0 range:NSMakeRange(0, mac.length)]) return NO;
+        uint8_t bytes[6]; uint32_t localIP, mask, gateway;
+        localNetwork(&localIP,&mask,&gateway); uint32_t currentGateway=configurationGateway();
+        if (currentGateway) gateway=currentGateway;
+        if (!NWARPParseMAC(mac.UTF8String,bytes) || !NWEligibleAddress(ipv4(row[@"ip"]),localIP,mask,gateway,bytes)) return NO;
+        // A proxy ARP/shared link identity is not an individually addressable
+        // peer for this mechanism. The launch adapter also checks fresh ARP.
+        for (NSString *otherIP in devices) if (![otherIP isEqual:row[@"ip"]] &&
+            [mac caseInsensitiveCompare:readObject(devices[otherIP],@"macAddress") ?: @""]==NSOrderedSame) return NO;
         id registered = readObject(commands(), @"runningBlocksForArp");
         if (![registered isKindOfClass:NSArray.class] || [registered count] >= 64) return NO;
     }
@@ -395,13 +422,13 @@ BOOL NWDeviceCanSetBlocked(NSDictionary *row, BOOL blocked) {
 }
 static void verifyDeviceBlock(NSDictionary *row, BOOL blocked, NSObject *token, NSUInteger attempt, void (^completion)(BOOL)) {
     if (deviceActionToken != token) return;
-    BOOL success = currentDevice(row) && isBlocked(row[@"ip"]) == blocked;
-    if (!success && currentDevice(row) && attempt < 7) {
+    BOOL success = deviceIdentity(row,blocked) && isBlocked(row[@"ip"]) == blocked;
+    if (!success && deviceIdentity(row,blocked) && attempt < 7) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 250 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
             verifyDeviceBlock(row, blocked, token, attempt + 1, completion);
         }); return;
     }
-    if (currentDevice(row)) updateDeviceState(row[@"ip"]);
+    if (deviceIdentity(row,blocked)) updateDeviceState(row[@"ip"]);
     deviceOutcome(success ? (blocked ? @"process_active" : @"stopped") : @"failed", success ? nil : @"process_state_mismatch_or_stale_device");
     deviceActionToken = nil; bulkBusy = NO; notify();
     if (completion) completion(success);
@@ -415,7 +442,7 @@ BOOL NWDeviceSetBlocked(NSDictionary *row, BOOL blocked, void (^completion)(BOOL
     NSMutableDictionary *details = [actionContext(blocked, NO) mutableCopy]; details[@"peer_tag"] = peerTag(row[@"ip"]);
     details[@"network_context"] = NWScanDiagnosticSnapshot(); deviceDiagnosticContext = details;
     NWTaskDiagnosticContext(details); NWDiagnosticRecord(@"wifi_device_action", @"running", details);
-    if (!currentDevice(row)) { deviceOutcome(@"failed", @"stale_device"); deviceActionToken = nil; bulkBusy = NO; notify(); return NO; }
+    if (!deviceIdentity(row,blocked)) { deviceOutcome(@"failed", @"stale_device"); deviceActionToken = nil; bulkBusy = NO; notify(); return NO; }
     @try {
         if (blocked) ((void (*)(id, SEL, id, id))objc_msgSend)(commands(), NSSelectorFromString(@"blockGivenIPWithIp:targetMac:"), row[@"ip"], row[@"mac"]);
         else ((void (*)(id, SEL, id))objc_msgSend)(commands(), NSSelectorFromString(@"unblockIPWithIp:"), row[@"ip"]);
@@ -463,6 +490,7 @@ static BOOL refreshScan(BOOL manual) {
 BOOL NWRefreshScan(void) { return refreshScan(YES); }
 NSDictionary *NWScanDiagnosticSnapshot(void) {
     int (*nativeUnblock)(void) = dlsym(RTLD_DEFAULT, "NWNativeUnblockAvailable");
+    int (*blockBinding)(void)=dlsym(RTLD_DEFAULT,"NWNativeBlockBindingAvailable");
     uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
     BOOL ipv6LinkLocal = NO, ipv6Other = NO; struct ifaddrs *list = NULL;
     int interfaceError = getifaddrs(&list) ? errno : 0;
@@ -475,7 +503,8 @@ NSDictionary *NWScanDiagnosticSnapshot(void) {
     if (list) freeifaddrs(list);
     int forwarding = 0; size_t size = sizeof(forwarding);
     BOOL forwardingKnown = !sysctlbyname("net.inet.ip.forwarding", &forwarding, &size, NULL, 0);
-    return @{@"phase": @(state.phase), @"generation": @(state.generation),
+    return @{@"phase": @(state.phase), @"generation": @(state.generation), @"network_epoch": @(networkEpoch),
+        @"scan_matches_current_network": @([scanNetwork isEqual:networkIdentity()]),
         @"network_context": @{@"en0_ipv6_link_local": @(ipv6LinkLocal), @"en0_ipv6_other": @(ipv6Other),
             @"interface_read_errno": @(interfaceError), @"ipv4_forwarding_known": @(forwardingKnown),
             @"ipv4_forwarding": forwardingKnown ? @(forwarding != 0) : NSNull.null,
@@ -486,7 +515,7 @@ NSDictionary *NWScanDiagnosticSnapshot(void) {
         @"name_resolution": [deviceNames diagnostics] ?: @{},
         @"native_queue_count": @(activeScanner.queue.operationCount), @"native_start_returned": @(nativeStartReturned),
         @"automatic_retries": @(recoveryRetries), @"ipv4_subnet_ready": @(NWScanInterfaceReady(local, mask)),
-        @"hooks": @{@"native_unblock": nativeUnblock ? @(nativeUnblock() != 0) : NSNull.null,
+        @"hooks": @{@"block_binding": blockBinding ? @(blockBinding()!=0) : @NO, @"native_unblock": nativeUnblock ? @(nativeUnblock() != 0) : NSNull.null,
             @"start": @(oldStart != NULL), @"found": @(oldFound != NULL),
             @"finished": @(oldFinished != NULL), @"failed": @(oldFailed != NULL), @"progress": @(oldProgress != NULL)},
         @"executable_loaded": @(appExecutableBase() != NULL)};
@@ -647,7 +676,7 @@ void NWInstallScanHooks(void) {
     devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil
         queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-            (void)note; [deviceNames stop];
+            (void)note; [deviceNames stop]; ++networkEpoch; notify();
         }];
     Class cls = NSClassFromString(@"MMLANScanner"); Method method = class_getInstanceMethod(cls, @selector(start));
     if (method && !oldStart) oldStart = (void *)method_setImplementation(method, (IMP)scannerStarted);
@@ -679,7 +708,7 @@ void NWBeginDeviceActionsUITest(void) {
     browserSavedNetwork = scanNetwork; browserSavedBusy = bulkBusy; browserSavedActionToken = deviceActionToken;
     browserSavedResolved = resolvedNameIPs; resolvedNameIPs = [NSMutableSet new];
     state.phase = NWComplete; ++state.generation; bulkBusy = NO; deviceActionToken = nil;
-    scanNetwork = networkIdentity(); devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
+    fixtureNetwork = YES; scanNetwork = networkIdentity(); devices = [NSMutableDictionary new]; bulkOwned = [NSMutableSet new];
     NWResetDeviceCommandFixture();
     for (NSArray *values in @[@[@"Mesa", @"192.0.2.42", @"00:11:22:33:44:55", @"Samsung"],
         @[@"iPhone", @"192.0.2.43", @"00:11:22:33:44:66", @"Apple"]]) {
@@ -691,6 +720,7 @@ void NWBeginDeviceActionsUITest(void) {
     }
 }
 void NWEndDeviceActionsUITest(void) {
+    fixtureNetwork = NO;
     state = browserSavedState; devices = browserSavedDevices; bulkOwned = browserSavedOwned;
     scanNetwork = browserSavedNetwork; bulkBusy = browserSavedBusy; deviceActionToken = browserSavedActionToken;
     resolvedNameIPs = browserSavedResolved;

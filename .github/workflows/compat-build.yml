@@ -1,7 +1,7 @@
-name: iOS 15-18 compatibility candidates
+name: iOS compatibility candidates
 on:
   push:
-    branches: [audit-rh25.5, ipad-onboarding-diagnostic1, btlegacy-iphone8-diagnostic1, btlegacy-iphone8-diagnostic2]
+    branches: [audit-rh25.5, ipad-onboarding-diagnostic1, btlegacy-iphone8-diagnostic1, btlegacy-iphone8-diagnostic2, dopamine-compat-audit1]
     paths:
       - 'src/**'
       - 'resources/**'

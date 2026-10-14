@@ -38,6 +38,7 @@ static BOOL emissionFinishedCleanly(NSDictionary *report) {
     NSString *code = report[@"error_code"];
     return labOperation(report[@"operation"]) && (!code || [code isEqual:@"cancelled"]) &&
         (!report[@"error"] || [code isEqual:@"cancelled"]) && !report[@"cleanup_warning"] &&
+        (!report[@"selection_completed"] || [report[@"selection_completed"] boolValue] || [code isEqual:@"cancelled"]) &&
         [report[@"controller_advertising_acknowledged"] boolValue] &&
         [report[@"advertising_stopped_acknowledged"] boolValue] &&
         [report[@"advertising_set_removed"] boolValue] && [report[@"service_restored"] boolValue] &&

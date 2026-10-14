@@ -128,7 +128,7 @@ static NSDictionary *bluetoothStateCompatibility(void) {
     struct utsname kernel = {0};
     unsigned darwin = uname(&kernel) == 0 ? (unsigned)strtoul(kernel.release, NULL, 10) : 0;
     if (!NWBTSkywalkOSAllowed((unsigned)os.majorVersion, darwin))
-        return failure(@"abi", @"This Skywalk contract covers matching iOS 15-18 / Darwin 21-24 only.");
+        return failure(@"abi", @"No admitted iOS/Darwin pair for this channel contract (15-18 or 26/25).");
     dlopen("/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager", RTLD_LAZY | RTLD_LOCAL);
     Class cls = NSClassFromString(@"BluetoothManager");
     if (!managerSignature(cls, NSSelectorFromString(@"sharedInstance"), YES, "@", NULL) ||
@@ -139,6 +139,31 @@ static NSDictionary *bluetoothStateCompatibility(void) {
     return nil;
 }
 
+NSDictionary *NWBTCompatibilityDiagnostics(void) {
+    NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
+    struct utsname kernel = {0}; int readError = uname(&kernel) ? errno : 0;
+    unsigned darwin = readError ? 0 : (unsigned)strtoul(kernel.release, NULL, 10);
+    NSMutableDictionary *encodings = [NSMutableDictionary new], *symbols = [NSMutableDictionary new];
+    dlopen("/System/Library/PrivateFrameworks/BluetoothManager.framework/BluetoothManager", RTLD_LAZY | RTLD_LOCAL);
+    Class cls = NSClassFromString(@"BluetoothManager");
+    for (NSString *name in @[@"sharedInstance", @"setSharedInstanceQueue:", @"available", @"enabled"]) {
+        Method method = [name isEqual:@"sharedInstance"] || [name isEqual:@"setSharedInstanceQueue:"] ?
+            class_getClassMethod(cls, NSSelectorFromString(name)) : class_getInstanceMethod(cls, NSSelectorFromString(name));
+        const char *encoding = method ? method_getTypeEncoding(method) : NULL;
+        encodings[name] = encoding ? [NSString stringWithUTF8String:encoding] : @"missing";
+    }
+    const char *required[] = {"os_channel_create", "os_channel_destroy", "os_channel_attr_create", "os_channel_attr_destroy",
+        "os_channel_read_attr", "os_channel_attr_get", "os_channel_ring_id", "os_channel_tx_ring", "os_channel_rx_ring",
+        "os_channel_get_next_slot", "os_channel_set_slot_properties", "os_channel_advance_slot", "os_channel_sync", "os_channel_get_fd"};
+    for (unsigned i=0;i<sizeof(required)/sizeof(*required);++i)
+        symbols[[NSString stringWithUTF8String:required[i]]] = @(dlsym(RTLD_DEFAULT, required[i]) != NULL);
+    return @{ @"policy": @"ios15-18-and-ios26-darwin25-candidate-v1", @"os_pair_admitted": @(NWBTSkywalkOSAllowed((unsigned)os.majorVersion,darwin)),
+        @"ios_major": @(os.majorVersion), @"ios_minor": @(os.minorVersion), @"ios_patch": @(os.patchVersion),
+        @"darwin_major": @(darwin), @"kernel_read_errno": @(readError), @"experimental": @(os.majorVersion==26),
+        @"manager_method_encodings": encodings, @"channel_symbol_presence": symbols,
+        @"slot_size": @(sizeof(NWBTSkywalkSlotProperties)), @"buffer_offset": @(offsetof(NWBTSkywalkSlotProperties,bufferPointer)),
+        @"channel_opened": @NO, @"presence_is_functional_proof": @NO };
+}
 NSDictionary *NWBTSkywalkCompatibility(void) {
     NSDictionary *error = bluetoothStateCompatibility(); if (error) return error;
     const char *symbols[] = {"os_channel_create", "os_channel_destroy", "os_channel_attr_create",

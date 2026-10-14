@@ -238,6 +238,7 @@ NSDictionary *NWBTReadLECapabilities(void) {
 @property(nonatomic, copy) NSString *error;
 @property(nonatomic) uint8_t credits;
 @property(nonatomic) NSUInteger events, bytes, commands;
+@property(nonatomic) double operationDeadline;
 @end
 @implementation NWBTLabSession
 - (NSData *)command:(uint16_t)opcode parameters:(NSData *)parameters phase:(NSString *)phase cleanup:(BOOL)cleanup {
@@ -245,6 +246,7 @@ NSDictionary *NWBTReadLECapabilities(void) {
     NSMutableDictionary *query = [@{@"opcode": @(opcode), @"phase": phase} mutableCopy];
     [self.queries addObject:query];
     BOOL sent = NO; double deadline = now() + 2.0;
+    if (!cleanup && self.operationDeadline) deadline=MIN(deadline,self.operationDeadline);
     while (now() < deadline && (cleanup || !NWBTCancelled) && !self.error) {
         if (!sent && self.credits) {
             uint8_t header[] = {(uint8_t)opcode, (uint8_t)(opcode >> 8), (uint8_t)parameters.length};
@@ -289,14 +291,16 @@ static BOOL verifyAdvertisingController(NWBTLabSession *session, NSMutableDictio
     NSData *version = [session command:0x1001 parameters:[NSData data] phase:@"transport_version" cleanup:NO];
     NSData *commands = version ? [session command:0x1002 parameters:[NSData data] phase:@"transport_commands" cleanup:NO] : nil;
     BOOL uart = [NWBTNativeTransport() isEqual:@"uart-h4"];
-    NSData *features = uart && commands.length == 70 ?
+    NSData *features = commands.length == 70 ?
         [session command:0x2003 parameters:[NSData data] phase:@"transport_le_features" cleanup:NO] : nil;
-    BOOL legacy = uart && features.length == 14 &&
-        !(((const uint8_t *)features.bytes)[7] & 0x10);
-    BOOL supported = legacy ?
-        NWBTLegacyAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6) :
-        NWBTExtendedAdvertisingCommands((const uint8_t *)commands.bytes + 6, commands.length - 6);
-    if (version.length != 14 || commands.length != 70 || (uart && features.length != 14) || !supported) {
+    BOOL extended = features.length == 14 && (((const uint8_t *)features.bytes)[7] & 0x10);
+    BOOL legacy = uart && features.length == 14 && !extended;
+    BOOL supported = commands.length == 70 && (legacy ?
+        NWBTLegacyAdvertisingCommands((const uint8_t *)commands.bytes + 6, 64) :
+        (extended && NWBTExtendedAdvertisingCommands((const uint8_t *)commands.bytes + 6, 64)));
+    report[@"le_extended_advertising_feature"] = @(extended);
+    report[@"controller_feature_reply_bytes"] = @(features.length);
+    if (version.length != 14 || commands.length != 70 || features.length != 14 || !supported) {
         if (!session.error) session.error = @"No verified HCI advertising command family on this controller.";
         report[@"error_code"] = @"unsupported";
         report[@"error"] = session.error;
@@ -304,7 +308,7 @@ static BOOL verifyAdvertisingController(NWBTLabSession *session, NSMutableDictio
         return NO;
     }
     report[@"advertising_mode"] = legacy ? @"legacy" : @"extended";
-    if (uart) report[@"le_extended_advertising_feature"] = @(!legacy);
+    report[@"advertising_contract_selection"] = @"le-feature-and-command-bitmap-before-first-setter";
     report[@"controller_contract_verified"] = @YES;
     report[@"controller_hci_version"] = @(((const uint8_t *)version.bytes)[6]);
     report[@"capacity_query_supported"] = @(NWBTAdvertisingCapacityQuery((const uint8_t *)commands.bytes + 6, commands.length - 6));
@@ -389,8 +393,10 @@ static NSDictionary *NWBTAdvertiseLabVariant(NSUInteger platform) {
     }
     if (fastPair) {
         report[@"service_uuid"] = @"FE2C";
-        report[@"service_data_hex"] = @"cd8256";
-        report[@"fast_pair_model_id"] = @0xcd8256;
+        uint8_t fixture[35]; NWBTLabFastPairData(fixture);
+        uint32_t model=((uint32_t)fixture[15]<<16)|((uint32_t)fixture[16]<<8)|fixture[17];
+        report[@"service_data_hex"] = [NSString stringWithFormat:@"%06x",model];
+        report[@"fast_pair_model_id"] = @(model);
         report[@"fast_pair_model_name"] = @"Pixel Buds";
         report[@"android_notification_verified"] = @NO;
         report[@"interval_ms"] = @100;
@@ -561,14 +567,17 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
             report[@"advertising_set_removed"] = @YES; // No extended set exists.
             NSUInteger enabled = 0;
             for (unsigned index=0; index<count && !session.error && !NWBTCancelled; ++index) {
-                if (started && now() >= started + 10.0) break;
+                if (started && now() >= started + 10.0) { session.error=@"Legacy selection deadline expired."; break; }
                 if (!configureLegacyModel(session, platform, catalogPlatform, catalogModels, index)) break;
+                // Configuration latency also consumes the shared selection
+                // budget. Never enable another model after its deadline.
+                if (started && now() >= started + 10.0) { session.error=@"Legacy selection deadline expired before enable."; break; }
                 uint8_t on = 1;
                 enableSubmitted = YES; // Even a lost ACK could have enabled it.
                 legacyDisabled = NO;
                 if (![session command:0x200a parameters:[NSData dataWithBytes:&on length:1]
                     phase:@"legacy_enable" cleanup:NO]) break;
-                if (!started) started = now();
+                if (!started) { started = now(); session.operationDeadline=started+10.0; }
                 ++enabled;
                 report[@"controller_advertising_acknowledged"] = @YES;
                 report[@"models_enabled_count"] = @(enabled);

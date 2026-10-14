@@ -39,6 +39,8 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
 @property(nonatomic) BOOL capacityQuery, missingSetter, closed, failCleanup;
 @property(nonatomic) BOOL rejectDuplicateLegacyDisable, legacyAdvertisingOn, rejectLegacyDisable;
 @property(nonatomic) unsigned setLimit, failOpcode, dropOpcode, enables;
+@property(nonatomic) BOOL missingLEFeature;
+@property(nonatomic) double configurationDelay;
 @end
 @implementation TestRing
 - (BOOL)send:(NSData *)packet {
@@ -56,7 +58,8 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
         if (self.capacityQuery) bytes[42] |= 0x80;
         if (self.missingSetter) bytes[42] &= ~0x04;
     }
-    if (opcode == 0x2003) { bytes[6] = 0xff; bytes[7] = 0x03; }
+    if (opcode == 0x2003) { bytes[6]=0xff; bytes[7]=legacyTransport || self.missingLEFeature ? 0x03 : 0x13; }
+    if (opcode==0x2005 || opcode==0x2006 || opcode==0x2008) clockValue+=self.configurationDelay;
     if (opcode == 0x203b) bytes[6] = self.setLimit;
     if (opcode == 0x2036) bytes[6] = 8;
     if (opcode == 0x2035) [self.addresses addObject:[packet subdataWithRange:NSMakeRange(3, 7)]];
@@ -128,6 +131,8 @@ int main(void) { @autoreleasepool {
     assert(report[@"error"] && !peer.enables && countOpcode(0x203c) == 1 && peer.closed);
     reset(); peer.failCleanup = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert(report[@"error"] && peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); peer.missingLEFeature=YES; report=NWBTAdvertiseCatalogLab(0,models);
+    assert([report[@"error_code"] isEqual:@"unsupported"] && !countOpcode(0x2036) && !countOpcode(0x2006) && peer.closed);
     reset(); peer.missingSetter = YES; report = NWBTAdvertiseCatalogLab(0, models);
     assert([report[@"error_code"] isEqual:@"unsupported"] && !countOpcode(0x2036) && peer.closed);
     reset(); report = NWBTAdvertiseApplePairingLab(); assert(!report[@"error"] && !countOpcode(0x203b)); clean(report);
@@ -149,6 +154,10 @@ int main(void) { @autoreleasepool {
            [report[@"selection_completed"] boolValue] && countOpcode(0x2006) == 6 &&
            countOpcode(0x2008) == 6 && countOpcode(0x200a) == 12 && !countOpcode(0x2036));
     assert(peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport=YES; peer.configurationDelay=1.5;
+    report=NWBTAdvertiseCatalogLab(0,models);
+    assert(report[@"error"] && ![report[@"selection_completed"] boolValue] && peer.enables<6 && peer.closed);
+    assert([report[@"advertising_stopped_acknowledged"] boolValue] && !peer.legacyAdvertisingOn);
     reset(); legacyTransport = YES; peer.rejectLegacyDisable = YES;
     report = NWBTAdvertiseCatalogLab(0, @[@1]);
     assert(report[@"error"] && ![report[@"advertising_stopped_acknowledged"] boolValue] &&

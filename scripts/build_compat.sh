@@ -5,6 +5,8 @@ cd "$(dirname "$0")/.."
 mkdir -p build/audit
 # Use the complete current extension and its tests; keep the normal dev target.
 NW_MIN_IOS=15.0 bash scripts/build_extension.sh
+clang -Wall -Wextra -Werror -Wno-unused-parameter -fno-objc-arc -fblocks -framework Foundation tests/test_bootstrap_binding.m src/compat/NWWiFiUnblock.m -o build/audit/test_bootstrap_binding
+build/audit/test_bootstrap_binding
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -Wno-unused-parameter -x objective-c -fno-objc-arc -fblocks -fPIC -O2 -dynamiclib -Wl,-fatal_warnings \

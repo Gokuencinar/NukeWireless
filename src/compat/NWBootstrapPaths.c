@@ -2,6 +2,9 @@
 #include "../NWInstallLayout.h"
 #include "NWWiFiUnblock.h"
 #include "../NWRouteNeighbors.h"
+#include "../NWARPBinding.h"
+#import <Foundation/Foundation.h>
+#include <fcntl.h>
 /* Compatibility candidate, recovered from commit 29614397b9b3744f65bfa00aefaa734c3477b9d0.
  * That commit's prebuilt library matches the pinned NukeWirelessPaths.dylib.
  * Recompiled for iOS 15; bootstrap paths and native-entry guards adapted here.
@@ -49,7 +52,6 @@ extern int close(int);
 extern void *dlopen(const char *, int);
 extern void *dlsym(void *, const char *);
 extern char *dlerror(void);
-extern void CFRelease(void *);
 
 static BOOL (*original_exists)(id, SEL, id);
 static void (*original_launch_path)(id, SEL, id);
@@ -64,7 +66,7 @@ static void (*original_did_appear)(id, SEL, BOOL);
 static void (*original_found_device)(id, SEL, id);
 static id (*original_scanner_init)(id, SEL, id, BOOL);
 static void (*original_scanner_start)(id, SEL);
-static void (*original_scanner_finished)(id, SEL, NSUInteger);
+static void (*original_scanner_finished)(id, SEL, int);
 static void (*original_scanner_failed)(id, SEL);
 static id oui_brands;
 static int info_overlay_added;
@@ -79,7 +81,9 @@ struct active_block {
     id task; /* Retained original task, never a detached PID. */
 };
 static struct active_block blocks[64];
-static struct active_block pending_block;
+static char task_binding_key, task_rejection_key;
+static int (*original_task_pid)(id,SEL);
+static BOOL (*original_task_running)(id,SEL);
 static int repair_in_progress;
 static int capture_root_task;
 static id captured_root_task;
@@ -227,10 +231,17 @@ static int wifi_has_ipv6(void) {
 }
 
 static void debug_line(const char *label, const char *value) {
-    int fd = open("/tmp/nukewireless_gateway_debug.log", 0x209, 0666);
+    // Private bounded trace contains event labels only. Raw IP/MAC, peer names,
+    // paths and child PIDs belong in neither the trace nor exported journals.
+    (void)value;
+    NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Caches/NukeWirelessTrace.log"];
+    int fd = open(path.fileSystemRepresentation, O_WRONLY|O_CREAT|O_APPEND|O_NOFOLLOW|O_CLOEXEC, 0600);
     if (fd < 0) return;
+    struct stat info;
+    if (fstat(fd,&info) || !S_ISREG(info.st_mode) || info.st_uid!=getuid() || info.st_nlink!=1 || (info.st_mode & 0077)) { close(fd); return; }
+    if (info.st_size > 65536 && ftruncate(fd,0)) { close(fd); return; }
     char line[512];
-    int n = snprintf(line, sizeof(line), "%s: %s\n", label, value ? value : "(null)");
+    int n = snprintf(line, sizeof(line), "%s\n", label);
     if (n > 0 && n < (int)sizeof(line)) write(fd, line, (unsigned long)n);
     close(fd);
 }
@@ -306,7 +317,8 @@ static int get_interface_mac(const char *name, char *mac, unsigned long mac_size
         if (!item->ifa_addr || !equals(item->ifa_name, name) ||
             item->ifa_addr->sa_family != AF_LINK) continue;
         struct sockaddr_dl *link = (struct sockaddr_dl *)item->ifa_addr;
-        if (link->sdl_alen != 6 || mac_size < 18) continue;
+        if (link->sdl_alen != 6 || mac_size < 18 ||
+            link->sdl_len < offsetof(struct sockaddr_dl,sdl_data)+link->sdl_nlen+6) continue;
         const unsigned char *bytes = (const unsigned char *)LLADDR(link);
         snprintf(mac, mac_size, "%02x:%02x:%02x:%02x:%02x:%02x",
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
@@ -538,7 +550,17 @@ static void patched_interrupt(id self, SEL cmd) {
     original_interrupt(self, cmd);
 }
 
+static int patched_task_pid(id self, SEL cmd) {
+    return objc_getAssociatedObject(self,&task_rejection_key) ? 0 : original_task_pid(self,cmd);
+}
+static BOOL patched_task_running(id self, SEL cmd) {
+    return objc_getAssociatedObject(self,&task_rejection_key) ? NO : original_task_running(self,cmd);
+}
 static void patched_launch(id self, SEL cmd) {
+    if (objc_getAssociatedObject(self,&task_rejection_key)) return;
+    struct active_block pending_block = {0};
+    NSData *binding = objc_getAssociatedObject(self,&task_binding_key);
+    if (binding.length == sizeof pending_block) memcpy(&pending_block,binding.bytes,sizeof pending_block);
     @try { original_launch(self, cmd); }
     @catch (id exception) {
         void (*failed)(id, id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticLaunchFailed");
@@ -581,7 +603,7 @@ static void patched_launch(id self, SEL cmd) {
                 blocks[slot].task = ((id (*)(id, SEL))objc_msgSend)(self, sel_registerName("retain"));
             }
         }
-        memset(&pending_block, 0, sizeof(pending_block));
+        objc_setAssociatedObject(self,&task_binding_key,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         void (*launched)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticLaunched");
         if (launched) launched(self);
     }
@@ -745,6 +767,7 @@ static void install_native_unblock(void) {
     debug_line("swift-unblock-hook", original_swift_unblock ? "installed" : "unavailable");
 }
 
+int NWNativeBlockBindingAvailable(void) { return original_arguments && original_launch && original_task_pid && original_task_running; }
 int NWNativeUnblockAvailable(void) { return original_swift_unblock != 0; }
 
 static id block_processes_for_ip(const char *ip) {
@@ -864,7 +887,7 @@ static void patched_scanner_start(id self, SEL cmd) {
     original_scanner_start(self, cmd);
 }
 
-static void patched_scanner_finished(id self, SEL cmd, NSUInteger status) {
+static void patched_scanner_finished(id self, SEL cmd, int status) {
     original_scanner_finished(self, cmd, status);
     if (self == wifi_scanner) {
         scan_in_progress = 0;
@@ -1580,92 +1603,77 @@ static void patched_did_appear(id self, SEL cmd, BOOL animated) {
     hide_info_credits(view);
 }
 
+static const char *argument_flag(NSArray *arguments, const char *flag) {
+    const char *value=NULL;
+    for (NSUInteger i=0;i<arguments.count;++i) if (equals(utf8(arguments[i]),flag)) {
+        if (value || i+1>=arguments.count) return NULL;
+        value=utf8(arguments[i+1]);
+    }
+    return value;
+}
 static void patched_arguments(id self, SEL cmd, id arguments) {
-    if (!arguments) {
-        original_arguments(self, cmd, arguments);
-        return;
-    }
-    NSUInteger count = ((NSUInteger (*)(id, SEL))objc_msgSend)(
-        arguments, sel_registerName("count"));
-    int is_arpoison = 0;
-    for (NSUInteger i = 0; i < count; ++i) {
-        id item = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-            arguments, sel_registerName("objectAtIndex:"), i);
-        if (contains(utf8(item), "arpoison")) { is_arpoison = 1; break; }
-    }
-    char gateway_ip[32], gateway_mac[32];
-    int has_gateway = is_arpoison && get_gateway(gateway_ip, sizeof(gateway_ip),
-                                                gateway_mac, sizeof(gateway_mac));
-    if (is_arpoison) debug_line("gateway-found", has_gateway ? "yes" : "no");
-    if (is_arpoison && !repair_in_progress) {
-        // Source-defined reporting API, optional until the UI extension loads.
-        // Capture preflight only; a gateway identity is not proof of blocking.
-        void (*record)(id, id, id) = (void *)dlsym((void *)-2, "NWDiagnosticRecord");
-        if (record) {
-            id details = ((id (*)(id, SEL, id, id))objc_msgSend)(objc_getClass("NSDictionary"),
-                sel_registerName("dictionaryWithObject:forKey:"),
-                string_from_utf8(has_gateway ? "ready" : "gateway_identity_unavailable"),
-                string_from_utf8("preflight"));
-            record(string_from_utf8("wifi_block_preflight"),
-                string_from_utf8(has_gateway ? "captured" : "failed"), details);
+    if (![arguments isKindOfClass:[NSArray class]]) { original_arguments(self,cmd,arguments); return; }
+    NSArray *input=arguments;
+    BOOL poison=NO;
+    for (id item in input) if (contains(utf8(item),"arpoison")) poison=YES;
+    NSMutableArray *result=[NSMutableArray arrayWithCapacity:input.count];
+    objc_setAssociatedObject(self,&task_binding_key,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(self,&task_rejection_key,nil,OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    struct active_block binding={0};
+    char gateway_ip[32]={0},gateway_mac[32]={0},phone_mac[32]={0},observed_mac[32]={0};
+    const char *error=NULL;
+    if (poison && !repair_in_progress) {
+        const char *target=argument_flag(input,"-s"),*target_mac=argument_flag(input,"-r");
+        const char *interface=argument_flag(input,"-i");
+        uint8_t peer[6],observed[6],router[6],phone[6];
+        struct in_addr address={0},local={0},mask={0},gateway={0};
+        if (!target || inet_pton(AF_INET,target,&address)!=1 || !equals(interface,"en0") || !NWARPParseMAC(target_mac,peer))
+            error="invalid_target_arguments";
+        if (!error && (!get_gateway(gateway_ip,sizeof gateway_ip,gateway_mac,sizeof gateway_mac) ||
+            inet_pton(AF_INET,gateway_ip,&gateway)!=1 || !NWARPParseMAC(gateway_mac,router))) error="gateway_identity_unavailable";
+        if (!error && (!get_interface_mac("en0",phone_mac,sizeof phone_mac) || !NWARPParseMAC(phone_mac,phone))) error="interface_identity_unavailable";
+        if (!error && (!get_mac_from_arp_table(target,observed_mac,sizeof observed_mac) || !NWARPParseMAC(observed_mac,observed))) error="neighbor_identity_unavailable";
+        struct ifaddrs *list=NULL;
+        if (!error && getifaddrs(&list)) error="interface_read_failed";
+        for (struct ifaddrs *item=list;item;item=item->ifa_next) if (item->ifa_addr && item->ifa_netmask &&
+            equals(item->ifa_name,"en0") && item->ifa_addr->sa_family==AF_INET && item->ifa_netmask->sa_family==AF_INET) {
+            local=((struct sockaddr_in *)item->ifa_addr)->sin_addr;
+            mask=((struct sockaddr_in *)item->ifa_netmask)->sin_addr; break;
+        }
+        if (list) freeifaddrs(list);
+        if (!error) error=NWARPBindingError(ntohl(address.s_addr),ntohl(local.s_addr),ntohl(mask.s_addr),ntohl(gateway.s_addr),peer,observed,router,phone);
+        if (!error && (!argument_flag(input,"-d") || !argument_flag(input,"-t"))) error="missing_destination_flags";
+        NSMutableDictionary *details=[NSMutableDictionary dictionaryWithDictionary:@{
+            @"preflight":error ? string_from_utf8(error) : @"ready", @"interface":@"en0",
+            @"binding_verified":@(!error), @"source_role":@"selected_peer", @"destination_role":@"current_gateway",
+            @"claimed_mac_role":@"this_iphone", @"restoration_mac_role":@"verified_peer",
+            @"target_neighbor_matches_selection":@(!error), @"internet_cut_confirmed":@NO }];
+        id (*context)(void)=(void *)dlsym((void *)-2,"NWTaskDiagnosticCurrentContext");
+        if (context) [details addEntriesFromDictionary:context()];
+        void (*record)(id,id,id)=(void *)dlsym((void *)-2,"NWDiagnosticRecord");
+        if (record) record(@"wifi_block_preflight",error ? @"failed" : @"captured",details);
+        if (error) objc_setAssociatedObject(self,&task_rejection_key,string_from_utf8(error),OBJC_ASSOCIATION_COPY_NONATOMIC);
+        else {
+            snprintf(binding.ip,sizeof binding.ip,"%s",target); snprintf(binding.real_mac,sizeof binding.real_mac,"%s",observed_mac);
+            objc_setAssociatedObject(self,&task_binding_key,[NSData dataWithBytes:&binding length:sizeof binding],OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            void (*prepare)(id,id)=(void *)dlsym((void *)-2,"NWTaskDiagnosticPrepareWithDetails");
+            if (prepare) prepare(self,details);
         }
     }
-    char phone_mac[32] = {0};
-    int has_phone_mac = is_arpoison && get_interface_mac("en0", phone_mac, sizeof(phone_mac));
-    if (is_arpoison) debug_line("phone-mac", has_phone_mac ? phone_mac : "missing");
-    if (is_arpoison && !repair_in_progress)
-        memset(&pending_block, 0, sizeof(pending_block));
-    Class array_class = objc_getClass("NSMutableArray");
-    id result = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-        array_class, sel_registerName("arrayWithCapacity:"), count);
-    for (NSUInteger i = 0; i < count; ++i) {
-        id item = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-            arguments, sel_registerName("objectAtIndex:"), i);
-        if (is_arpoison && i > 0) {
-            id previous = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-                arguments, sel_registerName("objectAtIndex:"), i - 1);
-            const char *flag = utf8(previous);
-            if (equals(flag, "-s") && utf8(item))
-                snprintf(pending_block.ip, sizeof(pending_block.ip), "%s", utf8(item));
-            if (equals(flag, "-r") && utf8(item))
-                snprintf(pending_block.real_mac, sizeof(pending_block.real_mac), "%s", utf8(item));
-            if (has_gateway && (!utf8(item) || !utf8(item)[0])) {
-                if (equals(flag, "-d")) item = string_from_utf8(gateway_ip);
-                else if (equals(flag, "-t")) item = string_from_utf8(gateway_mac);
-            }
-            if (equals(flag, "-r") && has_phone_mac && !repair_in_progress)
-                item = string_from_utf8(phone_mac);
+    for (NSUInteger i=0;i<input.count;++i) {
+        id item=input[i]; const char *flag=i ? utf8(input[i-1]) : NULL;
+        if (poison && !repair_in_progress && !error) {
+            // Replace stale non-empty native values too, using one fresh binding.
+            if (equals(flag,"-d")) item=string_from_utf8(gateway_ip);
+            else if (equals(flag,"-t")) item=string_from_utf8(gateway_mac);
+            else if (equals(flag,"-r")) item=string_from_utf8(phone_mac);
         }
-        ((void (*)(id, SEL, id))objc_msgSend)(
-            result, sel_registerName("addObject:"), rewrite_argument(item));
+        [result addObject:rewrite_argument(item)];
     }
-    original_arguments(self, cmd, result);
-    if (is_arpoison && !repair_in_progress) {
-        void (*prepare)(id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticPrepare");
-        if (prepare) prepare(self);
-    }
+    original_arguments(self,cmd,result);
     if (capture_root_task) {
-        id task_path = ((id (*)(id, SEL))objc_msgSend)(self,
-            sel_registerName("launchPath"));
-        if (contains(utf8(task_path), NWInstalledHelperSuffix))
-            captured_root_task = self;
-    }
-    if (!is_arpoison) {
-        id task_path = ((id (*)(id, SEL))objc_msgSend)(self,
-            sel_registerName("launchPath"));
-        debug_line("task-args-path", utf8(task_path));
-        for (NSUInteger j = 0; j < count; ++j) {
-            id arg = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(result,
-                sel_registerName("objectAtIndex:"), j);
-            debug_line("task-arg", utf8(arg));
-        }
-    }
-    if (is_arpoison && !repair_in_progress && pending_block.ip[0]) {
-        char arp_mac[32];
-        if (get_mac_from_arp_table(pending_block.ip, arp_mac, sizeof(arp_mac)))
-            snprintf(pending_block.real_mac, sizeof(pending_block.real_mac), "%s", arp_mac);
-        debug_line("block-target", pending_block.ip);
-        debug_line("block-real-mac", pending_block.real_mac);
+        id path=((id (*)(id,SEL))objc_msgSend)(self,sel_registerName("launchPath"));
+        if (contains(utf8(path),NWInstalledHelperSuffix)) captured_root_task=self;
     }
 }
 
@@ -1707,10 +1715,20 @@ static void install_paths(void) {
         sel_registerName("lanScanDidFindNewDevice:")) : 0;
     if (exists) original_exists = (void *)method_setImplementation(exists, (IMP)patched_exists);
     if (launch_path) original_launch_path = (void *)method_setImplementation(launch_path, (IMP)patched_launch_path);
-    if (arguments) original_arguments = (void *)method_setImplementation(arguments, (IMP)patched_arguments);
+    Method pid_method=class_getInstanceMethod(task_class,sel_registerName("processIdentifier"));
+    Method running_method=class_getInstanceMethod(task_class,sel_registerName("isRunning"));
+    BOOL task_contract=arguments && launch && pid_method && running_method &&
+        !strcmp(method_getTypeEncoding(arguments),"v24@0:8@16") && !strcmp(method_getTypeEncoding(launch),"v16@0:8") &&
+        !strcmp(method_getTypeEncoding(pid_method),"i16@0:8") &&
+        (!strcmp(method_getTypeEncoding(running_method),"B16@0:8") || !strcmp(method_getTypeEncoding(running_method),"c16@0:8"));
+    if (task_contract) {
+        original_arguments=(void *)method_setImplementation(arguments,(IMP)patched_arguments);
+        original_task_pid=(void *)method_setImplementation(pid_method,(IMP)patched_task_pid);
+        original_task_running=(void *)method_setImplementation(running_method,(IMP)patched_task_running);
+    }
     if (terminate) original_terminate = (void *)method_setImplementation(terminate, (IMP)patched_terminate);
     if (interrupt) original_interrupt = (void *)method_setImplementation(interrupt, (IMP)patched_interrupt);
-    if (launch) original_launch = (void *)method_setImplementation(launch, (IMP)patched_launch);
+    if (task_contract) original_launch = (void *)method_setImplementation(launch, (IMP)patched_launch);
     if (running_ip) method_setImplementation(running_ip, (IMP)patched_running_ip);
     if (running_arp) method_setImplementation(running_arp, (IMP)patched_running_arp);
     if (did_appear) original_did_appear = (void *)method_setImplementation(did_appear, (IMP)patched_did_appear);
@@ -1718,7 +1736,7 @@ static void install_paths(void) {
         scanner_init, (IMP)patched_scanner_init);
     if (scanner_start) original_scanner_start = (void *)method_setImplementation(
         scanner_start, (IMP)patched_scanner_start);
-    if (scanner_finished) original_scanner_finished = (void *)method_setImplementation(
+    if (scanner_finished && !strcmp(method_getTypeEncoding(scanner_finished),"v20@0:8i16")) original_scanner_finished = (void *)method_setImplementation(
         scanner_finished, (IMP)patched_scanner_finished);
     if (scanner_failed) original_scanner_failed = (void *)method_setImplementation(
         scanner_failed, (IMP)patched_scanner_failed);

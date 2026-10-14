@@ -2,6 +2,7 @@
 // Only NukeWireless-labelled rules and the selected hotspot client's states change.
 #define PRIVATE 1
 #include "../NWInstallLayout.h"
+#include "../NWCompatibility.h"
 #include "vendor/pfvar.h"
 #undef PRIVATE
 #include <sys/ioctl.h>
@@ -25,8 +26,10 @@
 #define MAX_ADDRESSES 16
 struct client_address { int family; unsigned char bytes[16]; };
 static int fd = -1;
+static unsigned kernel_major;
+static const char *last_stage = "arguments";
 static int fail(const char *code) {
-    printf("{\"ok\":false,\"error_code\":\"%s\",\"errno\":%d}\n", code, errno);
+    printf("{\"ok\":false,\"error_code\":\"%s\",\"errno\":%d,\"stage\":\"%s\",\"darwin_major\":%u,\"experimental\":%s}\n", code, errno, last_stage, kernel_major, kernel_major == 25 ? "true" : "false");
     if (fd >= 0) close(fd); return 1;
 }
 static int authorized(const char *executable) {
@@ -245,7 +248,7 @@ static int status(void) {
             inet_ntop(AF_INET,&request.rule.src.addr.v.a.addr,address,sizeof(address)))
             printf("%s\"%s\":\"%s\"",written++ ? ",":"",canonical,address);
     }
-    printf("},\"matched_packets\":%llu}\n",packets); close(fd); return 0;
+    printf("},\"matched_packets\":%llu,\"darwin_major\":%u,\"experimental\":%s,\"contract_readback_verified\":true,\"rule_struct_size\":%zu,\"status_struct_size\":%zu}\n",packets,kernel_major,kernel_major==25 ? "true" : "false",sizeof(struct pfioc_rule),sizeof(struct pf_status)); close(fd); return 0;
 }
 int main(int argc, char **argv) {
     // Bound even privileged children without giving the app signal entitlements.
@@ -255,10 +258,16 @@ int main(int argc, char **argv) {
     int query=!strcmp(argv[1], "status"), repair=!strcmp(argv[1], "reconcile"), clear=!strcmp(argv[1],"clear");
     if (!query && !repair && !clear && strcmp(argv[1], "block") && strcmp(argv[1], "unblock")) { errno = EINVAL; return fail("arguments"); }
     if ((query || repair || clear) != (argc == 2) || (clear && getuid()!=0)) { errno = EINVAL; return fail("arguments"); }
-    struct utsname os; if (uname(&os) || atoi(os.release) < 21 || atoi(os.release) > 24) return fail("unsupported");
+    last_stage = "kernel_admission";
+    struct utsname os; if (uname(&os)) return fail("kernel_read");
+    kernel_major = (unsigned)strtoul(os.release, NULL, 10);
+    if (!NWPFKernelContract(kernel_major)) { errno = 0; return fail("unsupported"); }
+    last_stage = "pf_open";
     fd = open("/dev/pf", query ? O_RDONLY : O_RDWR); if (fd < 0) return fail("pf_unavailable");
+    last_stage = "pf_contract_readback";
     struct pf_status contract={0}; struct pfioc_rule contract_rules;
     if (ioctl(fd,DIOCGETSTATUS,&contract) || rules_count(&contract_rules)<0) return fail("pf_contract");
+    last_stage = "pf_owned_rules";
     if (clear && !remove_rules(OWNER)) return fail("pf_remove");
     if (repair && !reconcile()) return fail("pf_reconcile");
     if (argc == 2) return status();
@@ -268,19 +277,24 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "unblock")) {
         if (!remove_rules(prefix)) return fail("pf_remove"); return status();
     }
+    last_stage = "hotspot_bridge";
     if (!bridge_for(ip, interface)) { errno = EADDRNOTAVAIL; return fail("hotspot_network"); }
     struct client_address addresses[MAX_ADDRESSES] = {{.family = AF_INET}}; memcpy(addresses[0].bytes, &ip, 4);
+    last_stage = "hotspot_neighbors";
     int matched = 0, count = neighbours(AF_INET, interface, mac, addresses, 1, ip, &matched);
     if (count < 0 || matched != 1) { errno = EADDRNOTAVAIL; return fail("hotspot_identity"); }
     count = neighbours(AF_INET6, interface, mac, addresses, count, ip, &matched); if (count < 0) return fail("hotspot_neighbors");
     struct pf_status state = {0}; struct pfioc_rule probe;
     if (ioctl(fd, DIOCGETSTATUS, &state) || rules_count(&probe) < 0) return fail("pf_contract");
+    last_stage = "pf_enable";
     if (!state.running && ioctl(fd, DIOCSTART) && errno != EEXIST) return fail("pf_enable");
     if (!remove_rules(prefix)) return fail("pf_remove");
+    last_stage = "pf_apply";
     for (int i = 0; i < count; ++i) for (int source = 0; source < 2; ++source) {
         char label[64]; snprintf(label, sizeof(label), "%s%d:%d", prefix, i, source);
         if (!add_rule(label, interface, &addresses[i], source)) { int saved = errno; remove_rules(prefix); errno = saved; return fail("pf_apply"); }
     }
+    last_stage = "pf_client_states";
     for (int i = 0; i < count; ++i) if (!kill_client_states(&addresses[i])) {
         int saved = errno; remove_rules(prefix); errno = saved; return fail("pf_states");
     }

@@ -8,6 +8,8 @@ case "$minimum_ios" in
   *) echo "Unsupported deployment target: $minimum_ios" >&2; exit 1 ;;
 esac
 python3 scripts/language_catalog.py build/audit
+clang -Wall -Wextra -Werror tests/test_arp_binding.c -o build/audit/test_arp_binding
+build/audit/test_arp_binding
 clang -Wall -Wextra -Werror tests/test_route_neighbors.c -o build/audit/test_route_neighbors
 build/audit/test_route_neighbors
 clang -Wall -Wextra -Werror tests/test_device_catalog.c -o build/audit/test_device_catalog

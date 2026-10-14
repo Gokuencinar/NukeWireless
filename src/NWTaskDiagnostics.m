@@ -32,6 +32,7 @@ int NWTaskDiagnosticRunning(id task) {
     @catch (NSException *exception) { (void)exception; return -1; }
 }
 void NWTaskDiagnosticContext(NSDictionary *context) { @synchronized (NWTaskObservation.class) { actionContext = [context copy]; } }
+NSDictionary *NWTaskDiagnosticCurrentContext(void) { @synchronized (NWTaskObservation.class) { return [actionContext copy] ?: @{}; } }
 static NSDictionary *details(NWTaskObservation *item) {
     NSMutableDictionary *value = [item.context mutableCopy] ?: [NSMutableDictionary new];
     value[@"internet_cut_confirmed"] = @NO;
@@ -81,6 +82,12 @@ void NWTaskDiagnosticPrepare(id task) {
         } else item.capture = @"runtime_contract_unavailable";
     } @catch (NSException *exception) { (void)exception; item.capture = @"capture_setup_failed"; }
     objc_setAssociatedObject(task, &observationKey, item, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+void NWTaskDiagnosticPrepareWithDetails(id task, NSDictionary *value) {
+    NWTaskDiagnosticPrepare(task);
+    NWTaskObservation *item = objc_getAssociatedObject(task, &observationKey);
+    NSMutableDictionary *merged = [item.context mutableCopy] ?: [NSMutableDictionary new];
+    [merged addEntriesFromDictionary:NWDiagnosticRedact(value ?: @{})]; item.context = merged;
 }
 static void finishObservation(NWTaskObservation *item, NSString *status, NSString *error) {
     NSMutableDictionary *value = [details(item) mutableCopy];

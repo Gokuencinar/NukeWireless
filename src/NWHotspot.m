@@ -141,6 +141,17 @@ static NSDictionary *invoke(NSArray<NSString *> *arguments) {
     if ([report[@"ok"] boolValue] && (!WIFEXITED(status) || WEXITSTATUS(status))) return @{@"ok":@NO,@"error_code":@"transport"};
     return report;
 }
+void NWHotspotReadDiagnostics(void (^completion)(NSDictionary *)) {
+    dispatch_async(filterQueue(), ^{
+        NSDictionary *raw=invoke(@[@"status"]);
+        NSMutableDictionary *report=[NSMutableDictionary dictionaryWithDictionary:raw];
+        // Helper labels include link identities; only counts leave the process.
+        report[@"owned_rule_count"]=@([raw[@"rules"] count]);
+        [report removeObjectForKey:@"rules"]; [report removeObjectForKey:@"ipv4"];
+        report[@"read_only"]=@YES; report[@"internet_cut_confirmed"]=@NO;
+        dispatch_async(dispatch_get_main_queue(), ^{ if(completion) completion(report); });
+    });
+}
 static void checkFilter(void) {
     if (checking || changing) return; checking=YES;
     NSUInteger generation=filterGeneration;
@@ -292,7 +303,7 @@ static BOOL refresh(void) {
             changing=NO; filterStatus=report; notify();
             id device=current(row);
             BOOL success=[report[@"ok"] boolValue] && device && blocked(device)==value;
-            NWDiagnosticRecord(@"hotspot_block",success ? @"applied":@"failed",@{@"error_code":report[@"error_code"] ?: @"",@"system_errno":report[@"errno"] ?: @0,@"block_requested":@(value)});
+            NWDiagnosticRecord(@"hotspot_block",success ? @"applied":@"failed",@{@"error_code":report[@"error_code"] ?: @"",@"system_errno":report[@"errno"] ?: @0,@"block_requested":@(value), @"helper_contract":@{ @"stage":report[@"stage"] ?: @"completed", @"darwin_major":report[@"darwin_major"] ?: @0, @"experimental":report[@"experimental"] ?: @NO, @"contract_readback_verified":report[@"contract_readback_verified"] ?: @NO, @"matched_packets":report[@"matched_packets"] ?: @0 }, @"internet_cut_confirmed":@NO});
             if (!success) [self message:[NSString stringWithFormat:NWText(@"hotspot.blockFailed"),report[@"error_code"] ?: @"verification"]];
         });
     });

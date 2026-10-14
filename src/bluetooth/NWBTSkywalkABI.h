@@ -2,6 +2,7 @@
 #define NWBT_SKYWALK_ABI_H
 #include <stdint.h>
 #include <stddef.h>
+#include "../NWCompatibility.h"
 
 // Same contract in Apple's XNU 8020.101.4, 8792.61.2, 10002.1.13 and
 // 11215.1.10 os_channel.h. See docs/BLUETOOTH-SKYWALK-PORT.md for evidence.
@@ -21,7 +22,7 @@ enum {
     NWBTSkywalkBufferSize = 4
 };
 static inline int NWBTSkywalkOSAllowed(unsigned ios, unsigned darwin) {
-    return ios >= 15 && ios <= 18 && darwin == ios + 6;
+    return NWTransportOSContract(ios, darwin);
 }
 // Extended advertising setters, per-set address and removal. Capacity querying
 // is optional: the tester's 20H240 controller advertises these setters but not

@@ -7,6 +7,7 @@
 NSDictionary *NWBTSkywalkCompatibility(void);
 // Also checks the actual HCI nexus descriptor, without opening any channel.
 NSDictionary *NWBTNativeAvailability(void);
+NSDictionary *NWBTCompatibilityDiagnostics(void);
 // Selected once per worker, before transport ownership. UART admission is exact
 // firmware-specific; legacy ACT/ACL never switches to this transport.
 NSString *NWBTNativeTransport(void);

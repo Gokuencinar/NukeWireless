@@ -6,6 +6,7 @@ SOURCES = ["src/NWLegacyABI.h", "src/NWInstallLayout.h", "scripts/install_layout
            "scripts/compat_manifest.py", "scripts/build_compat_debs.py", "scripts/compat_macho.py",
            "scripts/compat_layout.py", "scripts/embedded_ui.py", "scripts/build_bluetooth_deb.py",
            "scripts/test_ui_simulator.sh", ".github/workflows/compat-build.yml"]
+SOURCES += ["src/NWARPBinding.h", "src/NWCompatibility.h", "tests/test_arp_binding.c", "tests/test_bootstrap_binding.m"]
 SOURCES += ["src/compat/NWWiFiUnblock.h", "src/compat/NWWiFiUnblock.m", "tests/test_wifi_unblock.m"]
 
 def compat_sources():
