@@ -67,7 +67,11 @@ static BOOL isDeviceMenu(UIAlertController *menu) {
         self.device = deviceForMenu(menu);
         self.hotspotMenu = [objc_getAssociatedObject(menu, &hotspotKey) boolValue];
         NSMutableArray *items = [NSMutableArray new];
-        for (UIAlertAction *action in menu.actions) if (action.style != UIAlertActionStyleCancel) [items addObject:action];
+        for (UIAlertAction *action in menu.actions) if (action.style != UIAlertActionStyleCancel) {
+            if (!self.hotspotMenu && (titleMatches(action,@"Block Device") || titleMatches(action,@"Unblock Device")))
+                action.enabled = action.enabled && self.device && NWDeviceCanSetBlocked(self.device,titleMatches(action,@"Block Device"));
+            [items addObject:action];
+        }
         self.items = items;
     }
     return self;

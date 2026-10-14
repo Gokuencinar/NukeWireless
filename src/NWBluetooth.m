@@ -688,6 +688,10 @@ int NWBluetoothUIRegressionCheck(void) {
             NSMutableDictionary *complete = [quiet mutableCopy]; complete[@"operation"] = operation;
             [complete removeObjectForKey:@"error_code"]; lastReport = complete;
             if (reportVisible() || !emissionFinishedCleanly(complete)) return 59;
+            NSMutableDictionary *partialSelection=[complete mutableCopy]; partialSelection[@"selection_completed"]=@NO;
+            if (emissionFinishedCleanly(partialSelection)) return 73;
+            partialSelection[@"error_code"]=@"cancelled";
+            if (!emissionFinishedCleanly(partialSelection)) return 74;
             for (NSString *field in @[@"controller_advertising_acknowledged", @"advertising_stopped_acknowledged", @"advertising_set_removed", @"service_restored"]) {
                 NSMutableDictionary *partial = [complete mutableCopy]; partial[field] = @NO; lastReport = partial;
                 if (!reportVisible() || !NWBluetoothEmissionIssue()) return 60;

@@ -18,10 +18,13 @@ int main(void) {
         NSTask *task = [NSTask new]; task.launchPath = @"/bin/sh";
         task.arguments = @[@"-c", @"printf 'permission denied 192.168.1.42 private-name\\n' >&2; exit 7"];
         NWTaskDiagnosticPrepare(task); assert([task.standardError isKindOfClass:NSPipe.class]);
+        NWTaskDiagnosticContext(@{@"operation_id":@"wifi-2",@"peer_tag":@"peer-2"});
+        NWTaskDiagnosticPrepareWithDetails(task,@{@"binding_verified":@YES,@"source_role":@"selected_peer"});
         [task launch]; NWTaskDiagnosticLaunched(task); [task waitUntilExit]; drain();
         NSDictionary *event = last(), *details = event[@"details"];
         assert([event[@"status"] isEqual:@"failed"] && [details[@"exit_status"] isEqual:@7]);
         assert([details[@"operation_id"] isEqual:@"wifi-1"] && ![details[@"internet_cut_confirmed"] boolValue]);
+        assert([details[@"peer_tag"] isEqual:@"peer-1"] && [details[@"binding_verified"] boolValue]);
         assert([details[@"stderr_categories"] containsObject:@"permission denied"]);
         assert(![details.description containsString:@"private-name"] && ![details.description containsString:@"192.168"]);
         assert(NWTaskDiagnosticRunning(task) == 0);

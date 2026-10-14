@@ -746,6 +746,10 @@ int NWDeviceActionsUIRegressionCheck(void) {
         if (![NWDeviceCommandFixtureCalls() isEqual:@[@[@"block", @"192.0.2.42", @"00:11:22:33:44:55"]]] ||
             ![NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 6;
         if (!NWDeviceSetBlocked(row, NO, nil) || [NWDeviceSnapshot().firstObject[@"blocked"] boolValue]) return 7;
+        ++networkEpoch;
+        BOOL epochRejected=!NWDeviceCanSetBlocked(row,YES) && NWDeviceCanSetBlocked(row,NO);
+        --networkEpoch;
+        if (!epochRejected) return 17;
         if (NWDeviceCanSetBlocked(NWDeviceSnapshot().lastObject, YES)) return 8;
         state.phase = NWScanning;
         if (NWDeviceCanSetBlocked(row, YES)) return 9;

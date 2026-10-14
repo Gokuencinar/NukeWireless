@@ -30,6 +30,9 @@ int main(void) {
         assert([NWDiagnosticSnapshot()[@"important_events"] firstObject][@"details"][@"sequence"]);
         NWDiagnosticRecord(@"wifi_scan", @"running", @{}); assert(NWDiagnosticSnapshot()[@"pending_tests"][@"wifi_scan"]);
         NWDiagnosticRecord(@"wifi_scan", @"empty", @{}); assert(!NWDiagnosticSnapshot()[@"pending_tests"][@"wifi_scan"]);
+        NSDictionary *runtime=NWDiagnosticSnapshot()[@"runtime"];
+        assert(runtime[@"ios_major"] && runtime[@"kernel_release"] && runtime[@"ios_build"] && runtime[@"source_commit"]);
+        assert(!runtime[@"serial"] && !runtime[@"udid"] && !runtime[@"ip"]);
         NSMutableDictionary *huge = [NSMutableDictionary new];
         for (unsigned i = 0; i < 80; ++i) huge[@(i).stringValue] = [@"x" stringByPaddingToLength:2048 withString:@"x" startingAtIndex:0];
         NWDiagnosticRecord(@"oversize", @"captured", huge);

@@ -17,7 +17,7 @@ static void assignArguments(id task,SEL cmd,id value) { (void)cmd; [task setArgu
 static void launchFixture(id task,SEL cmd) { (void)cmd; ++launches; [task setIsRunning:YES]; }
 static int pidFixture(id task,SEL cmd) { (void)cmd; return [task processIdentifier]; }
 static BOOL runningFixture(id task,SEL cmd) { (void)cmd; return [task isRunning]; }
-static void bind(BindingTask *task,const char *ip,const char *mac) {
+static void bindFixture(BindingTask *task,const char *ip,const char *mac) {
     struct active_block value={0}; snprintf(value.ip,sizeof value.ip,"%s",ip);
     snprintf(value.real_mac,sizeof value.real_mac,"%s",mac);
     objc_setAssociatedObject(task,&task_binding_key,[NSData dataWithBytes:&value length:sizeof value],OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -34,8 +34,8 @@ int main(void) { @autoreleasepool {
     patched_arguments(first,NULL,@[@"unrelated-command"]);
     assert(!objc_getAssociatedObject(first,&task_rejection_key));
     BindingTask *second=[[[BindingTask alloc] init] autorelease]; second.processIdentifier=102;
-    bind(first,"192.0.2.42","02:11:22:33:44:55");
-    bind(second,"192.0.2.43","02:11:22:33:44:66");
+    bindFixture(first,"192.0.2.42","02:11:22:33:44:55");
+    bindFixture(second,"192.0.2.43","02:11:22:33:44:66");
     patched_launch(second,NULL); patched_launch(first,NULL);
     assert(launches==2 && blocks[0].pid==102 && blocks[1].pid==101);
     assert(!strcmp(blocks[0].ip,"192.0.2.43") && !strcmp(blocks[1].ip,"192.0.2.42"));
