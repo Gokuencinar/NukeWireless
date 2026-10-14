@@ -134,13 +134,13 @@ static uint32_t configurationGateway(void) {
     return ipv4(value[@"Router"]);
 }
 static NSString *networkIdentity(void) {
-    uint32_t local, mask; localNetwork(&local, &mask, NULL);
+    uint32_t local, mask, gateway; localNetwork(&local, &mask, &gateway);
     // Public interface data only: no synchronous MobileWiFi/wifid query.
     // A background transition invalidates scan admission even if a different
     // AP happens to reuse the same subnet and router. This is not a BSSID probe.
     unsigned index = if_nametoindex("en0");
     return [NSString stringWithFormat:@"%u/%u/%u/%u/%llu", local, mask,
-        configurationGateway(), index, (unsigned long long)networkEpoch];
+        gateway, index, (unsigned long long)networkEpoch];
 }
 static BOOL hasCustomName(id device) {
     if ([readObject(device, @"nickName") length]) return YES;
@@ -408,8 +408,8 @@ BOOL NWDeviceCanSetBlocked(NSDictionary *row, BOOL blocked) {
 #endif
         NSString *mac = readObject(device, @"macAddress");
         uint8_t bytes[6]; uint32_t localIP, mask, gateway;
-        localNetwork(&localIP,&mask,&gateway); uint32_t currentGateway=configurationGateway();
-        if (currentGateway) gateway=currentGateway;
+        localNetwork(&localIP,&mask,&gateway);
+        if (!gateway) gateway=configurationGateway();
         if (!NWARPParseMAC(mac.UTF8String,bytes) || !NWEligibleAddress(ipv4(row[@"ip"]),localIP,mask,gateway,bytes)) return NO;
         // A proxy ARP/shared link identity is not an individually addressable
         // peer for this mechanism. The launch adapter also checks fresh ARP.
@@ -459,6 +459,19 @@ NSString *NWReadGatewayAddress(void) {
     struct in_addr address = {.s_addr = htonl(gateway)};
     char text[INET_ADDRSTRLEN];
     return inet_ntop(AF_INET, &address, text, sizeof(text)) ? [NSString stringWithUTF8String:text] : nil;
+}
+NSDictionary *NWScanPeerDiagnosticContext(NSString *address) {
+    if (!NSThread.isMainThread) return @{@"context_unavailable_reason":@"not_main_thread"};
+    NSMutableDictionary *value=[actionContext(YES,NO) mutableCopy];
+    if (ipv4(address)) value[@"peer_tag"]=peerTag(address);
+    NSString *mac=readObject(devices[address],@"macAddress"); unsigned shared=0;
+    for (id device in devices.allValues) if (mac.length &&
+        [mac caseInsensitiveCompare:readObject(device,@"macAddress") ?: @""]==NSOrderedSame) ++shared;
+    value[@"selected_peer_in_scan"]=@(devices[address]!=nil);
+    value[@"matching_link_identity_count"]=@(shared);
+    value[@"scan_matches_current_network"]=@([scanNetwork isEqual:networkIdentity()] && state.phase==NWComplete);
+    value[@"generation"]=@(state.generation); value[@"network_epoch"]=@(networkEpoch);
+    return value;
 }
 static const uint8_t *appExecutableBase(void) {
     for (uint32_t index = 0; index < _dyld_image_count(); index++) {

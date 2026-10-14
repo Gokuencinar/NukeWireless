@@ -1618,10 +1618,15 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
     if (poison && !repair_in_progress) {
         const char *target=argument_flag(input,"-s"),*target_mac=argument_flag(input,"-r");
         const char *interface=argument_flag(input,"-i");
+        id (*peer_context)(id)=(void *)dlsym((void *)-2,"NWScanPeerDiagnosticContext");
+        NSDictionary *selection=peer_context && target ? peer_context(string_from_utf8(target)) : @{};
         uint8_t peer[6],observed[6],router[6],phone[6];
         struct in_addr address={0},local={0},mask={0},gateway={0};
         if (!target || inet_pton(AF_INET,target,&address)!=1 || !equals(interface,"en0") || !NWARPParseMAC(target_mac,peer))
             error="invalid_target_arguments";
+        if (!error && selection[@"scan_matches_current_network"] &&
+            (![selection[@"scan_matches_current_network"] boolValue] || ![selection[@"selected_peer_in_scan"] boolValue])) error="stale_scan_identity";
+        if (!error && [selection[@"matching_link_identity_count"] unsignedIntValue]>1) error="shared_link_identity";
         if (!error && (!get_gateway(gateway_ip,sizeof gateway_ip,gateway_mac,sizeof gateway_mac) ||
             inet_pton(AF_INET,gateway_ip,&gateway)!=1 || !NWARPParseMAC(gateway_mac,router))) error="gateway_identity_unavailable";
         if (!error && (!get_interface_mac("en0",phone_mac,sizeof phone_mac) || !NWARPParseMAC(phone_mac,phone))) error="interface_identity_unavailable";
@@ -1641,6 +1646,7 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
             @"binding_verified":@(!error), @"source_role":@"selected_peer", @"destination_role":@"current_gateway",
             @"claimed_mac_role":@"this_iphone", @"restoration_mac_role":@"verified_peer",
             @"target_neighbor_matches_selection":@(!error), @"internet_cut_confirmed":@NO }];
+        [details addEntriesFromDictionary:selection];
         id (*context)(void)=(void *)dlsym((void *)-2,"NWTaskDiagnosticCurrentContext");
         if (context) [details addEntriesFromDictionary:context()];
         void (*record)(id,id,id)=(void *)dlsym((void *)-2,"NWDiagnosticRecord");

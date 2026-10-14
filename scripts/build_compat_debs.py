@@ -97,7 +97,8 @@ def package(scheme, core, artifact, output):
               "runtime_verified": False, "source_core_version": core_manifest["version"],
               "app_signing_identifier": "me.midnightchips.harpy-reloaded",
               "bluetooth_native_verified_environment": {"machine": "iPhone11,2", "ios": "16.3.1", "bootstrap": "roothide"},
-              "bluetooth_native_admission_policy": "skywalk-or-exact-uart-v2",
+              "bluetooth_native_admission_policy": "ios26-guarded-skywalk-or-exact-uart-v3",
+              "runtime_candidate_admission": {"ios15-18": "matching Darwin 21-24", "ios26": "Darwin 25; runtime guards required", "ios26_physical_acceptance": "pending"},
               "removed_duplicate_adapter": "HarpyRootHidePaths.dylib",
               "native_files": checks, "adapter": manifest,
               "ui_integration": {"mode": "embedded-required-v1", "mandatory_loads": list(LOADS),
@@ -118,7 +119,7 @@ Section: Utilities
 {predepends}Depends: firmware (>= 15.0), firmware (<< 19.0), ldid, arpoison, network-cmds, {hooks}
 Conflicts: xyz.cypwn.harpy-reloaded
 Replaces: xyz.cypwn.harpy-reloaded
-Description: NukeWireless iOS 15-18 development diagnostic edition ({label})
+Description: NukeWireless guarded iOS compatibility test edition ({label})
 '''.encode()
     output.mkdir(parents=True, exist_ok=True)
     destination = output / f"com.gokuencinar.nukewireless_{VERSION}_{architecture}.deb"
