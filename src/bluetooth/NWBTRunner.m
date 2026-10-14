@@ -244,6 +244,9 @@ static int recover(void) {
     if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 ||
         (byte != 'a' && byte != 'u' && byte != 'l')) return 0;
     char arm = byte; byte = 0;
+    // Start the legacy watchdog clock immediately after arming. A bounded
+    // launchctl PID snapshot below must not silently extend its 22s window.
+    double legacyDeadline = arm == 'l' ? uptime() + 22.0 : 0;
     // Observe the live daemon before the legacy experiment finishes. A mere
     // running() check after kickstart cannot establish controller reset.
     pid_t initialServicePID = arm == 'l' ? runningServicePID() : 0;
@@ -254,8 +257,16 @@ static int recover(void) {
     // duration. The recovery process is independent of the app and worker.
     // If a worker stalls, kill its UART owner so the port can be acquired for
     // an explicit disable, then reset the daemon regardless of the outcome.
-    int polled = poll(&descriptor, 1, arm == 'l' ? 22000 : -1);
-    BOOL timedOut = arm == 'l' && polled == 0;
+    int polled;
+    do {
+        int timeout = -1;
+        if (arm == 'l') {
+            double remaining = legacyDeadline - uptime();
+            timeout = remaining > 0 ? (int)(remaining * 1000.0) : 0;
+        }
+        polled = poll(&descriptor, 1, timeout);
+    } while (polled < 0 && errno == EINTR && (arm != 'l' || uptime() < legacyDeadline));
+    BOOL timedOut = arm == 'l' && polled <= 0;
     if (timedOut && worker > 1 && getppid() == worker) {
         kill(worker, SIGKILL);
         poll(&descriptor, 1, 1500);
