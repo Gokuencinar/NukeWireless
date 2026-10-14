@@ -45,6 +45,11 @@ int main(void) {
     assert(NWBTRecoveryDecision('u', 0, 'p') == NWBTRecoveryRetireAndRestore);
     assert(NWBTRecoveryDecision('u', -1, 'p') == NWBTRecoveryRetireAndRestore);
     assert(NWBTRecoveryDecision('u', 1, 'r') == NWBTRecoveryRetireAndRestore);
+    assert(NWBTRecoveryDecision('u', 1, 's') == NWBTRecoveryRetireAndRestore);
+    assert(!NWBTLegacyEmergencyStopRequired(1, 's'));
+    assert(NWBTLegacyEmergencyStopRequired(1, 'r'));
+    assert(NWBTLegacyEmergencyStopRequired(0, 's'));
+    assert(NWBTLegacyEmergencyStopRequired(-1, 's'));
     assert(NWBTRecoveryDecision('u', 1, 'x') == NWBTRecoveryRetireAndRestore);
     assert(NWBTRecoveryDecision('a', 1, 'p') == NWBTRecoveryRestore);
     assert(NWBTRecoveryDecision('a', 0, 0) == NWBTRecoveryRestore);

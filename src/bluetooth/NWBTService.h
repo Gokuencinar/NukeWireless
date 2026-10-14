@@ -12,6 +12,13 @@ static inline enum NWBTRecoveryAction NWBTRecoveryDecision(char arm, int receive
         NWBTRecoveryObserve : NWBTRecoveryRetireAndRestore;
     return arm == 'a' ? NWBTRecoveryRestore : NWBTRecoveryNone;
 }
+// 's' is a worker-provided, ACK-verified legacy disable with the UART port
+// already closed/restored. Retire bluetoothd to reset the global random
+// address, but avoid submitting a redundant disable which returns 0x0c on
+// the admitted firmware. EOF, missing ACK or any other result must retry.
+static inline int NWBTLegacyEmergencyStopRequired(int received, char completion) {
+    return received != 1 || completion != 's';
+}
 // Parse only a unique, complete launchctl PID line. A PID is used for comparing
 // snapshots, never for signalling a process.
 static inline int NWBTServicePID(const char *state) {

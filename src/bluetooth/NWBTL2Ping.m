@@ -538,7 +538,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         report[@"requested_advertising_sets"] = @(count);
         report[@"interval_ms"] = platform == 1 ? @152.5 : @100;
     }
-    BOOL enableSubmitted = NO, legacy = NO; double started = 0;
+    BOOL enableSubmitted = NO, legacy = NO, legacyDisabled = NO; double started = 0;
     @try {
         session.ring = ring;
         for (unsigned i=0;i<32;i++) {
@@ -565,6 +565,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
                 if (!configureLegacyModel(session, platform, catalogPlatform, catalogModels, index)) break;
                 uint8_t on = 1;
                 enableSubmitted = YES; // Even a lost ACK could have enabled it.
+                legacyDisabled = NO;
                 if (![session command:0x200a parameters:[NSData dataWithBytes:&on length:1]
                     phase:@"legacy_enable" cleanup:NO]) break;
                 if (!started) started = now();
@@ -577,6 +578,7 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
                 uint8_t off = 0;
                 if (![session command:0x200a parameters:[NSData dataWithBytes:&off length:1]
                     phase:@"legacy_disable_between_models" cleanup:YES]) break;
+                legacyDisabled = YES;
                 if (NWBTCancelled) break;
             }
             report[@"selection_completed"] = @(enabled == count && !session.error && !NWBTCancelled);
@@ -651,14 +653,16 @@ static NSDictionary *advertiseMultiDevice(NSUInteger platform, NSArray<NSNumber 
         NSString *original = session.error; session.error = nil;
         BOOL clean = YES;
         if (legacy) {
-            // This is the only final safe state for legacy advertising, which
-            // has NO controller-enforced duration. A missing ACK forces the
-            // independent recovery process to retire/restart bluetoothd.
+            // A successfully acknowledged disable already leaves advertising
+            // off. Sending another 0x200a disable on iPhone10,2/20H240 is
+            // rejected with Command Disallowed (0x0c), despite the previous
+            // disable succeeding. Retry ONLY when no disable ACK was received.
+            // If the retry fails, independent recovery must still run.
             uint8_t off = 0;
-            if (enableSubmitted) clean = [session command:0x200a
+            if (enableSubmitted && !legacyDisabled) clean = [session command:0x200a
                 parameters:[NSData dataWithBytes:&off length:1]
                 phase:@"legacy_final_disable" cleanup:YES] != nil;
-            report[@"advertising_stopped_acknowledged"] = @(enableSubmitted && clean);
+            report[@"advertising_stopped_acknowledged"] = @(enableSubmitted && (legacyDisabled || clean));
             report[@"advertising_set_removed"] = @YES;
         } else if (enableSubmitted) {
             for(unsigned i=0;i<handles.count;i++) {

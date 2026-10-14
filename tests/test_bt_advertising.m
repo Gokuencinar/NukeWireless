@@ -37,6 +37,7 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
 @property(nonatomic, strong) NSMutableArray<NSData *> *addresses;
 @property(nonatomic, strong) NSMutableArray<NSData *> *payloads;
 @property(nonatomic) BOOL capacityQuery, missingSetter, closed, failCleanup;
+@property(nonatomic) BOOL rejectDuplicateLegacyDisable, legacyAdvertisingOn, rejectLegacyDisable;
 @property(nonatomic) unsigned setLimit, failOpcode, dropOpcode, enables;
 @end
 @implementation TestRing
@@ -63,7 +64,12 @@ void NWBTCloseNativeChannel(void *channel) { (void)channel; }
     if (opcode == 0x2039 && p[3]) {
         self.enables++; unsigned ticks = u16(p+6); assert(ticks > 0 && ticks <= 1000);
     }
-    if (opcode == 0x200a && p[3]) self.enables++;
+    if (opcode == 0x200a) {
+        if (p[3]) { self.enables++; self.legacyAdvertisingOn = YES; }
+        else if (self.rejectLegacyDisable || (self.rejectDuplicateLegacyDisable && !self.legacyAdvertisingOn))
+            bytes[5] = 0x0c;
+        else self.legacyAdvertisingOn = NO;
+    }
     if (opcode == self.failOpcode || (self.failCleanup && (opcode == 0x203c || (opcode == 0x2039 && !p[3])))) bytes[5] = 0x0c;
     self.reply = opcode == self.dropOpcode ? nil : [NSData dataWithBytes:bytes length:size+5];
     return YES;
@@ -127,18 +133,26 @@ int main(void) { @autoreleasepool {
     reset(); report = NWBTAdvertiseApplePairingLab(); assert(!report[@"error"] && !countOpcode(0x203b)); clean(report);
     // Repeated operations never retain handles or cancellation from the last run.
     reset(); report = NWBTAdvertiseCatalogLab(1, @[@0]); assert(!report[@"error"]); clean(report);
-    reset(); legacyTransport = YES; report = NWBTAdvertiseCatalogLab(0, @[@1]);
+    // Physical iPhone10,2 reports 0x0c if disable is repeated after ACK 0.
+    // The successful first disable is authoritative: no redundant final HCI.
+    reset(); legacyTransport = YES; peer.rejectDuplicateLegacyDisable = YES;
+    report = NWBTAdvertiseCatalogLab(0, @[@1]);
     assert(!report[@"error"] && peer.enables == 1 &&
            [report[@"advertising_mode"] isEqual:@"legacy"] &&
            [report[@"advertising_stopped_acknowledged"] boolValue] &&
            countOpcode(0x2006) == 1 && countOpcode(0x2008) == 1 &&
-           countOpcode(0x200a) >= 2 && !countOpcode(0x2036) && !countOpcode(0x203c));
+           countOpcode(0x200a) == 2 && !countOpcode(0x2036) && !countOpcode(0x203c));
     assert(peer.closed && !NWBTUARTCanPreserveService(report));
-    reset(); legacyTransport = YES; report = NWBTAdvertiseCatalogLab(0, models);
+    reset(); legacyTransport = YES; peer.rejectDuplicateLegacyDisable = YES;
+    report = NWBTAdvertiseCatalogLab(0, models);
     assert(!report[@"error"] && peer.enables == 6 &&
            [report[@"selection_completed"] boolValue] && countOpcode(0x2006) == 6 &&
-           countOpcode(0x2008) == 6 && countOpcode(0x200a) >= 12 && !countOpcode(0x2036));
+           countOpcode(0x2008) == 6 && countOpcode(0x200a) == 12 && !countOpcode(0x2036));
     assert(peer.closed && !NWBTUARTCanPreserveService(report));
+    reset(); legacyTransport = YES; peer.rejectLegacyDisable = YES;
+    report = NWBTAdvertiseCatalogLab(0, @[@1]);
+    assert(report[@"error"] && ![report[@"advertising_stopped_acknowledged"] boolValue] &&
+           countOpcode(0x200a) == 3 && peer.closed && !NWBTUARTCanPreserveService(report));
     reset(); legacyTransport = YES; peer.failOpcode = 0x2008;
     report = NWBTAdvertiseCatalogLab(0, @[@1]);
     assert(report[@"error"] && !peer.enables && peer.closed && !NWBTUARTCanPreserveService(report));

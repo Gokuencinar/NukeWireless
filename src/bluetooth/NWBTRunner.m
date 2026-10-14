@@ -164,6 +164,12 @@ static BOOL running(void) {
     return control("print", service, &state) == 0 && [state hasPrefix:prefix] &&
         [state containsString:@"\n\tstate = running\n"];
 }
+static pid_t runningServicePID(void) {
+    NSString *state = nil;
+    if (control("print", service, &state) != 0 ||
+        ![state containsString:@"\n\tstate = running\n"]) return 0;
+    return (pid_t)NWBTServicePID(state.UTF8String);
+}
 static BOOL selectService(void) {
     // Inspect both fixed domains without changing either. Refuse ambiguity.
     int selected = -1;
@@ -227,6 +233,9 @@ static int recover(void) {
     if (getuid() || fstat(3, &pipeInfo) || !S_ISFIFO(pipeInfo.st_mode) ||
         fstat(4, &lockInfo) || !S_ISREG(lockInfo.st_mode) || lockInfo.st_uid || (lockInfo.st_mode & 0077) ||
         fstat(5, &handshake) || !S_ISFIFO(handshake.st_mode)) return 1;
+    // Child launchctl processes must never inherit our recovery lock/pipe.
+    // dup2 in startRecovery intentionally clears FD_CLOEXEC on these handles.
+    if (fcntl(3, F_SETFD, FD_CLOEXEC) || fcntl(4, F_SETFD, FD_CLOEXEC)) return 1;
     signal(SIGPIPE, SIG_IGN);
     if (write(5, "y", 1) != 1) return 1;
     close(5);
@@ -235,6 +244,9 @@ static int recover(void) {
     if (poll(&descriptor, 1, 5000) <= 0 || read(3, &byte, 1) != 1 ||
         (byte != 'a' && byte != 'u' && byte != 'l')) return 0;
     char arm = byte; byte = 0;
+    // Observe the live daemon before the legacy experiment finishes. A mere
+    // running() check after kickstart cannot establish controller reset.
+    pid_t initialServicePID = arm == 'l' ? runningServicePID() : 0;
     // This child survives app/worker exit and owns the inherited flock until
     // restoration finishes. EOF, completion or process termination restores.
     pid_t worker = getppid();
@@ -254,11 +266,32 @@ static int recover(void) {
     // A normal UART session closed/restored its own socket and stopped its
     // advertising handles. Do not reset the initialized controller afterwards.
     // Worker death/EOF or uncertain cleanup still has independent recovery.
-    if (arm == 'l' && action == NWBTRecoveryRetireAndRestore)
+    if (arm == 'l' && action == NWBTRecoveryRetireAndRestore &&
+        NWBTLegacyEmergencyStopRequired(received, byte))
         (void)NWBTForceLegacyAdvertisingStop();
-    if (action == NWBTRecoveryRetireAndRestore) control("bootout", service, NULL);
+    BOOL retired = YES;
+    if (action == NWBTRecoveryRetireAndRestore) {
+        retired = control("bootout", service, NULL) == 0;
+        if (arm == 'l' && retired) {
+            // Require evidence that the old PID stopped or was replaced;
+            // launchctl success alone is insufficient on this firmware.
+            double deadline = uptime() + 3.0;
+            while (uptime() < deadline) {
+                pid_t current = runningServicePID();
+                if (!current || (initialServicePID > 1 && current != initialServicePID)) break;
+                usleep(100000);
+            }
+        }
+    }
     BOOL preserved = action == NWBTRecoveryObserve && running();
     BOOL restored = preserved || restoreService();
+    if (arm == 'l' && action == NWBTRecoveryRetireAndRestore) {
+        pid_t newPID = runningServicePID();
+        // The global HCI random address can survive if bluetoothd never
+        // actually restarted. Report failure rather than claiming recovery.
+        restored = restored && retired && initialServicePID > 1 &&
+            newPID > 1 && newPID != initialServicePID;
+    }
     close(3); close(4);
     // A service that disappeared after the parent's snapshot still gets
     // recovered. Exit 2 distinguishes this repair from true preservation.
@@ -410,7 +443,16 @@ static NSDictionary *runExclusive(NSString *address, const char *ownPath, NSUInt
             preserveService = !control("print", service, &state) &&
                 [state containsString:@"\n\tstate = running\n"] && NWBTServicePID(state.UTF8String) == initialServicePID;
         }
-        if (writer >= 0) { if (armed) write(writer, preserveService ? "p" : "r", 1); close(writer); }
+        if (writer >= 0) {
+            NSDictionary *transport = report[@"transport_details"];
+            BOOL acknowledgedLegacyStop = uart && lab &&
+                [report[@"advertising_mode"] isEqual:@"legacy"] &&
+                [report[@"advertising_stopped_acknowledged"] boolValue] &&
+                [transport[@"channel_closed"] boolValue] &&
+                [transport[@"configuration_restored"] boolValue];
+            if (armed) write(writer, preserveService ? "p" : acknowledgedLegacyStop ? "s" : "r", 1);
+            close(writer);
+        }
         if (recovery > 0) {
             int status = 0; BOOL exited = NO; double deadline = uptime() + 18.0;
             // Service recovery owns cancellation from here. A hard worker exit
