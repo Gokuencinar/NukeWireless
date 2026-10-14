@@ -32,6 +32,9 @@ stable branch or claim physical acceptance on new hardware.
   binding. New blocks require the current scan/network epoch. Leaving the app
   invalidates admission; releasing an owned block remains possible with its
   matching device identity. An epoch is not an observation of a BSSID change.
+  Restoration also checks the original gateway, local subnet and current peer
+  identity; an owned child can stop after changing networks without sending old
+  restoration identities to the newly joined LAN. This is logged separately.
 - Correct recovered scan status ABI: signed 32-bit `int`, checked before hooking.
 - Legacy selection commands share the operation deadline. A partial selection
   remains an error and is visible; successful completion and a clean explicit

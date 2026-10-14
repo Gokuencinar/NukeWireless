@@ -70,6 +70,8 @@ struct cg_rect { struct cg_point origin; struct cg_size size; };
 struct active_block {
     char ip[32];
     char real_mac[32];
+    char gateway_ip[32], gateway_mac[32];
+    uint32_t local_ip, netmask;
     int pid;
     id task; /* Retained original task, never a detached PID. */
 };
@@ -679,8 +681,36 @@ static void stop_block_for_ip(const char *ip_text) {
     if (block_is_running(slot)) run_as_root(kill_path, kill_args, 2);
     debug_line("unblock-kill", pid_text);
     char gateway_ip[32], gateway_mac[32];
-    if (blocks[slot].real_mac[0] &&
-        get_gateway(gateway_ip, sizeof(gateway_ip), gateway_mac, sizeof(gateway_mac))) {
+    uint32_t current_local=0,current_mask=0;
+    struct ifaddrs *addresses=NULL;
+    if (!getifaddrs(&addresses)) {
+        for (struct ifaddrs *item=addresses;item;item=item->ifa_next) if (item->ifa_addr && item->ifa_netmask &&
+            equals(item->ifa_name,"en0") && item->ifa_addr->sa_family==AF_INET && item->ifa_netmask->sa_family==AF_INET) {
+            current_local=ntohl(((struct sockaddr_in *)item->ifa_addr)->sin_addr.s_addr);
+            current_mask=ntohl(((struct sockaddr_in *)item->ifa_netmask)->sin_addr.s_addr); break;
+        }
+        freeifaddrs(addresses);
+    }
+    char observed_mac[32]={0}; uint8_t observed[6],stored[6],router[6],stored_router[6];
+    BOOL binding_matches=blocks[slot].real_mac[0] && blocks[slot].gateway_ip[0] &&
+        current_local==blocks[slot].local_ip && current_mask==blocks[slot].netmask &&
+        get_gateway(gateway_ip,sizeof gateway_ip,gateway_mac,sizeof gateway_mac) &&
+        equals(gateway_ip,blocks[slot].gateway_ip) && NWARPParseMAC(gateway_mac,router) &&
+        NWARPParseMAC(blocks[slot].gateway_mac,stored_router) && !memcmp(router,stored_router,6) &&
+        get_mac_from_arp_table(blocks[slot].ip,observed_mac,sizeof observed_mac) &&
+        NWARPParseMAC(observed_mac,observed) && NWARPParseMAC(blocks[slot].real_mac,stored) && !memcmp(observed,stored,6);
+    void (*record_restore)(id,id,id)=(void *)dlsym(RTLD_DEFAULT,"NWDiagnosticRecord");
+    if (record_restore) {
+        id (*context)(void)=(void *)dlsym(RTLD_DEFAULT,"NWTaskDiagnosticCurrentContext");
+        NSMutableDictionary *details=[NSMutableDictionary dictionaryWithDictionary:context ? context() : @{}];
+        [details addEntriesFromDictionary:@{@"network_binding_matches":@(binding_matches),
+            @"restoration_submitted":@(binding_matches), @"internet_restored_confirmed":@NO,
+            @"restoration_policy":@"original_gateway_and_current_peer_identity"}];
+        record_restore(@"wifi_unblock_restore",binding_matches ? @"submitted" : @"warning",details);
+    }
+    // Stop the owned child regardless of network changes. Never send old peer
+    // identities to a newly joined LAN while repairing the previous block.
+    if (binding_matches) {
         snprintf(poison_path, sizeof(poison_path), "%s/usr/bin/arpoison", root);
         const char *repair_args[] = {"-i", "en0", "-d", gateway_ip,
             "-s", blocks[slot].ip, "-t", gateway_mac, "-r", blocks[slot].real_mac,
@@ -1669,6 +1699,9 @@ static void patched_arguments(id self, SEL cmd, id arguments) {
         if (error) objc_setAssociatedObject(self,&task_rejection_key,string_from_utf8(error),OBJC_ASSOCIATION_COPY_NONATOMIC);
         else {
             snprintf(binding.ip,sizeof binding.ip,"%s",target); snprintf(binding.real_mac,sizeof binding.real_mac,"%s",observed_mac);
+            snprintf(binding.gateway_ip,sizeof binding.gateway_ip,"%s",gateway_ip);
+            snprintf(binding.gateway_mac,sizeof binding.gateway_mac,"%s",gateway_mac);
+            binding.local_ip=ntohl(local.s_addr); binding.netmask=ntohl(mask.s_addr);
             objc_setAssociatedObject(self,&task_binding_key,[NSData dataWithBytes:&binding length:sizeof binding],OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             void (*prepare)(id,id)=(void *)dlsym((void *)-2,"NWTaskDiagnosticPrepareWithDetails");
             if (prepare) prepare(self,details);
