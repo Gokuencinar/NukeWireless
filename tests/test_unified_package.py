@@ -100,7 +100,7 @@ class FixtureTests(unittest.TestCase):
             archives=unified.read_ar(worker_path.read_bytes())
             files=unified.members(worker_path.read_bytes(),"data.tar")
             name="var/jb/usr/share/nukewireless-bluetooth/README.txt"
-            member,_=files[name]; files[name]=(member,value)
+            member,_=files[name]; member.size=len(value); files[name]=(member,value)
             archives["data.tar.gz"]=tar_bytes(list(files.values()))
             worker_path.write_bytes(pack_ar(list(archives.items())))
             manifest_path=worker_path.with_suffix(".manifest.json")
