@@ -554,6 +554,21 @@ static void patched_launch(id self, SEL cmd) {
     struct active_block pending_block = {0};
     NSData *binding = objc_getAssociatedObject(self,&task_binding_key);
     if (binding.length == sizeof pending_block) memcpy(&pending_block,binding.bytes,sizeof pending_block);
+    if (pending_block.ip[0] && !repair_in_progress) {
+        BOOL free_slot=NO,duplicate=NO;
+        for (unsigned i=0;i<64;++i) {
+            BOOL active=block_is_running(i);
+            if (!active) free_slot=YES;
+            if (active && equals(blocks[i].ip,pending_block.ip)) duplicate=YES;
+        }
+        if (!free_slot || duplicate) {
+            NSString *reason=duplicate ? @"block_already_owned" : @"block_registry_full";
+            objc_setAssociatedObject(self,&task_rejection_key,reason,OBJC_ASSOCIATION_COPY_NONATOMIC);
+            void (*failed)(id,id)=(void *)dlsym(RTLD_DEFAULT,"NWTaskDiagnosticLaunchFailed");
+            if (failed) failed(self,[NSException exceptionWithName:reason reason:@"Rejected before child launch" userInfo:nil]);
+            return;
+        }
+    }
     @try { original_launch(self, cmd); }
     @catch (id exception) {
         void (*failed)(id, id) = (void *)dlsym((void *)-2, "NWTaskDiagnosticLaunchFailed");

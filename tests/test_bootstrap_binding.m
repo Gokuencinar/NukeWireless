@@ -40,6 +40,10 @@ int main(void) { @autoreleasepool {
     assert(launches==2 && blocks[0].pid==102 && blocks[1].pid==101);
     assert(!strcmp(blocks[0].ip,"192.0.2.43") && !strcmp(blocks[1].ip,"192.0.2.42"));
     assert(!strcmp(blocks[0].real_mac,"02:11:22:33:44:66") && !strcmp(blocks[1].real_mac,"02:11:22:33:44:55"));
+    BindingTask *duplicate=[[[BindingTask alloc] init] autorelease]; duplicate.processIdentifier=103;
+    bindFixture(duplicate,"192.0.2.42","02:11:22:33:44:55"); patched_launch(duplicate,NULL);
+    assert(launches==2 && patched_task_pid(duplicate,NULL)==0 && !patched_task_running(duplicate,NULL));
+    assert(blocks[1].task==first && blocks[1].pid==101);
     assert(!objc_getAssociatedObject(first,&task_binding_key) && !objc_getAssociatedObject(second,&task_binding_key));
     for(unsigned i=0;i<64;++i) { [blocks[i].task release]; memset(&blocks[i],0,sizeof blocks[i]); }
     puts("PASS: rejected task sends nothing, PID/state veto and interleaved per-task binding ownership");
