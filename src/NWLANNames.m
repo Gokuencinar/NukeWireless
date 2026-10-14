@@ -223,6 +223,7 @@ NSString *NWTestUPnPName(NSData *data) { return upnpName(data); }
     if (!self.http) {
         NSURLSessionConfiguration *config = NSURLSessionConfiguration.ephemeralSessionConfiguration;
         config.timeoutIntervalForRequest = 3; config.timeoutIntervalForResource = 4;
+        config.allowsCellularAccess = NO;
         config.HTTPShouldSetCookies = NO; config.HTTPShouldUsePipelining = NO;
         config.HTTPCookieStorage = nil; config.URLCredentialStorage = nil; config.URLCache = nil;
         config.connectionProxyDictionary = @{};
