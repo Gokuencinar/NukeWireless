@@ -49,7 +49,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(info['CFBundleIdentifier'],'me.midnightchips.harpy-reloaded')
         self.assertEqual(info['CFBundleDisplayName'],'NukeWireless Dev')
         self.assertEqual(info['CFBundleShortVersionString'],package.VERSION)
-        self.assertEqual(info['CFBundleVersion'], '20025')
+        self.assertEqual(info['CFBundleVersion'], '20026')
         self.assertTrue(info['UIFileSharingEnabled'])
         self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
         self.assertEqual(info['NukeWirelessWorkerVersion'], package.WORKER_VERSION)
@@ -58,6 +58,7 @@ class PackageTests(unittest.TestCase):
         from device_name_metadata import SERVICES
         self.assertEqual(info['NSBonjourServices'], SERVICES)
         self.assertTrue(info['NSLocalNetworkUsageDescription'])
+        self.assertTrue(info['NSAppTransportSecurity']['NSAllowsLocalNetworking'])
         discovery = (ROOT/'src/NWDeviceNames.m').read_text(encoding='utf-8').split('BOOL NWDeviceNameIsPlaceholder')[0]
         self.assertEqual(re.findall(r'@"(_[^"]+)"', discovery), SERVICES)
         self.assertFalse(any('LocationUsage' in key for key in info))

@@ -7,3 +7,7 @@ USAGE = "Discover device names on your Wi-Fi network / Identificar equipos en tu
 
 def apply(metadata):
     metadata.update(NSBonjourServices=SERVICES, NSLocalNetworkUsageDescription=USAGE)
+    # UPnP device descriptions use local HTTP; keep ATS for other destinations.
+    transport = dict(metadata.get('NSAppTransportSecurity', {}))
+    transport['NSAllowsLocalNetworking'] = True
+    metadata['NSAppTransportSecurity'] = transport

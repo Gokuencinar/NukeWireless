@@ -4,6 +4,7 @@
 NSArray<NSString *> *NWNameServiceTypes(void);
 NSString *NWCleanDeviceName(NSString *value);
 BOOL NWDeviceNameIsPlaceholder(NSString *value);
+NSString *NWBonjourFriendlyName(NSString *type, NSData *txt);
 #ifdef NW_NAME_TESTING
 NSString *NWTestPTRName(NSData *data);
 #endif

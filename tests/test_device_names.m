@@ -1,6 +1,23 @@
 #import "../src/NWDeviceNames.h"
+#import "../src/NWLANNames.h"
 #include <assert.h>
 int main(void) { @autoreleasepool {
+    NSData *(^utf8)(NSString *) = ^NSData *(NSString *text) { return [text dataUsingEncoding:NSUTF8StringEncoding]; };
+    NSData *txt = [NSNetService dataFromTXTRecordDictionary:@{@"fn":utf8(@"TV Salón"),@"md":utf8(@"Chromecast"),@"id":utf8(@"opaque-id")}];
+    assert([NWBonjourFriendlyName(@"_googlecast._tcp.",txt) isEqual:@"TV Salón"]);
+    assert(!NWBonjourFriendlyName(@"_http._tcp.",txt));
+    assert(!NWBonjourFriendlyName(@"_googlecast._tcp.",[NSNetService dataFromTXTRecordDictionary:@{@"md":utf8(@"Chromecast")} ]));
+    assert(!NWBonjourFriendlyName(@"_googlecast._tcp.",[NSMutableData dataWithLength:4097]));
+    NSString *(^reply)(NSString *) = ^NSString *(NSString *url) { return [NSString stringWithFormat:@"HTTP/1.1 200 OK\r\nLOCATION: %@\r\nST: upnp:rootdevice\r\n\r\n",url]; };
+    assert(NWTestSSDPURL(utf8(reply(@"http://192.0.2.5:8000/device.xml")),@"192.0.2.5"));
+    for (NSString *url in @[@"http://192.0.2.6/a",@"http://example.org/a",@"file:///a",@"http://user:pass@192.0.2.5/a",@"http://192.0.2.5:0/a",@"http://192.0.2.5:65536/a",@"http://192.0.2.5/a#x"])
+        assert(!NWTestSSDPURL(utf8(reply(url)),@"192.0.2.5"));
+    assert(!NWTestSSDPURL(utf8(@"HTTP/1.1 200 OK\r\nLOCATION: http://192.0.2.5/a\r\nLOCATION: http://192.0.2.5/b\r\n\r\n"),@"192.0.2.5"));
+    assert(!NWTestSSDPURL(utf8(@"HTTP/1.1 200 OK\r\nST: upnp:rootdevice\r\n\r\n"),@"192.0.2.5"));
+    assert([NWTestUPnPName(utf8(@"<root xmlns='urn:schemas-upnp-org:device-1-0'><device><friendlyName>TV Salón</friendlyName><deviceList><device><friendlyName>Embedded</friendlyName></device></deviceList></device></root>")) isEqual:@"TV Salón"]);
+    for (NSString *xml in @[@"<root><device><friendlyName>Device</friendlyName></device></root>",@"<root><device><friendlyName>A<b>B</b></friendlyName></device></root>",@"<root><device><friendlyName>A</friendlyName><friendlyName>B</friendlyName></device></root>",@"<root><device><friendlyName>A</friendlyName></device>",@"<!DOCTYPE root [<!ENTITY x 'TV'>]><root><device><friendlyName>&x;</friendlyName></device></root>"])
+        assert(!NWTestUPnPName(utf8(xml)));
+    assert(!NWTestUPnPName([NSMutableData dataWithLength:65537]));
     assert(NWDeviceNameIsPlaceholder(@"Device .42"));
     assert(NWDeviceNameIsPlaceholder(@"Equipo 42"));
     assert(NWDeviceNameIsPlaceholder(@"Unknown Host"));

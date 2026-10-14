@@ -1,4 +1,5 @@
 #import "NWDeviceNames.h"
+#import "NWLANNames.h"
 #import <arpa/inet.h>
 #import <net/if.h>
 #import <dns_sd.h>
@@ -28,6 +29,13 @@ NSString *NWCleanDeviceName(NSString *value) {
         [[NSUUID alloc] initWithUUIDString:name]) return nil;
     return name;
 }
+NSString *NWBonjourFriendlyName(NSString *type, NSData *txt) {
+    // Google Cast's advertised fn is the friendly name, not md (model) or id.
+    if (![type isEqual:@"_googlecast._tcp."] || !txt.length || txt.length > 4096) return nil;
+    NSData *name = [NSNetService dictionaryFromTXTRecordData:txt][@"fn"];
+    if (!name.length || name.length > 255) return nil;
+    return NWCleanDeviceName([[NSString alloc] initWithData:name encoding:NSUTF8StringEncoding]);
+}
 
 @class NWDeviceNames;
 @interface NWNameQuery : NSObject
@@ -50,6 +58,7 @@ NSString *NWCleanDeviceName(NSString *value) {
 @property(nonatomic, strong) NSMutableSet<NSString *> *seenServices;
 @property(nonatomic, strong) NSMutableArray<NSNetService *> *waitingServices;
 @property(nonatomic, strong) NSMutableArray<NWNameQuery *> *pending, *queries;
+@property(nonatomic, strong) NWLANNames *lan;
 - (void)offer:(NSString *)name ip:(NSString *)ip mac:(NSString *)mac rank:(NSUInteger)rank;
 - (void)complete:(NWNameQuery *)query;
 - (void)pump;
@@ -104,6 +113,11 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     [self.peers removeAllObjects]; [self.names removeAllObjects]; [self.seenServices removeAllObjects];
     self.serviceCount = self.queryCount = self.failures = self.updates = 0;
     self.dnsError = self.bonjourError = 0;
+    __weak NWDeviceNames *resolver = self;
+    self.lan = [[NWLANNames alloc] initWithUpdate:^(NSString *ip, NSString *mac, NSString *name, NSUInteger rank) {
+        [resolver offer:name ip:ip mac:mac rank:rank];
+    }];
+    [self.lan start];
     NSUInteger session = self.session;
     for (NSString *type in NWNameServiceTypes()) {
         NSNetServiceBrowser *browser = [NSNetServiceBrowser new]; browser.delegate = self;
@@ -127,6 +141,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
 }
 - (void)stop {
     self.active = NO; self.session++;
+    [self.lan stop];
     [self stopBonjour]; [self.pending removeAllObjects];
     for (NWNameQuery *query in self.queries) {
         if (query.reference) { DNSServiceRefDeallocate(query.reference); query.reference = NULL; }
@@ -140,6 +155,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     if (self.peers.count >= 128 && !self.peers[ip]) return;
     if (self.peers[ip]) [self.names removeObjectForKey:ip];
     self.peers[ip] = mac;
+    if (self.networking) [self.lan trackIP:ip mac:mac];
     NSDictionary *evidence = self.names[ip];
     if (evidence) self.update(ip, mac, evidence[@"name"]);
     if (!self.networking || self.queryCount >= 128) return;
@@ -200,6 +216,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
 - (void)netServiceDidResolveAddress:(NSNetService *)service {
     if (!self.active || ![self.services containsObject:service]) return;
     NSString *friendly = service.name;
+    NSString *txtName = NWBonjourFriendlyName(service.type, service.TXTRecordData);
     // RAOP instances carry a hardware prefix; it is not the user-visible name.
     if ([service.type isEqualToString:@"_raop._tcp."]) {
         NSRange marker = [friendly rangeOfString:@"@"];
@@ -215,6 +232,7 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
         NSString *ip = @(text);
         [self offer:service.hostName ip:ip mac:nil rank:40];
         if (friendlyService) [self offer:friendly ip:ip mac:nil rank:60];
+        if (txtName) [self offer:txtName ip:ip mac:nil rank:70];
     }
     service.delegate = nil; [service stop]; [self.services removeObject:service];
     [self pumpServices];
@@ -230,9 +248,11 @@ static void reverseReply(DNSServiceRef ref, DNSServiceFlags flags, uint32_t inte
     self.failures++; self.bonjourError = [error[NSNetServicesErrorCode] integerValue];
 }
 - (NSDictionary *)diagnostics {
-    return @{@"peers":@(self.peers.count), @"names":@(self.names.count), @"updates":@(self.updates),
+    NSMutableDictionary *result = [@{@"peers":@(self.peers.count), @"names":@(self.names.count), @"updates":@(self.updates),
              @"services":@(self.serviceCount), @"reverse_queries":@(self.queryCount), @"lookup_errors":@(self.failures),
-             @"last_dns_error":@(self.dnsError), @"last_bonjour_error":@(self.bonjourError), @"active":@(self.active)};
+             @"last_dns_error":@(self.dnsError), @"last_bonjour_error":@(self.bonjourError), @"active":@(self.active)} mutableCopy];
+    [result addEntriesFromDictionary:self.lan.diagnostics ?: @{}];
+    return result;
 }
 #ifdef NW_NAME_TESTING
 - (void)testBegin { self.active = YES; }
