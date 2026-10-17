@@ -160,6 +160,9 @@ int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
     MKAnnotationView *marker = nil; CGRect frame = CGRectZero; BOOL visible = NO;
     do {
         [controller.view layoutIfNeeded];
+        // The fixture runs synchronously inside SwiftUI's appearance callback.
+        // Commit its pending layers before waiting on MapKit's render callback.
+        [CATransaction flush];
         [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
         marker = [controller.map viewForAnnotation:annotation];
         frame = [marker convertRect:marker.bounds toView:controller.map];
@@ -169,6 +172,8 @@ int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
     } while ((!visible || !controller.renderedFrame) && deadline.timeIntervalSinceNow > 0);
     NSDictionary *state = @{@"visible":@(visible),@"rendered_frame":@(controller.renderedFrame),
         @"marker_frame":NSStringFromCGRect(frame),@"map_bounds":NSStringFromCGRect(controller.map.bounds),
+        @"fixture_visible_rect":MKStringFromMapRect(controller.map.visibleMapRect),
+        @"fixture_region":@[@(controller.map.region.center.latitude),@(controller.map.region.center.longitude),@(controller.map.region.span.latitudeDelta),@(controller.map.region.span.longitudeDelta)],
         @"marker_hidden":@(marker.hidden),@"marker_alpha":@(marker.alpha),@"marker_opacity":@(marker.layer.opacity)};
     NSURL *documents = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     NSURL *stateFile = [documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-map-layout.json",NWLanguageCode()]];
