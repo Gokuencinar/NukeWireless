@@ -351,9 +351,15 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     if (fixture.isScanning || controller.requested || controller.scanning) return 8;
     [controller.view removeFromSuperview];
     UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
-    [window addSubview:navigation.view]; navigation.view.frame = window.bounds;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+        if ([scene isKindOfClass:UIWindowScene.class]) { window.windowScene = (UIWindowScene *)scene; break; }
+    window.rootViewController = navigation; window.hidden = NO;
+    [window layoutIfNeeded]; [navigation.view layoutIfNeeded];
     controller.requested = YES; [controller startPoweredScan];
-    if (!controller.scanning) return 13;
+    if (!controller.scanning) {
+        NSLog(@"BLE fixture navigation: window=%d requested=%d app=%ld",controller.view.window != nil,controller.requested,(long)UIApplication.sharedApplication.applicationState);
+        window.hidden = YES; return 13;
+    }
     [controller tableView:controller.tableView didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
     UIViewController *detail = navigation.topViewController; [detail loadViewIfNeeded];
     if (detail == controller || !controller.scanning || ![detail.navigationItem.rightBarButtonItem.title isEqual:NWText(@"bt.stop")]) return 14;
@@ -379,7 +385,7 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     NSURL *documents = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     NSString *name = [NSString stringWithFormat:@"%@-ble-signal.png",NWLanguageCode()];
     [UIImagePNGRepresentation(image) writeToURL:[documents URLByAppendingPathComponent:name] atomically:YES];
-    [NWBLEHistory.shared clear]; [navigation.view removeFromSuperview];
+    [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil;
     return 0;
 }
 int NWBLEUIRegressionCheck(void) {
