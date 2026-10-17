@@ -387,7 +387,9 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     UINavigationController *navigation = [[NWBLETestNavigationController alloc] initWithRootViewController:controller];
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
         if ([scene isKindOfClass:UIWindowScene.class]) { window.windowScene = (UIWindowScene *)scene; window.frame = ((UIWindowScene *)scene).coordinateSpace.bounds; break; }
-    window.rootViewController = navigation; window.hidden = NO;
+    UIWindow *previousKey = nil;
+    for (UIWindow *candidate in window.windowScene.windows) if (candidate.isKeyWindow) { previousKey = candidate; break; }
+    window.rootViewController = navigation; [window makeKeyAndVisible];
     [window layoutIfNeeded]; [navigation.view layoutIfNeeded];
     controller.requested = YES; [controller startPoweredScan];
     if (!controller.scanning) {
@@ -417,6 +419,16 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];
     if (navigation.topViewController != map || controller.scanning) return 25;
     int mapCheck = NWBLEMapVisibleUIRegressionCheck(map); if (mapCheck) return mapCheck;
+    // MapKit uses a GPU surface; UIView snapshots can omit tiles and markers.
+    // Let the host capture the actual simulator display before continuing.
+    NSURL *captureDocuments = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
+    NSString *capturePrefix = [NSString stringWithFormat:@"%@-ble-map-",NWLanguageCode()];
+    NSURL *readyFile = [captureDocuments URLByAppendingPathComponent:[capturePrefix stringByAppendingString:@"ready.json"]];
+    NSURL *capturedFile = [captureDocuments URLByAppendingPathComponent:[capturePrefix stringByAppendingString:@"captured.json"]];
+    [@"{}" writeToURL:readyFile atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    NSDate *captureDeadline = [NSDate dateWithTimeIntervalSinceNow:12];
+    while (![NSFileManager.defaultManager fileExistsAtPath:capturedFile.path] && captureDeadline.timeIntervalSinceNow > 0)
+        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
     [map.view layoutIfNeeded];
     [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
     UIGraphicsImageRenderer *mapRenderer = [[UIGraphicsImageRenderer alloc] initWithSize:map.view.bounds.size];
@@ -442,6 +454,8 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     }];
     [UIImagePNGRepresentation(proximity) writeToURL:[documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-proximity.png",NWLanguageCode()]] atomically:YES];
     [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil; window.windowScene = nil;
+    [previousKey makeKeyWindow];
+    if (@available(iOS 16.0,*)) [previousKey.rootViewController setNeedsUpdateOfSupportedInterfaceOrientations];
     return 0;
 }
 int NWBLEUIRegressionCheck(void) {
