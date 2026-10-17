@@ -324,6 +324,13 @@
 UIViewController *NWBLEController(void) { return [NWBLEViewController new]; }
 
 #ifdef NW_UI_TESTING
+// The temporary UIKit window must not constrain the enclosing SwiftUI scene.
+@interface NWBLETestNavigationController : UINavigationController
+@end
+@implementation NWBLETestNavigationController
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations { return UIInterfaceOrientationMaskAllButUpsideDown; }
+- (BOOL)shouldAutorotate { return YES; }
+@end
 // State-flow fixture only: no CoreBluetooth manager or radio is instantiated.
 @interface NWBLETestCentral : NSObject
 @property(nonatomic, weak) id delegate;
@@ -377,9 +384,9 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     [controller stop];
     if (fixture.isScanning || controller.requested || controller.scanning) return 8;
     [controller.view removeFromSuperview];
-    UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+    UINavigationController *navigation = [[NWBLETestNavigationController alloc] initWithRootViewController:controller];
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
-        if ([scene isKindOfClass:UIWindowScene.class]) { window.windowScene = (UIWindowScene *)scene; break; }
+        if ([scene isKindOfClass:UIWindowScene.class]) { window.windowScene = (UIWindowScene *)scene; window.frame = ((UIWindowScene *)scene).coordinateSpace.bounds; break; }
     window.rootViewController = navigation; window.hidden = NO;
     [window layoutIfNeeded]; [navigation.view layoutIfNeeded];
     controller.requested = YES; [controller startPoweredScan];
@@ -434,7 +441,7 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
         (void)context; [graph.view drawViewHierarchyInRect:graph.view.bounds afterScreenUpdates:YES];
     }];
     [UIImagePNGRepresentation(proximity) writeToURL:[documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-proximity.png",NWLanguageCode()]] atomically:YES];
-    [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil;
+    [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil; window.windowScene = nil;
     return 0;
 }
 int NWBLEUIRegressionCheck(void) {
