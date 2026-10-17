@@ -5,6 +5,10 @@
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import <MapKit/MapKit.h>
+#ifdef NW_UI_TESTING
+#import "NWLanguage.h"
+#import <QuartzCore/QuartzCore.h>
+#endif
 
 @interface NWBLEPlaceAnnotation : MKPointAnnotation
 @property(nonatomic) NSUInteger count;
