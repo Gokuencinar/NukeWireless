@@ -120,15 +120,17 @@ class PackageTests(unittest.TestCase):
         self.assertIn(b'firmware (>= 16.3)',after['control'][1])
         self.assertEqual(self.after[package.INFO_LIBRARY+'.roothidepatch'][0].linkname,'/usr/lib/DynamicPatches/AutoPatches.dylib')
 
-    def test_provenance_and_no_location_requests(self):
+    def test_provenance_and_foreground_location_only(self):
         manifest=json.loads(RESULT.with_suffix('.manifest.json').read_text())
         self.assertEqual(manifest['extension']['sources'],source_hashes())
         binary=self.after[package.INFO_LIBRARY][1]
         self.assertEqual(sha(binary),manifest['extension']['binary_sha256'])
         self.assertTrue(('NWBuild-' + package.VERSION.split('~')[-1]).encode() in binary, 'Compiled version marker must match package version')
         self.assertNotIn(b'NWUIRegressionCheck',binary)
-        for token in [b'CLLocationManager',b'requestWhenInUseAuthorization',b'requestAlwaysAuthorization']:
-            self.assertNotIn(token,binary)
+        for token in [b'CLLocationManager',b'requestWhenInUseAuthorization']:
+            self.assertIn(token,binary)
+        self.assertNotIn(b'requestAlwaysAuthorization',binary)
+        self.assertNotIn(b'NWBLELocationFixture',binary)
 
     def test_rejects_unknown_baseline_and_stale_binary(self):
         with tempfile.TemporaryDirectory() as temp:

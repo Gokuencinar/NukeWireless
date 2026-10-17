@@ -88,8 +88,10 @@ def build(source, artifact, output):
     helper = (artifact / "nw-hotspot").read_bytes()
     if manifest.get("hotspot_helper_sha256") != sha(helper):
         raise ValueError("stale or mismatched hotspot helper")
-    if any(x in library for x in (b"requestWhenInUseAuthorization", b"requestAlwaysAuthorization", b"CLLocationManager")):
-        raise ValueError("unexpected location-permission API")
+    if b"requestAlwaysAuthorization" in library:
+        raise ValueError("unexpected permanent location-permission API")
+    if not all(token in library for token in (b"requestWhenInUseAuthorization", b"CLLocationManager")):
+        raise ValueError("missing foreground location-permission API")
     parts = read_ar(raw)
     control = read_tar(get_tar_member(parts, "control.tar"))
     entries = read_tar(get_tar_member(parts, "data.tar"))
