@@ -409,6 +409,7 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     UIViewController *map = NWBLEMapController();
     [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];
     if (navigation.topViewController != map || controller.scanning) return 25;
+    int mapCheck = NWBLEMapVisibleUIRegressionCheck(map); if (mapCheck) return mapCheck;
     [map.view layoutIfNeeded];
     [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
     UIGraphicsImageRenderer *mapRenderer = [[UIGraphicsImageRenderer alloc] initWithSize:map.view.bounds.size];

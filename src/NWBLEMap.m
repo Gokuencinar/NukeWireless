@@ -31,6 +31,7 @@
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(refresh) name:NWBLEHistoryChanged object:NWBLEHistory.shared]; [self refresh];
 }
 - (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated]; NWStyleNavigationBar(self.navigationController.navigationBar); [self refresh]; }
+- (void)viewDidLayoutSubviews { [super viewDidLayoutSubviews]; [self fitIfNeeded]; }
 - (void)dealloc { self.map.delegate = nil; [NSNotificationCenter.defaultCenter removeObserver:self]; }
 - (void)refresh {
     [self.map removeAnnotations:self.map.annotations]; [self.map removeOverlays:self.map.overlays];
@@ -47,7 +48,10 @@
     [self.map addAnnotations:annotations];
     self.hint.text = NWText(annotations.count ? @"ble.map_hint" : @"ble.map_empty");
     self.navigationItem.rightBarButtonItem.enabled = annotations.count > 0 && !NWBLEHistory.shared.loading && !NWBLEHistory.shared.storageError;
-    if (annotations.count && !self.fitted) {
+    [self fitIfNeeded];
+}
+- (void)fitIfNeeded {
+    if (self.map.annotations.count && !self.fitted && self.map.bounds.size.width > 0 && self.map.bounds.size.height > 0) {
         // Include the fix uncertainty in the fitted area, also for a single point.
         MKMapRect extent = MKMapRectNull;
         for (id<MKOverlay> overlay in self.map.overlays) extent = MKMapRectUnion(extent,overlay.boundingMapRect);
@@ -77,6 +81,18 @@ int NWBLEMapUIRegressionCheck(void) {
     NWBLEMapViewController *controller = (id)NWBLEMapController(); [controller loadViewIfNeeded];
     NSUInteger count = 0; for (NSDictionary *record in NWBLEHistory.shared.records) if ([record[@"observations"] count]) count++;
     if (controller.map.showsUserLocation || controller.map.annotations.count != count || controller.map.overlays.count != count) return 21;
+    return 0;
+}
+int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
+    NWBLEMapViewController *controller = (id)view;
+    [controller.view layoutIfNeeded];
+    id<MKAnnotation> annotation = controller.map.annotations.firstObject;
+    if (!annotation || !controller.fitted) return 32;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:5];
+    while (![controller.map viewForAnnotation:annotation] && deadline.timeIntervalSinceNow > 0)
+        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
+    if (![controller.map viewForAnnotation:annotation]) return 33;
+    if (!MKMapRectContainsPoint(controller.map.visibleMapRect,MKMapPointForCoordinate(annotation.coordinate))) return 34;
     return 0;
 }
 #endif
