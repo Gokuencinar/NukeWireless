@@ -133,9 +133,19 @@ int NWBLEMapUIRegressionCheck(void) {
 }
 int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
     NWBLEMapViewController *controller = (id)view;
-    [controller.view layoutIfNeeded];
+    // UIKit can finish a navigation attachment on the next main-loop turn,
+    // even with animated:NO. Exercise that lifecycle before asserting the fit.
+    NSDate *attachmentDeadline = [NSDate dateWithTimeIntervalSinceNow:5];
+    while ((!controller.view.window || !controller.fitted) && attachmentDeadline.timeIntervalSinceNow > 0) {
+        [controller.navigationController.view layoutIfNeeded];
+        [controller.view layoutIfNeeded];
+        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
+    }
     id<MKAnnotation> annotation = controller.map.annotations.firstObject;
-    if (!annotation || !controller.fitted) return 32;
+    if (!annotation || !controller.fitted) {
+        NSLog(@"BLE map fixture: attached=%d fitted=%d places=%lu size=%.0fx%.0f",controller.view.window != nil,controller.fitted,(unsigned long)controller.map.annotations.count,controller.map.bounds.size.width,controller.map.bounds.size.height);
+        return 32;
+    }
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:5];
     while (![controller.map viewForAnnotation:annotation] && deadline.timeIntervalSinceNow > 0)
         [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
