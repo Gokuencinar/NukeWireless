@@ -320,3 +320,6 @@
 "ble.service_hid" = "Human Interface Device · 1812";
 "ble.service_environment" = "Environmental Sensing · 181A";
 "ble.service_fastpair" = "Google Fast Pair · FE2C";
+
+"ble.map_group" = "%lu devices detected";
+"ble.map_center" = "Show saved locations";

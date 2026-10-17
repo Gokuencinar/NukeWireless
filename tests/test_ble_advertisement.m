@@ -70,5 +70,13 @@ int main(void) { @autoreleasepool {
     assert([cleanLocations[0][@"observations"] count] == 8);
     assert([NWBLEServiceLabels(@[@"fe2c",@"0000180F-0000-1000-8000-00805F9B34FB",@"180F",@"FFFF"]) count] == 2);
     assert(!NWBLEServiceLabels(@[@"Flock",@"Apple",@"09C8"]).count);
+    NSMutableArray *coincident = [NSMutableArray new];
+    for (unsigned i=0;i<7;i++) [coincident addObject:@{@"name":@"Test",@"seen":@1001,@"observations":@[point]}];
+    NSArray *places = NWBLEObservationPlaces(coincident);
+    assert(places.count == 1 && [places[0][@"count"] intValue] == 7);
+    assert([places[0][@"accuracy"] doubleValue] == 150);
+    NSMutableDictionary *other = [point mutableCopy]; other[@"longitude"] = @(-3.6);
+    [coincident addObject:@{@"seen":@1001,@"observations":@[other]}];
+    assert(NWBLEObservationPlaces(coincident).count == 2);
     puts("PASS: BLE advertisement merging, unavailable RSSI, truncated manufacturer and immutable snapshots");
 } return 0; }

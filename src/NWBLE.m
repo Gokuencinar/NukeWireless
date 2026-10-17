@@ -412,8 +412,16 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     [history loadViewIfNeeded];
     if (history.rows.count != 1 || history.central || [history tableView:history.tableView numberOfRowsInSection:0] != 1) return 16;
     NSMutableDictionary *placed = [history.rows.firstObject mutableCopy];
-    placed[@"observation"] = @{@"latitude":@40.4,@"longitude":@(-3.7),@"accuracy":@150,@"time":@1700000011};
+    placed[@"observation"] = @{@"latitude":@40.4,@"longitude":@(-3.7),@"accuracy":@9.288,@"time":@1700000011};
     [NWBLEHistory.shared observe:placed atTime:1700000011];
+    // Reproduce the physical phone: seven peers observed at exactly one fix.
+    placed[@"observation"] = @{@"latitude":@40.4,@"longitude":@(-3.7),@"accuracy":@9.288,@"time":@1700000011};
+    for (unsigned i=0;i<6;i++) {
+        placed[@"identifier"] = [NSString stringWithFormat:@"00000000-0000-4000-8000-%012u",i];
+        [NWBLEHistory.shared observe:placed atTime:1700000011];
+    }
+    NSArray *places = NWBLEObservationPlaces(NWBLEHistory.shared.records);
+    if (places.count != 1 || [places[0][@"count"] unsignedIntegerValue] != 7) return 35;
     if (NWBLEMapUIRegressionCheck()) return 24;
     UIViewController *map = NWBLEMapController();
     [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];

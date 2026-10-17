@@ -166,3 +166,20 @@ NSArray<NSDictionary *> *NWBLEValidateHistory(id input) {
     }
     return records;
 }
+
+NSArray<NSDictionary *> *NWBLEObservationPlaces(NSArray<NSDictionary *> *records) {
+    NSMutableDictionary *groups = [NSMutableDictionary new];
+    for (NSDictionary *record in records) {
+        NSDictionary *point = NWBLEValidateObservation([record[@"observations"] lastObject],[record[@"seen"] doubleValue],NO);
+        if (!point) continue;
+        NSString *key = [NSString stringWithFormat:@"%.8f/%.8f",[point[@"latitude"] doubleValue],[point[@"longitude"] doubleValue]];
+        NSMutableDictionary *group = groups[key];
+        if (!group) { group = [point mutableCopy]; group[@"count"] = @0; group[@"name"] = record[@"name"] ?: @""; groups[key] = group; }
+        group[@"count"] = @([group[@"count"] unsignedIntegerValue]+1);
+        group[@"accuracy"] = @(MAX([group[@"accuracy"] doubleValue],[point[@"accuracy"] doubleValue]));
+        group[@"time"] = @(MAX([group[@"time"] doubleValue],[point[@"time"] doubleValue]));
+    }
+    NSArray *keys = [groups.allKeys sortedArrayUsingSelector:@selector(compare:)];
+    NSMutableArray *places = [NSMutableArray new]; for (NSString *key in keys) [places addObject:[groups[key] copy]];
+    return places;
+}

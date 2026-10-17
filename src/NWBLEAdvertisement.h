@@ -10,3 +10,5 @@ NSArray<NSDictionary *> *NWBLESignalSamples(NSArray *previous, NSInteger rssi, d
 BOOL NWBLEMatchesFilter(NSDictionary *record, NSString *text, NSInteger filter);
 NSDictionary *NWBLEHistoryRecord(NSDictionary *previous, NSDictionary *advertisement, double wallTime);
 NSArray<NSDictionary *> *NWBLEValidateHistory(id input);
+
+NSArray<NSDictionary *> *NWBLEObservationPlaces(NSArray<NSDictionary *> *records);
