@@ -23,6 +23,8 @@ build/audit/test_policy
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/test_resources.m -o build/audit/test_resources
 build/audit/test_resources
 clang -Wall -Wextra -Werror -fobjc-arc -framework Foundation src/NWBLEAdvertisement.m tests/test_ble_advertisement.m -o build/audit/test_ble_advertisement
+clang -Wall -Wextra -Werror -fobjc-arc -fblocks -framework Foundation src/NWBLEAdvertisement.m src/NWBLEHistory.m tests/test_ble_history.m -o build/audit/test_ble_history
+build/audit/test_ble_history
 build/audit/test_ble_advertisement
 clang -Wall -Wextra -Werror -fobjc-arc -fblocks -DNW_DIAGNOSTIC_TESTING -framework Foundation src/NWDiagnosticReport.m tests/test_diagnostics.m -o build/audit/test_diagnostics
 build/audit/test_diagnostics
@@ -42,7 +44,7 @@ xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -is
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
   -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
   -o build/audit/NukeWirelessInfo_ios.dylib \
-  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEDetail.m src/NWBLEHistory.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target "$minimum_ios" --target-device iphone --target-device ipad
