@@ -31,9 +31,9 @@ trap collect_ui_artifacts EXIT
 xcrun --sdk iphonesimulator clang -arch "$arch" "-mios-simulator-version-min=$minimum_ios" -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -fPIC -O2 -dynamiclib -DNW_UI_TESTING \
   -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
+  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration -framework CoreLocation -framework MapKit \
   -o "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
-  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEDetail.m src/NWBLEHistory.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLELocation.m src/NWBLEMap.m src/NWBLEDetail.m src/NWBLEHistory.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c tests/UIRegressionStub.c tests/DeviceActionsFixture.m
 xcrun --sdk iphonesimulator swiftc -target "$arch-apple-ios$minimum_ios-simulator" -sdk "$sdk" -parse-as-library \
   tests/UIRegression.swift "$out/UIRegression.app/Frameworks/NukeWirelessInfo.dylib" \
   -Xlinker -rpath -Xlinker @executable_path/Frameworks -o "$out/UIRegression.app/UIRegression"
@@ -48,6 +48,7 @@ with open(sys.argv[1], 'wb') as f:
         CFBundleShortVersionString='1', MinimumOSVersion=sys.argv[2], UILaunchScreen={},
         NukeWirelessUIIntegration='embedded-required-v1', UIDeviceFamily=[1,2],
         UISupportedInterfaceOrientations=['UIInterfaceOrientationPortrait','UIInterfaceOrientationLandscapeLeft','UIInterfaceOrientationLandscapeRight'],
+        NSLocationWhenInUseUsageDescription='Save optional BLE observation locations during foreground scans',
         NSBluetoothAlwaysUsageDescription='Scan nearby BLE devices',
         UIApplicationSceneManifest={'UIApplicationSupportsMultipleScenes': False}), f)
 PY

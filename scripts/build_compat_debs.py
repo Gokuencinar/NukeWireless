@@ -18,7 +18,7 @@ from compat_layout import SCHEMES, ordered_entries
 from package_utils import regular, read_ar, get_tar_member, pack_ar, tar_bytes
 from embedded_ui import embed_ui, LIBRARIES, LOADS
 
-VERSION = "2.0.0~diagnostic24"
+VERSION = "2.0.0~diagnostic25"
 
 def maintainer_script(prefix, inject):
     root = "/" + prefix.rstrip("/") if prefix else ""
@@ -57,7 +57,7 @@ def package(scheme, core, artifact, output):
             or manifest["target"] != "arm64-ios15.0" or core_manifest["target"] != manifest["target"]):
         raise ValueError("mismatched compatibility build; rebuild the current sources")
     metadata = plistlib.loads(original[BASE_APP + "Info.plist"])
-    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20027", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0", NukeWirelessUIIntegration="embedded-required-v1")
+    metadata.update(CFBundleExecutable=EXECUTABLE, CFBundleShortVersionString=VERSION, CFBundleVersion="20028", NukeWirelessPackageScheme=scheme, MinimumOSVersion="15.0", NukeWirelessUIIntegration="embedded-required-v1")
     replacement = {
         BASE_APP + "Info.plist": plistlib.dumps(metadata, fmt=plistlib.FMT_BINARY),
         BASE_APP + "HarpyReloaded": embed_ui(original[BASE_APP + "HarpyReloaded"]),

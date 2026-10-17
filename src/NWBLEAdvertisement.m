@@ -7,6 +7,30 @@ static NSString *boundedText(id value, NSUInteger limit) {
     if (!text.length || text.length > limit || [text rangeOfCharacterFromSet:NSCharacterSet.controlCharacterSet].location != NSNotFound) return nil;
     return text;
 }
+NSDictionary *NWBLEValidateObservation(id input, double referenceTime, BOOL fresh) {
+    if (![input isKindOfClass:NSDictionary.class] || !isfinite(referenceTime) || referenceTime <= 0) return nil;
+    for (NSString *key in @[@"latitude",@"longitude",@"accuracy",@"time"])
+        if (![input[key] isKindOfClass:NSNumber.class] || !isfinite([input[key] doubleValue])) return nil;
+    double lat=[input[@"latitude"] doubleValue], lon=[input[@"longitude"] doubleValue];
+    double accuracy=[input[@"accuracy"] doubleValue], time=[input[@"time"] doubleValue];
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || accuracy < 0 || accuracy > 5000 || time <= 0 ||
+        time > referenceTime+1 || (fresh && referenceTime-time > 10)) return nil;
+    return @{@"latitude":@(lat),@"longitude":@(lon),@"accuracy":@(accuracy),@"time":@(time)};
+}
+NSArray<NSString *> *NWBLEServiceLabels(NSArray *services) {
+    // UUID evidence only. Names, company IDs and RSSI never establish device identity.
+    NSDictionary *known = @{@"180A":@"ble.service_information",@"180D":@"ble.service_heart",
+        @"180F":@"ble.service_battery",@"1812":@"ble.service_hid",@"181A":@"ble.service_environment",@"FE2C":@"ble.service_fastpair"};
+    NSMutableOrderedSet *labels = [NSMutableOrderedSet new];
+    for (id value in services) {
+        if (![value isKindOfClass:NSString.class]) continue;
+        NSString *uuid = [value uppercaseString];
+        if (uuid.length == 36 && [uuid hasPrefix:@"0000"] && [uuid hasSuffix:@"-0000-1000-8000-00805F9B34FB"])
+            uuid = [uuid substringWithRange:NSMakeRange(4,4)];
+        if (known[uuid]) [labels addObject:known[uuid]];
+    }
+    return labels.array;
+}
 NSArray<NSDictionary *> *NWBLESignalSamples(NSArray *previous, NSInteger rssi, double time) {
     if (!isfinite(time) || time < 0) return previous ?: @[];
     NSMutableArray *samples = [NSMutableArray new]; double last = -1;
@@ -101,7 +125,17 @@ NSDictionary *NWBLEHistoryRecord(NSDictionary *previous, NSDictionary *advertise
     record[@"seen"] = @(MAX(last,wallTime));
     record[@"advertisements"] = @(MIN((NSUInteger)1000000000,[previous[@"advertisements"] unsignedIntegerValue] + 1));
     record[@"samples"] = NWBLESignalSamples(previous[@"samples"],rssi,MAX(last,wallTime));
-    // Deliberately omit raw manufacturer payloads, service data and location.
+    NSMutableArray *points = [NSMutableArray new];
+    if ([previous[@"observations"] isKindOfClass:NSArray.class]) for (id item in previous[@"observations"]) {
+        NSDictionary *point = NWBLEValidateObservation(item,MAX(last,wallTime),NO);
+        if (point) [points addObject:point];
+        if (points.count > 8) [points removeObjectAtIndex:0];
+    }
+    NSDictionary *point = NWBLEValidateObservation(advertisement[@"observation"],wallTime,YES);
+    if (point && (!points.count || [point[@"time"] doubleValue]-[points.lastObject[@"time"] doubleValue] >= 10)) [points addObject:point];
+    if (points.count > 8) [points removeObjectAtIndex:0];
+    if (points.count) record[@"observations"] = points; else [record removeObjectForKey:@"observations"];
+    // Raw manufacturer/service payloads are never persisted.
     return record;
 }
 NSArray<NSDictionary *> *NWBLEValidateHistory(id input) {
@@ -119,6 +153,15 @@ NSArray<NSDictionary *> *NWBLEValidateHistory(id input) {
         NSMutableDictionary *record = [clean mutableCopy];
         record[@"firstSeen"] = @(first); record[@"advertisements"] = @((NSUInteger)count);
         record[@"samples"] = NWBLESignalSamples(item[@"samples"],127,last);
+        NSMutableArray *points = [NSMutableArray new];
+        if ([item[@"observations"] isKindOfClass:NSArray.class] && [item[@"observations"] count] <= 8) {
+            double previousTime = 0;
+            for (id inputPoint in item[@"observations"]) {
+                NSDictionary *point = NWBLEValidateObservation(inputPoint,last,NO);
+                if (point && [point[@"time"] doubleValue] >= previousTime) { [points addObject:point]; previousTime = [point[@"time"] doubleValue]; }
+            }
+        }
+        if (points.count) record[@"observations"] = points;
         [seen addObject:record[@"identifier"]]; [records addObject:record];
     }
     return records;

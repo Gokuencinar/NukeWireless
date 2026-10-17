@@ -42,9 +42,9 @@ build/audit/test_hotspot_filter
 xcrun --sdk iphoneos clang -arch arm64 "-miphoneos-version-min=$minimum_ios" -isysroot "$sdk" \
   -Wall -Wextra -Werror -Werror=unguarded-availability -fobjc-arc -fblocks -fPIC -O2 -dynamiclib \
   -Wl,-fatal_warnings -Wl,-install_name,@rpath/NukeWirelessInfo.dylib -framework UIKit -framework Foundation \
-  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration \
+  -framework QuartzCore -framework CoreGraphics -framework CoreBluetooth -framework SystemConfiguration -framework CoreLocation -framework MapKit \
   -o build/audit/NukeWirelessInfo_ios.dylib \
-  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLEDetail.m src/NWBLEHistory.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
+  src/NukeWirelessInfo.m src/NWDiagnostics.m src/NWPresentationDiagnostics.m src/NWDiagnosticReport.m src/NWTaskDiagnostics.m src/NWMainTabs.m src/NWAppearance.m src/NWDeviceBrowser.m src/NWDeviceActions.m src/NWHotspot.m src/NWBluetooth.m src/NWBluetoothCatalog.m src/NWBLE.m src/NWBLELocation.m src/NWBLEMap.m src/NWBLEDetail.m src/NWBLEHistory.m src/NWBLEAdvertisement.m src/NWScanBridge.m src/NWDeviceNames.m src/NWLANNames.m src/NWResources.m src/NWLanguage.m src/NWPolicy.c src/NWRefreshThunk.S
 file build/audit/NukeWirelessInfo_ios.dylib
 xcrun --sdk iphoneos ibtool --compile build/audit/NukeLaunch.storyboardc resources/NukeLaunch.storyboard \
   --minimum-deployment-target "$minimum_ios" --target-device iphone --target-device ipad

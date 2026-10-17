@@ -3,6 +3,8 @@
 #import "NWBLEAdvertisement.h"
 #import "NWBLEHistory.h"
 #import "NWBLEDetail.h"
+#import "NWBLELocation.h"
+#import "NWBLEMap.h"
 #import "NWAppearance.h"
 #import "NWResources.h"
 #import "NWLanguage.h"
@@ -13,6 +15,7 @@
 @interface NWBLEViewController : UITableViewController <CBCentralManagerDelegate, UISearchResultsUpdating>
 @property(nonatomic, strong) CBCentralManager *central;
 @property(nonatomic) BOOL historyMode;
+@property(nonatomic,strong) NWBLELocation *location;
 @property(nonatomic) BOOL exporting;
 @property(nonatomic, strong) UISearchController *search;
 @property(nonatomic, strong) UISegmentedControl *filter;
@@ -34,6 +37,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad]; self.title = NWText(@"ble.title");
     self.records = [NSMutableDictionary new]; self.rows = @[];
+    self.location = [NWBLELocation new];
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.search.searchResultsUpdater = self; self.search.obscuresBackgroundDuringPresentation = NO;
     self.search.searchBar.placeholder = NWText(@"ble.search"); self.navigationItem.searchController = self.search;
@@ -51,9 +55,11 @@
         self.title = NWText(@"ble.history");
         self.navigationItem.rightBarButtonItems = @[
             [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"trash"] style:UIBarButtonItemStylePlain target:self action:@selector(clearHistory)],
+            [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"map"] style:UIBarButtonItemStylePlain target:self action:@selector(openMap)],
             [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"square.and.arrow.up"] style:UIBarButtonItemStylePlain target:self action:@selector(exportHistory)]];
         self.navigationItem.rightBarButtonItems.firstObject.accessibilityLabel = NWText(@"ble.history_clear");
         self.navigationItem.rightBarButtonItems.lastObject.accessibilityLabel = NWText(@"ble.history_export");
+        self.navigationItem.rightBarButtonItems[1].accessibilityLabel = NWText(@"ble.map");
     }
     self.status = NWText(@"ble.idle");
     self.tableView.rowHeight = UITableViewAutomaticDimension;
@@ -75,7 +81,7 @@
     [self.deadline invalidate]; [self.redraw invalidate];
 }
 - (void)stop {
-    self.requested = NO; self.scanning = NO;
+    self.requested = NO; self.scanning = NO; self.location.scanning = NO;
     [self.central stopScan];
     [self.deadline invalidate]; self.deadline = nil;
     [self.redraw invalidate]; self.redraw = nil;
@@ -85,6 +91,7 @@
 - (void)backgrounded:(NSNotification *)notification { (void)notification; [self stop]; }
 - (void)becameActive:(NSNotification *)notification {
     (void)notification;
+    self.location.scanning = self.scanning;
     // The initial powered-on callback can arrive while the permission alert
     // makes UIApplication inactive. Resume the pending request once active.
     if (self.requested && self.central.state == CBManagerStatePoweredOn) [self startPoweredScan];
@@ -99,7 +106,8 @@
         @"observed_corebluetooth_scanning": @(self.observedScanning),
         @"corebluetooth_scanning": @(self.central.isScanning),
         @"discovery_callbacks": @(self.discoveries), @"device_count": @(self.records.count),
-        @"history_storage_error": @(NWBLEHistory.shared.storageError), @"history_count": @(NWBLEHistory.shared.records.count)};
+        @"history_storage_error": @(NWBLEHistory.shared.storageError), @"history_count": @(NWBLEHistory.shared.records.count),
+        @"location_enabled":@(self.location.enabled), @"location_status":self.location.statusKey};
     NSString *status = self.requested || self.scanning ? @"running" : self.observedScanning ? (self.records.count ? @"passed" : @"empty") : @"not_run";
     if (CBManager.authorization == CBManagerAuthorizationDenied || CBManager.authorization == CBManagerAuthorizationRestricted ||
         (self.central && (self.central.state == CBManagerStatePoweredOff || self.central.state == CBManagerStateUnsupported))) status = @"blocked";
@@ -131,9 +139,11 @@
     }
     [self.tableView reloadData];
 }
+- (void)locationToggled:(UISwitch *)toggle { self.location.enabled = toggle.on; [self refreshRows]; }
 - (void)filterChanged { [self refreshRows]; }
 - (void)updateSearchResultsForSearchController:(UISearchController *)search { (void)search; [self refreshRows]; }
 - (void)historyChanged:(NSNotification *)notification { (void)notification; if (self.historyMode) [self refreshRows]; }
+- (void)openMap { [self.navigationController pushViewController:NWBLEMapController() animated:YES]; }
 - (void)clearHistory {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:NWText(@"ble.history_clear") message:NWText(@"ble.history_clear_hint") preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:NWText(@"cancel") style:UIAlertActionStyleCancel handler:nil]];
@@ -165,7 +175,7 @@
     if (self.historyMode || NWBluetoothBusy() || NWBulkBusy()) {
         self.requested = NO; self.status = NWText(@"bt.error.busy"); [self refreshRows]; return;
     }
-    self.scanning = YES; self.status = NWText(@"ble.scanning");
+    self.scanning = YES; self.status = NWText(@"ble.scanning"); self.location.scanning = YES;
     [self.central scanForPeripheralsWithServices:nil options:@{CBCentralManagerScanOptionAllowDuplicatesKey: @YES}];
     self.submitted = YES;
     [self saveDiagnostics:@"scan_submitted"];
@@ -212,12 +222,14 @@
         advertisement[CBAdvertisementDataLocalNameKey] ?: peripheral.name, RSSI.integerValue,
         advertisement[CBAdvertisementDataManufacturerDataKey], services,
         advertisement[CBAdvertisementDataIsConnectable], NSProcessInfo.processInfo.systemUptime);
-    [NWBLEHistory.shared observe:self.records[identifier] atTime:NSDate.date.timeIntervalSince1970];
+    NSMutableDictionary *observed = [self.records[identifier] mutableCopy];
+    NSDictionary *place = self.location.observation; if (place) observed[@"observation"] = place;
+    [NWBLEHistory.shared observe:observed atTime:NSDate.date.timeIntervalSince1970];
     if (self.discoveries == 1 || self.discoveries % 10 == 0) [self saveDiagnostics:@"discovered"];
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)table { (void)table; return self.historyMode ? 1 : 2; }
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    (void)table; return !self.historyMode && section == 0 ? 3 : MAX((NSUInteger)1, self.rows.count);
+    (void)table; return !self.historyMode && section == 0 ? 5 : MAX((NSUInteger)1, self.rows.count);
 }
 - (NSString *)tableView:(UITableView *)table titleForFooterInSection:(NSInteger)section {
     (void)table; if (self.historyMode) return NWText(NWBLEHistory.shared.storageError ? @"ble.history_error" : @"ble.history_hint");
@@ -234,6 +246,15 @@
         content.image = [UIImage systemImageNamed:@"info.circle"];
     } else if (!self.historyMode && index.section == 0 && index.row == 2) {
         content.text = NWText(@"ble.history"); content.image = [UIImage systemImageNamed:@"clock.arrow.circlepath"];
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    } else if (!self.historyMode && index.section == 0 && index.row == 3) {
+        content.text = NWText(@"ble.location"); content.secondaryText = NWText(self.location.statusKey);
+        content.image = [UIImage systemImageNamed:@"location"];
+        UISwitch *toggle = [UISwitch new]; toggle.on = self.location.enabled;
+        toggle.accessibilityLabel = content.text; [toggle addTarget:self action:@selector(locationToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = toggle; cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    } else if (!self.historyMode && index.section == 0 && index.row == 4) {
+        content.text = NWText(@"ble.map"); content.image = [UIImage systemImageNamed:@"map"];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     } else if (!self.historyMode && index.section == 0) {
         content.text = NWText(self.requested || self.scanning ? @"ble.stop" : @"ble.start");
@@ -265,6 +286,10 @@
     if (!self.historyMode && index.section == 0 && index.row == 2) {
         NWBLEViewController *history = [NWBLEViewController new]; history.historyMode = YES;
         [self.navigationController pushViewController:history animated:YES]; return;
+    }
+    if (!self.historyMode && index.section == 0 && index.row == 3) return;
+    if (!self.historyMode && index.section == 0 && index.row == 4) {
+        [self.navigationController pushViewController:NWBLEMapController() animated:YES]; return;
     }
     if (!self.historyMode && index.section == 0) {
         if (self.requested || self.scanning) { [self stop]; return; }
@@ -316,7 +341,8 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     if (!NWScanBusy()) return 9;
     NWBLEViewController *controller = [NWBLEViewController new];
     [controller loadViewIfNeeded];
-    if (controller.central || controller.scanning || controller.rows.count) return 1;
+    if (controller.central || controller.scanning || controller.rows.count || controller.location.enabled) return 1;
+    if (NWBLEMapUIRegressionCheck()) return 21;
     controller.records[@"fixture"] = NWBLEUpdateRecord(nil, @"fixture", @"BLE fixture", -65,
         nil, @[@"180F"], @YES, NSProcessInfo.processInfo.systemUptime);
     [controller refreshRows];
@@ -375,6 +401,16 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     NWBLEViewController *history = [NWBLEViewController new]; history.historyMode = YES;
     [history loadViewIfNeeded];
     if (history.rows.count != 1 || history.central || [history tableView:history.tableView numberOfRowsInSection:0] != 1) return 16;
+    NSMutableDictionary *placed = [history.rows.firstObject mutableCopy];
+    placed[@"observation"] = @{@"latitude":@40.4,@"longitude":@(-3.7),@"accuracy":@150,@"time":@1700000011};
+    [NWBLEHistory.shared observe:placed atTime:1700000011];
+    if (NWBLEMapUIRegressionCheck()) return 24;
+    UIViewController *map = NWBLEMapController();
+    [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];
+    if (navigation.topViewController != map || controller.scanning) return 25;
+    [navigation popViewControllerAnimated:NO];
+    if (navigation.topViewController != controller) return 26;
+    [history refreshRows];
     NSDictionary *record = history.rows.firstObject;
     UIViewController *graph = NWBLEDetailController(^NSDictionary *{ return record; },YES,nil,nil);
     [graph loadViewIfNeeded]; graph.view.frame = CGRectMake(0,0,390,844); [graph.view layoutIfNeeded];
@@ -385,6 +421,11 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     NSURL *documents = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
     NSString *name = [NSString stringWithFormat:@"%@-ble-signal.png",NWLanguageCode()];
     [UIImagePNGRepresentation(image) writeToURL:[documents URLByAppendingPathComponent:name] atomically:YES];
+    if (NWBLEDetailUIRegressionCheck(graph)) return 22;
+    UIImage *proximity = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        (void)context; [graph.view drawViewHierarchyInRect:graph.view.bounds afterScreenUpdates:YES];
+    }];
+    [UIImagePNGRepresentation(proximity) writeToURL:[documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-proximity.png",NWLanguageCode()]] atomically:YES];
     [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil;
     return 0;
 }

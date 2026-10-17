@@ -1,5 +1,6 @@
 #import "../src/NWBLEAdvertisement.h"
 #include <assert.h>
+#include <math.h>
 int main(void) { @autoreleasepool {
     uint8_t apple[] = {0x4C, 0x00, 0x07};
     uint8_t unknown[] = {0x00, 0x00};
@@ -45,5 +46,29 @@ int main(void) { @autoreleasepool {
     assert(!NWBLEValidateHistory(@[broken]).count);
     broken = [history mutableCopy]; broken[@"firstSeen"] = @1002;
     assert(!NWBLEValidateHistory(@[broken]).count);
+    // Only bounded, recent, finite location fixes are accepted; old history stays readable.
+    NSDictionary *point = @{@"latitude":@40.4,@"longitude":@(-3.7),@"accuracy":@150,@"time":@1000};
+    assert(NWBLEValidateObservation(point,1001,YES));
+    assert(!NWBLEValidateObservation(point,1011,YES));
+    assert(NWBLEValidateObservation(point,2000,NO));
+    NSMutableDictionary *badPoint = [point mutableCopy]; badPoint[@"latitude"] = @91;
+    assert(!NWBLEValidateObservation(badPoint,1001,YES));
+    badPoint = [point mutableCopy]; badPoint[@"accuracy"] = @(-1);
+    assert(!NWBLEValidateObservation(badPoint,1001,YES));
+    badPoint[@"accuracy"] = @(NAN); assert(!NWBLEValidateObservation(badPoint,1001,YES));
+    assert(!NWBLEValidateObservation(@"bad",1001,YES));
+    advertisement[@"observation"] = point;
+    NSDictionary *located = NWBLEHistoryRecord(nil,advertisement,1001);
+    assert([located[@"observations"] count] == 1);
+    located = NWBLEHistoryRecord(located,advertisement,1002); assert([located[@"observations"] count] == 1);
+    for (unsigned i=1;i<=12;i++) {
+        NSMutableDictionary *moving = [point mutableCopy]; moving[@"time"] = @(1000+i*11);
+        advertisement[@"observation"] = moving; located = NWBLEHistoryRecord(located,advertisement,1001+i*11);
+    }
+    assert([located[@"observations"] count] == 8);
+    NSArray *cleanLocations = NWBLEValidateHistory(@[located]);
+    assert([cleanLocations[0][@"observations"] count] == 8);
+    assert([NWBLEServiceLabels(@[@"fe2c",@"0000180F-0000-1000-8000-00805F9B34FB",@"180F",@"FFFF"]) count] == 2);
+    assert(!NWBLEServiceLabels(@[@"Flock",@"Apple",@"09C8"]).count);
     puts("PASS: BLE advertisement merging, unavailable RSSI, truncated manufacturer and immutable snapshots");
 } return 0; }

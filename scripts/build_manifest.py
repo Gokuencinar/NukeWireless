@@ -16,6 +16,7 @@ SOURCES = ['src/NukeWirelessInfo.m', 'src/NWMainTabs.m', 'src/NWMainTabs.h', 'sr
            'scripts/startup_resources.py',
            'resources/startup/NukeWirelessIcon.png']
 SOURCES += ['src/NWCompatibility.h', 'src/NWARPBinding.h', 'tests/test_arp_binding.c']
+SOURCES += ['src/NWBLELocation.h', 'src/NWBLELocation.m', 'src/NWBLEMap.h', 'src/NWBLEMap.m']
 SOURCES += ['src/NWBLEHistory.h', 'src/NWBLEHistory.m', 'src/NWBLEDetail.h', 'src/NWBLEDetail.m', 'tests/test_ble_history.m', 'tests/test_ble_advertisement.m']
 SOURCES += ['src/NWLANNames.h', 'src/NWLANNames.m', 'src/NWNetBIOSName.h', 'tests/test_netbios_name.c']
 SOURCES += ['src/NWDeviceNames.h', 'src/NWDeviceNames.m', 'tests/test_device_names.m', 'scripts/device_name_metadata.py']
@@ -46,5 +47,5 @@ if __name__ == '__main__':
                          for p in sorted((out / 'NukeLaunch.storyboardc').rglob('*')) if p.is_file()},
         'startup_files': {name: sha((out / name).read_bytes()) for name in ['NWBootPic.png']},
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic24', 'target': args.target,
+        'diagnostic_schema': 1, 'version': '2.0.0~diagnostic25', 'target': args.target,
     }, indent=2) + '\n', encoding='utf-8')

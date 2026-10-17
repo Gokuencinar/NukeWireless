@@ -13,17 +13,21 @@ int main(void) { @autoreleasepool {
     waitUntil(^BOOL { return !store.loading; });
     NSString *uuid = @"A3EF8A7A-69D7-4BB9-BAAC-BE81FE99FE52";
     NSDictionary *record = NWBLEUpdateRecord(nil,uuid,@"Test TV",-60,[NSData dataWithBytes:"\x4c\x00\x07" length:3],@[@"180F"],@YES,5);
-    [store observe:record atTime:1000]; [store observe:record atTime:1001]; [store flush];
+    NSMutableDictionary *located = [record mutableCopy]; located[@"observation"] = @{@"latitude":@40,@"longitude":@(-3),@"accuracy":@150,@"time":@1000};
+    [store observe:located atTime:1000]; [store observe:record atTime:1001]; [store flush];
     __block BOOL exported = NO;
     [store exportWithCompletion:^(NSURL *file,NSError *error) {
         assert(file && !error); NSDictionary *root = [NSJSONSerialization JSONObjectWithData:[NSData dataWithContentsOfURL:file] options:0 error:NULL];
         assert([root[@"devices"] count] == 1 && [root[@"devices"][0][@"advertisements"] intValue] == 2);
-        assert(!root[@"devices"][0][@"manufacturer"]); exported = YES;
+        assert(!root[@"devices"][0][@"manufacturer"]);
+        assert([root[@"devices"][0][@"observations"] count] == 1); exported = YES;
     }];
     waitUntil(^BOOL { return exported; });
     NWBLEHistory *reloaded = [[NWBLEHistory alloc] initWithURL:url];
     waitUntil(^BOOL { return !reloaded.loading; });
     assert(reloaded.records.count == 1 && [reloaded.records[0][@"name"] isEqual:@"Test TV"]);
+    assert([reloaded.records[0][@"observations"] count] == 1);
+    [reloaded clearLocations]; assert(!reloaded.records[0][@"observations"] && [reloaded.records[0][@"advertisements"] intValue] == 2);
     [reloaded clear]; __block BOOL cleared = NO;
     [reloaded exportWithCompletion:^(NSURL *file,NSError *error) { assert(file && !error); cleared = YES; }];
     waitUntil(^BOOL { return cleared; });

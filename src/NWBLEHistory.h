@@ -7,6 +7,7 @@ FOUNDATION_EXPORT NSNotificationName const NWBLEHistoryChanged;
 - (NSArray<NSDictionary *> *)records;
 - (void)flush;
 - (void)clear;
+- (void)clearLocations;
 - (void)exportWithCompletion:(void (^)(NSURL *, NSError *))completion;
 @property(nonatomic,readonly) BOOL loading;
 @property(nonatomic,readonly) NSInteger storageError;

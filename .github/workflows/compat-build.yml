@@ -52,3 +52,23 @@ jobs:
             build/ui/*.json
             build/ui/*.ips
           retention-days: 14
+
+  ble-ipad:
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        orientation: [portrait, landscape]
+    steps:
+      - uses: actions/checkout@v4
+      - name: BLE and existing navigation checks on iPad with rotation and background cycles
+        run: NW_MIN_IOS=15.0 NW_UI_DEVICE_FAMILY=iPad NW_UI_ORIENTATION=${{ matrix.orientation }} NW_UI_ROTATION=rotate bash scripts/test_ui_simulator.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnostic25-ipad-${{ matrix.orientation }}
+          path: |
+            build/ui/*.png
+            build/ui/*.json
+            build/ui/*.ips
+          retention-days: 14

@@ -28,7 +28,7 @@ NSNotificationName const NWBLEHistoryChanged = @"NukeWirelessBLEHistoryChanged";
         dispatch_async(_writer,^{
             NSError *error; NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:url.path error:&error];
             NSArray *records = @[]; NSInteger invalid = 0;
-            if (attributes && [attributes fileSize] <= 1024*1024) {
+            if (attributes && [attributes fileSize] <= 2*1024*1024) {
                 NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
                 NSDictionary *root = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:&error] : nil;
                 if ([root isKindOfClass:NSDictionary.class] && [root[@"schema_version"] isEqual:@1] &&
@@ -44,10 +44,17 @@ NSNotificationName const NWBLEHistoryChanged = @"NukeWirelessBLEHistoryChanged";
                     if (!recent) owner.items[identifier] = saved;
                     else {
                         NSMutableDictionary *merged = [recent mutableCopy];
-                        for (NSString *key in @[@"name",@"company",@"connectable"]) if (!merged[key] && saved[key]) merged[key] = saved[key];
+                        for (NSString *key in @[@"name",@"company",@"connectable",@"observations"]) if (!merged[key] && saved[key]) merged[key] = saved[key];
                         merged[@"seen"] = @(MAX([saved[@"seen"] doubleValue],[recent[@"seen"] doubleValue]));
                         merged[@"firstSeen"] = @([saved[@"firstSeen"] doubleValue] < [recent[@"firstSeen"] doubleValue] ? [saved[@"firstSeen"] doubleValue] : [recent[@"firstSeen"] doubleValue]);
                         merged[@"advertisements"] = @(MIN((NSUInteger)1000000000,[saved[@"advertisements"] unsignedIntegerValue]+[recent[@"advertisements"] unsignedIntegerValue]));
+                        NSMutableArray *points = [NSMutableArray new];
+                        [points addObjectsFromArray:saved[@"observations"] ?: @[]]; [points addObjectsFromArray:recent[@"observations"] ?: @[]];
+                        [points sortUsingComparator:^NSComparisonResult(NSDictionary *a,NSDictionary *b) { return [a[@"time"] compare:b[@"time"]]; }];
+                        NSMutableArray *unique = [NSMutableArray new];
+                        for (NSDictionary *point in points) if (!unique.count || [point[@"time"] doubleValue] > [unique.lastObject[@"time"] doubleValue]) [unique addObject:point];
+                        if (unique.count > 8) [unique removeObjectsInRange:NSMakeRange(0,unique.count-8)];
+                        if (unique.count) merged[@"observations"] = unique;
                         owner.items[identifier] = merged;
                     }
                 }
@@ -97,6 +104,14 @@ NSNotificationName const NWBLEHistoryChanged = @"NukeWirelessBLEHistoryChanged";
         NSInteger code = error.code;
         dispatch_async(dispatch_get_main_queue(),^{ NWBLEHistory *owner = weak; if (owner.storageError != code) { owner.storageError = code; [owner changed]; } });
     });
+}
+- (void)clearLocations {
+    if (self.loading || self.storageError) return;
+    for (NSString *identifier in self.items.allKeys) {
+        NSMutableDictionary *record = [self.items[identifier] mutableCopy];
+        [record removeObjectForKey:@"observations"]; self.items[identifier] = record;
+    }
+    [self flush]; [self changed];
 }
 - (void)clear { self.generation++; self.storageError = 0; [self.items removeAllObjects]; [self flush]; [self changed]; }
 - (void)exportWithCompletion:(void (^)(NSURL *,NSError *))completion {
