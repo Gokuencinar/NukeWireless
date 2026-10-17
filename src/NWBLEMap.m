@@ -143,33 +143,16 @@ int NWBLEMapUIRegressionCheck(void) {
 }
 int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
     NWBLEMapViewController *controller = (id)view;
-    // UIKit can finish a navigation attachment on the next main-loop turn,
-    // even with animated:NO. Exercise that lifecycle before asserting the fit.
-    NSDate *attachmentDeadline = [NSDate dateWithTimeIntervalSinceNow:5];
-    while ((!controller.view.window || !controller.fitted) && attachmentDeadline.timeIntervalSinceNow > 0) {
-        [controller.navigationController.view layoutIfNeeded];
-        [controller.view layoutIfNeeded];
-        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
-    }
+    [controller.navigationController.view layoutIfNeeded];
+    [controller.view layoutIfNeeded];
     id<MKAnnotation> annotation = controller.map.annotations.firstObject;
-    if (!annotation || !controller.fitted) {
-        NSLog(@"BLE map fixture: attached=%d fitted=%d places=%lu size=%.0fx%.0f",controller.view.window != nil,controller.fitted,(unsigned long)controller.map.annotations.count,controller.map.bounds.size.width,controller.map.bounds.size.height);
-        return 32;
-    }
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:8];
-    MKAnnotationView *marker = nil; CGRect frame = CGRectZero; BOOL visible = NO;
-    do {
-        [controller.view layoutIfNeeded];
-        // The fixture runs synchronously inside SwiftUI's appearance callback.
-        // Commit its pending layers before waiting on MapKit's render callback.
-        [CATransaction flush];
-        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
-        marker = [controller.map viewForAnnotation:annotation];
-        frame = [marker convertRect:marker.bounds toView:controller.map];
-        CALayer *presented = marker.layer.presentationLayer;
-        visible = marker.window && !marker.hidden && marker.alpha > .9 && marker.bounds.size.width > 0 && marker.bounds.size.height > 0 &&
-            CGRectIntersectsRect(frame,controller.map.bounds) && (!presented || presented.opacity > .9);
-    } while ((!visible || !controller.renderedFrame) && deadline.timeIntervalSinceNow > 0);
+    if (!annotation || !controller.view.window || !controller.fitted) return 32;
+    MKAnnotationView *marker = [controller.map viewForAnnotation:annotation];
+    CGRect frame = marker ? [marker convertRect:marker.bounds toView:controller.map] : CGRectZero;
+    CALayer *presented = marker.layer.presentationLayer;
+    BOOL visible = marker.window && !marker.hidden && marker.alpha > .9 && marker.layer.opacity > .9 &&
+        marker.bounds.size.width > 0 && marker.bounds.size.height > 0 &&
+        CGRectIntersectsRect(frame,controller.map.bounds) && (!presented || presented.opacity > .9);
     NSDictionary *state = @{@"visible":@(visible),@"rendered_frame":@(controller.renderedFrame),
         @"marker_frame":NSStringFromCGRect(frame),@"map_bounds":NSStringFromCGRect(controller.map.bounds),
         @"fixture_visible_rect":MKStringFromMapRect(controller.map.visibleMapRect),

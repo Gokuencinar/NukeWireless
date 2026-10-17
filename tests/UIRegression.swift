@@ -34,8 +34,10 @@ func catalogState(_ state: Int32) -> Int32
 @_silgen_name("NWBluetoothCatalogUIRegressionSinglePresent")
 func presentSingleEmission() -> Int32
 
-@_silgen_name("NWBLEUIRegressionCheck")
-func checkBLEUI() -> Int32
+@_silgen_name("NWBLEUIRegressionBegin")
+func beginBLEUI()
+@_silgen_name("NWBLEUIRegressionResult")
+func resultBLEUI() -> Int32
 @_silgen_name("NWMainTabsUIRegressionUseLegacyTraits")
 func useLegacyPadTraits()
 @_silgen_name("NWPresentationDiagnosticsUIRegressionCheck")
@@ -300,11 +302,8 @@ struct RegressionTabs: View {
                                 results.append(checkUI(4))
                                 results.append(checkUI(2))
                                 results.append(checkDiagnosticsUI())
-                                results.append(checkBLEUI())
-                                results.append(checkBluetoothUI())
-                                results.append(checkBrowserUI())
-                                results.append(presentCatalog(0))
-                                captureCatalog(0)
+                                beginBLEUI()
+                                finishBLEUI(0)
                             }
                         }
                     }
@@ -332,6 +331,17 @@ struct RegressionTabs: View {
                                  "real_background_cycles": 4], "ui-regression.json")
                 }
             }
+        }
+    }
+    private func finishBLEUI(_ attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            let result = resultBLEUI()
+            if result == -1 && attempt < 120 { finishBLEUI(attempt + 1); return }
+            results.append(result == -1 ? 98 : result)
+            results.append(checkBluetoothUI())
+            results.append(checkBrowserUI())
+            results.append(presentCatalog(0))
+            captureCatalog(0)
         }
     }
     private func setDark(_ dark: Bool) {

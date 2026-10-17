@@ -111,7 +111,7 @@ for language in en es; do
 rm -f "$container/Documents/$language-ble-map-ready.json" "$container/Documents/$language-ble-map-captured.json"
 rm -f "$container/Documents/ui-regression.json" "$container/Documents/ui-initial.json" "$container/Documents"/resume-*.json
 xcrun simctl launch "$device" app.nukewireless.ui-regression --language "$language" --orientation "${NW_UI_ORIENTATION:-portrait}" --traits "${NW_UI_TRAITS:-native}" --rotation "${NW_UI_ROTATION:-fixed}"
-for attempt in $(seq 1 30); do
+for attempt in $(seq 1 45); do
   if [ -f "$container/Documents/$language-ble-map-ready.json" ] && [ ! -f "$container/Documents/$language-ble-map-captured.json" ]; then
     xcrun simctl io "$device" screenshot "$out/$language-ble-map-screen.png"
     printf '{}' > "$container/Documents/$language-ble-map-captured.json"

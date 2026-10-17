@@ -344,6 +344,16 @@ UIViewController *NWBLEController(void) { return [NWBLEViewController new]; }
     (void)services; (void)options; self.starts++; self.scanning = YES;
 }
 @end
+static int NWBLEFixtureResult = -1;
+static BOOL NWBLEFixtureRunning = NO;
+static int NWBLECompleteMapFixture(UINavigationController *, NWBLEViewController *, NWBLEViewController *, UIViewController *);
+static void NWBLEAwaitMapFixture(UIViewController *map, NSUInteger attempt, void (^completion)(int)) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(.1*NSEC_PER_SEC)),dispatch_get_main_queue(),^{
+        int result = NWBLEMapVisibleUIRegressionCheck(map);
+        if ((result == 32 || result == 33) && attempt < 80) NWBLEAwaitMapFixture(map,attempt+1,completion);
+        else completion(result);
+    });
+}
 static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     if (!NWScanBusy()) return 9;
     NWBLEViewController *controller = [NWBLEViewController new];
@@ -426,7 +436,19 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     UIViewController *map = NWBLEMapController();
     [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];
     if (navigation.topViewController != map || controller.scanning) return 25;
-    int mapCheck = NWBLEMapVisibleUIRegressionCheck(map); if (mapCheck) return mapCheck;
+    // Return to the main queue so MapKit's asynchronous renderer can start.
+    NWBLEAwaitMapFixture(map,0,^(int failure) {
+        @try { NWBLEFixtureResult = failure ?: NWBLECompleteMapFixture(navigation,controller,history,map); }
+        @finally {
+            [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil; window.windowScene = nil;
+            [previousKey makeKeyWindow];
+            if (@available(iOS 16.0,*)) [previousKey.rootViewController setNeedsUpdateOfSupportedInterfaceOrientations];
+            NWBLEFixtureRunning = NO; NWEndWiFiScanUITest();
+        }
+    });
+    return 0;
+}
+static int NWBLECompleteMapFixture(UINavigationController *navigation, NWBLEViewController *controller, NWBLEViewController *history, UIViewController *map) {
     // MapKit uses a GPU surface; UIView snapshots can omit tiles and markers.
     // Let the host capture the actual simulator display before continuing.
     NSURL *captureDocuments = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
@@ -461,14 +483,15 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
         (void)context; [graph.view drawViewHierarchyInRect:graph.view.bounds afterScreenUpdates:YES];
     }];
     [UIImagePNGRepresentation(proximity) writeToURL:[documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-proximity.png",NWLanguageCode()]] atomically:YES];
-    [NWBLEHistory.shared clear]; window.hidden = YES; window.rootViewController = nil; window.windowScene = nil;
-    [previousKey makeKeyWindow];
-    if (@available(iOS 16.0,*)) [previousKey.rootViewController setNeedsUpdateOfSupportedInterfaceOrientations];
     return 0;
 }
-int NWBLEUIRegressionCheck(void) {
+void NWBLEUIRegressionBegin(void) {
+    if (NWBLEFixtureRunning) return;
+    NWBLEFixtureRunning = YES; NWBLEFixtureResult = -1;
     NWBeginWiFiScanUITest();
-    @try { return NWBLEWhileWiFiScanUIRegressionCheck(); }
-    @finally { NWEndWiFiScanUITest(); }
+    int result = NWBLEWhileWiFiScanUIRegressionCheck();
+    if (result) { NWBLEFixtureResult = result; NWBLEFixtureRunning = NO; NWEndWiFiScanUITest(); }
 }
+int NWBLEUIRegressionResult(void) { return NWBLEFixtureResult; }
+
 #endif
