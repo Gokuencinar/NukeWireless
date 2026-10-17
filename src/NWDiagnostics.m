@@ -263,11 +263,18 @@ void NWDiagnosticsInstall(void) {
 }
 #ifdef NW_UI_TESTING
 extern int NWBluetoothUIRegressionCatalogState(int state);
-int NWDiagnosticsUIRegressionPresent(void) {
+static UIViewController *NWDiagnosticsFixtureRoot(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) if ([scene isKindOfClass:UIWindowScene.class])
         for (UIWindow *candidate in ((UIWindowScene *)scene).windows) if (candidate.isKeyWindow) window = candidate;
-    UIViewController *root = window.rootViewController;
+    return window.rootViewController;
+}
+int NWDiagnosticsUIRegressionReady(void) {
+    UIViewController *root = NWDiagnosticsFixtureRoot();
+    return root && !root.presentedViewController && !root.transitionCoordinator && !NWBluetoothBusy();
+}
+int NWDiagnosticsUIRegressionPresent(void) {
+    UIViewController *root = NWDiagnosticsFixtureRoot();
     if (!root || root.presentedViewController || NWBluetoothBusy()) return 1;
     [root presentViewController:[[UINavigationController alloc] initWithRootViewController:NWDiagnosticsController()] animated:NO completion:nil];
     return 0;

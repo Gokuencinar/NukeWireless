@@ -5,6 +5,8 @@ import Combine
 func checkDiagnosticsUI() -> Int32
 @_silgen_name("NWDiagnosticsUIRegressionPresent")
 func presentDiagnostics() -> Int32
+@_silgen_name("NWDiagnosticsUIRegressionReady")
+func diagnosticsReady() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionCheck")
 func checkBrowserUI() -> Int32
 @_silgen_name("NWDeviceBrowserUIRegressionPresent")
@@ -438,21 +440,26 @@ struct RegressionTabs: View {
                 snapshot("hotspot.png"); results.append(presentHotspot(1)); setDark(true); captureHotspot(1)
             } else {
                 snapshot("hotspot-actions-dark.png"); results.append(presentHotspot(2))
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    results.append(presentDiagnostics()); setDark(false)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                        snapshot("diagnostics.png"); setDark(true)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            snapshot("diagnostics-dark.png")
-                            let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
-                                .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController
-                            root?.dismiss(animated: false) { diagnosticNavigation(0) }
-                        }
-                    }
+                captureDiagnostics(0)
+            }
+        }
+    }
+    private func captureDiagnostics(_ attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if diagnosticsReady() == 0 && attempt < 30 { captureDiagnostics(attempt + 1); return }
+            results.append(presentDiagnostics()); setDark(false)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                snapshot("diagnostics.png"); setDark(true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    snapshot("diagnostics-dark.png")
+                    let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                        .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController
+                    root?.dismiss(animated: false) { diagnosticNavigation(0) }
                 }
             }
         }
     }
+
     private func diagnosticNavigation(_ phase: Int32) {
         results.append(checkDiagnosticNavigation(phase))
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
