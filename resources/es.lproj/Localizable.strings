@@ -295,3 +295,4 @@
 "ble.history_payload_omitted" = "Los datos originales del anuncio no se guardan en el historial.";
 "ble.signal_hint" = "Una señal más intensa puede indicar mayor proximidad. Las paredes, la orientación y las interferencias influyen. No indica distancia ni dirección exactas.";
 "ble.session_seen" = "Primera hace %.1f s · última hace %.1f s";
+"ble.filter_empty" = "Ningún dispositivo coincide con este filtro.";

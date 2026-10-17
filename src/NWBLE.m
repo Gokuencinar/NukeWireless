@@ -239,7 +239,7 @@
         content.text = NWText(self.requested || self.scanning ? @"ble.stop" : @"ble.start");
         content.secondaryText = self.status; content.image = [UIImage systemImageNamed:@"antenna.radiowaves.left.and.right"];
     } else if (!self.rows.count) {
-        content.text = NWText(self.historyMode ? @"ble.history_empty" : @"ble.empty"); cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        content.text = NWText(self.historyMode ? @"ble.history_empty" : self.records.count ? @"ble.filter_empty" : @"ble.empty"); cell.selectionStyle = UITableViewCellSelectionStyleNone;
     } else {
         NSDictionary *record = self.rows[index.row];
         content.text = record[@"name"] ?: NWText(@"ble.unnamed");

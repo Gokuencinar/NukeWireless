@@ -295,3 +295,4 @@
 "ble.history_payload_omitted" = "Raw payloads are not saved in history.";
 "ble.signal_hint" = "A stronger signal may indicate greater proximity. Walls, orientation and interference affect it. It does not provide exact distance or direction.";
 "ble.session_seen" = "First %.1f s ago · last %.1f s ago";
+"ble.filter_empty" = "No devices match this filter.";
