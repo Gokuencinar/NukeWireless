@@ -46,7 +46,7 @@
     }
     [self.map addAnnotations:annotations];
     self.hint.text = NWText(annotations.count ? @"ble.map_hint" : @"ble.map_empty");
-    self.navigationItem.rightBarButtonItem.enabled = annotations.count > 0 && !NWBLEHistory.shared.loading;
+    self.navigationItem.rightBarButtonItem.enabled = annotations.count > 0 && !NWBLEHistory.shared.loading && !NWBLEHistory.shared.storageError;
     if (annotations.count && !self.fitted) {
         // Include the fix uncertainty in the fitted area, also for a single point.
         MKMapRect extent = MKMapRectNull;

@@ -6,3 +6,6 @@
 @property(nonatomic,readonly) NSString *statusKey;
 - (NSDictionary *)observation;
 @end
+#ifdef NW_UI_TESTING
+int NWBLELocationUIRegressionCheck(void);
+#endif

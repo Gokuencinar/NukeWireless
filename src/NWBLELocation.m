@@ -7,6 +7,34 @@
 @property(nonatomic,strong) CLLocation *latest;
 @property(nonatomic) BOOL failed;
 @end
+#ifdef NW_UI_TESTING
+// No real manager, permissions or location I/O in simulator regression.
+@interface NWBLELocationFixture : NSObject
+@property(nonatomic) CLAuthorizationStatus authorizationStatus;
+@property(nonatomic,weak) id delegate;
+@property(nonatomic) NSUInteger starts, stops;
+@end
+@implementation NWBLELocationFixture
+- (void)startUpdatingLocation { self.starts++; }
+- (void)stopUpdatingLocation { self.stops++; }
+@end
+int NWBLELocationUIRegressionCheck(void) {
+    NWBLELocation *source = [NWBLELocation new]; source.scanning = YES;
+    if (source.manager || source.observation || source.enabled) return 27;
+    NWBLELocationFixture *fixture = [NWBLELocationFixture new];
+    fixture.authorizationStatus = kCLAuthorizationStatusAuthorizedWhenInUse;
+    source.manager = (id)fixture; source.enabled = YES;
+    if (fixture.starts != 1) return 28;
+    [source locationManager:(id)fixture didUpdateLocations:@[[[CLLocation alloc] initWithLatitude:40 longitude:-3]]];
+    if (!source.observation) return 29;
+    source.scanning = NO;
+    if (source.observation || !fixture.stops) return 30;
+    fixture.authorizationStatus = kCLAuthorizationStatusDenied; source.scanning = YES;
+    if (source.observation || ![source.statusKey isEqual:@"ble.location_denied"] || fixture.starts != 1) return 31;
+    source.enabled = NO; source.manager = nil;
+    return 0;
+}
+#endif
 @implementation NWBLELocation
 - (void)setEnabled:(BOOL)enabled {
     _enabled = enabled;

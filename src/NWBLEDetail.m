@@ -165,7 +165,8 @@ UIViewController *NWBLEDetailController(NSDictionary *(^record)(void), BOOL hist
 #ifdef NW_UI_TESTING
 int NWBLEDetailUIRegressionCheck(UIViewController *controller) {
     NWBLEDetailViewController *detail = (id)controller;
-    detail.mode.selectedSegmentIndex = 1; [detail modeChanged];
+    [UIView performWithoutAnimation:^{ detail.mode.selectedSegmentIndex = 1; [detail.mode layoutIfNeeded]; [detail modeChanged]; [detail.view layoutIfNeeded]; }];
+    [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
     if (!detail.graph.proximity || ![detail.graph.signal isEqual:detail.record[@"rssi"]]) return 22;
     if ([detail tableView:detail.tableView numberOfRowsInSection:0] != 10) return 23;
     return 0;

@@ -343,6 +343,7 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     [controller loadViewIfNeeded];
     if (controller.central || controller.scanning || controller.rows.count || controller.location.enabled) return 1;
     if (NWBLEMapUIRegressionCheck()) return 21;
+    int locationCheck = NWBLELocationUIRegressionCheck(); if (locationCheck) return locationCheck;
     controller.records[@"fixture"] = NWBLEUpdateRecord(nil, @"fixture", @"BLE fixture", -65,
         nil, @[@"180F"], @YES, NSProcessInfo.processInfo.systemUptime);
     [controller refreshRows];
@@ -408,6 +409,12 @@ static int NWBLEWhileWiFiScanUIRegressionCheck(void) {
     UIViewController *map = NWBLEMapController();
     [navigation pushViewController:map animated:NO]; [map loadViewIfNeeded];
     if (navigation.topViewController != map || controller.scanning) return 25;
+    [map.view layoutIfNeeded];
+    [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
+    UIGraphicsImageRenderer *mapRenderer = [[UIGraphicsImageRenderer alloc] initWithSize:map.view.bounds.size];
+    UIImage *mapImage = [mapRenderer imageWithActions:^(UIGraphicsImageRendererContext *context) { (void)context; [map.view drawViewHierarchyInRect:map.view.bounds afterScreenUpdates:YES]; }];
+    NSURL *mapDocuments = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
+    [UIImagePNGRepresentation(mapImage) writeToURL:[mapDocuments URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-map.png",NWLanguageCode()]] atomically:YES];
     [navigation popViewControllerAnimated:NO];
     if (navigation.topViewController != controller) return 26;
     [history refreshRows];
