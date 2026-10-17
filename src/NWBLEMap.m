@@ -17,6 +17,7 @@
 @property(nonatomic) BOOL fitted;
 @property(nonatomic) NSInteger mapError;
 @property(nonatomic) BOOL renderRecorded;
+@property(nonatomic) BOOL renderedFrame;
 @end
 @implementation NWBLEMapViewController
 - (void)viewDidLoad {
@@ -105,13 +106,15 @@
     }
     NSDictionary *state = @{@"devices_with_places":@(located),@"place_count":@(self.map.annotations.count),
         @"visible_marker_count":@(visible),@"viewport_fitted":@(self.fitted),@"attached":@(self.map.window != nil),
+        @"rendered_frame":@(self.renderedFrame),
         @"width":@(self.map.bounds.size.width),@"height":@(self.map.bounds.size.height),@"map_loading_error":@(self.mapError),
         @"history_loading":@(NWBLEHistory.shared.loading),@"history_storage_error":@(NWBLEHistory.shared.storageError)};
     [NSUserDefaults.standardUserDefaults setObject:state forKey:@"NukeWirelessBLELastMap"];
     NWDiagnosticRecord(@"ble_map",@"viewed",state);
 }
 - (void)mapViewDidFinishRenderingMap:(MKMapView *)map fullyRendered:(BOOL)fullyRendered {
-    (void)map; if (fullyRendered && !self.renderRecorded && self.viewIfLoaded.window) { self.renderRecorded = YES; [self recordState]; }
+    (void)map; self.renderedFrame = YES;
+    if (fullyRendered && !self.renderRecorded && self.viewIfLoaded.window) { self.renderRecorded = YES; [self recordState]; }
 }
 - (void)mapViewDidFailLoadingMap:(MKMapView *)map withError:(NSError *)error {
     (void)map; if (self.mapError != error.code && self.viewIfLoaded.window) { self.mapError = error.code; [self recordState]; }
@@ -146,11 +149,24 @@ int NWBLEMapVisibleUIRegressionCheck(UIViewController *view) {
         NSLog(@"BLE map fixture: attached=%d fitted=%d places=%lu size=%.0fx%.0f",controller.view.window != nil,controller.fitted,(unsigned long)controller.map.annotations.count,controller.map.bounds.size.width,controller.map.bounds.size.height);
         return 32;
     }
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:5];
-    while (![controller.map viewForAnnotation:annotation] && deadline.timeIntervalSinceNow > 0)
-        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.05]];
-    MKAnnotationView *marker = [controller.map viewForAnnotation:annotation];
-    if (!marker.window || marker.clusteringIdentifier || marker.displayPriority != MKFeatureDisplayPriorityRequired) return 33;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:8];
+    MKAnnotationView *marker = nil; CGRect frame = CGRectZero; BOOL visible = NO;
+    do {
+        [controller.view layoutIfNeeded];
+        [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
+        marker = [controller.map viewForAnnotation:annotation];
+        frame = [marker convertRect:marker.bounds toView:controller.map];
+        CALayer *presented = marker.layer.presentationLayer;
+        visible = marker.window && !marker.hidden && marker.alpha > .9 && marker.bounds.size.width > 0 && marker.bounds.size.height > 0 &&
+            CGRectIntersectsRect(frame,controller.map.bounds) && (!presented || presented.opacity > .9);
+    } while ((!visible || !controller.renderedFrame) && deadline.timeIntervalSinceNow > 0);
+    NSDictionary *state = @{@"visible":@(visible),@"rendered_frame":@(controller.renderedFrame),
+        @"marker_frame":NSStringFromCGRect(frame),@"map_bounds":NSStringFromCGRect(controller.map.bounds),
+        @"marker_hidden":@(marker.hidden),@"marker_alpha":@(marker.alpha),@"marker_opacity":@(marker.layer.opacity)};
+    NSURL *documents = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
+    NSURL *stateFile = [documents URLByAppendingPathComponent:[NSString stringWithFormat:@"%@-ble-map-layout.json",NWLanguageCode()]];
+    [[NSJSONSerialization dataWithJSONObject:state options:0 error:NULL] writeToURL:stateFile atomically:YES];
+    if (!visible || !controller.renderedFrame || marker.clusteringIdentifier || marker.displayPriority != MKFeatureDisplayPriorityRequired) return 33;
     if (!MKMapRectContainsPoint(controller.map.visibleMapRect,MKMapPointForCoordinate(annotation.coordinate))) return 34;
     return 0;
 }
