@@ -48,7 +48,7 @@
 }
 - (void)viewWillAppear:(BOOL)animated { [super viewWillAppear:animated]; NWStyleNavigationBar(self.navigationController.navigationBar); [self refresh]; }
 - (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated]; [self recenter];
+    [super viewDidAppear:animated]; [self fitIfNeeded];
     __weak NWBLEMapViewController *weak = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,(int64_t)(.5*NSEC_PER_SEC)),dispatch_get_main_queue(),^{
         if (weak.viewIfLoaded.window) [weak recordState];
@@ -76,7 +76,7 @@
 }
 - (void)recenter { self.fitted = NO; [self fitIfNeeded]; }
 - (void)fitIfNeeded {
-    if (self.map.annotations.count && !self.fitted && self.view.window && self.map.bounds.size.width > 0 && self.map.bounds.size.height > 0) {
+    if (self.map.annotations.count && !self.fitted && self.map.bounds.size.width > 0 && self.map.bounds.size.height > 0) {
         // Include the fix uncertainty in the fitted area, also for a single point.
         MKMapRect extent = MKMapRectNull;
         for (id<MKOverlay> overlay in self.map.overlays) extent = MKMapRectUnion(extent,overlay.boundingMapRect);
@@ -86,7 +86,10 @@
         CLLocationCoordinate2D center = MKCoordinateForMapPoint(middle);
         double side = 1000*MKMapPointsPerMeterAtLatitude(center.latitude);
         extent = MKMapRectUnion(extent,MKMapRectMake(middle.x-side/2,middle.y-side/2,side,side));
-        [self.map setVisibleMapRect:extent edgePadding:UIEdgeInsetsMake(40,40,40,40) animated:NO]; self.fitted = YES;
+        // MapKit can synchronously trigger another layout while changing its
+        // viewport. Mark the fit first so that layout cannot reenter it.
+        self.fitted = YES;
+        [self.map setVisibleMapRect:extent edgePadding:UIEdgeInsetsMake(40,40,40,40) animated:NO];
     }
 }
 - (MKAnnotationView *)mapView:(MKMapView *)map viewForAnnotation:(id<MKAnnotation>)annotation {
